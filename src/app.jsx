@@ -11,24 +11,13 @@ import CalendarPage from "./pages/Calendar.jsx";
 import WorkerDashboard from "./pages/WorkerDashboard.jsx";
 import Profile from "./pages/Profile.jsx";
 
+import { useAuth } from "./hooks/useAuth.js";
+
 function App() {
-  // For mock login, store role in state (admin default)
-  const [user, setUser] = React.useState(() => {
-    const savedUser = localStorage.getItem("ampolleta_user");
-    return savedUser ? JSON.parse(savedUser) : null;
-  });
+  const { user, login: handleLogin, logout: handleLogout, updateUser } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
 
 
-  const handleLogin = (userInfo) => {
-    setUser(userInfo);
-    localStorage.setItem("ampolleta_user", JSON.stringify(userInfo));
-  };
-
-  const handleLogout = () => {
-    setUser(null);
-    localStorage.removeItem("ampolleta_user");
-  };
 
   // Simple protected route component
   const ProtectedRoute = ({ children }) => {
@@ -37,7 +26,7 @@ function App() {
 
   const AdminRoute = ({ children }) => {
     if (!user) return <Navigate to="/login" replace />;
-    if (user.systemRole !== 'admin') return <Navigate to="/worker-dashboard" replace />;
+    if (user.systemRole !== 'admin' && user.systemRole !== 'viewer') return <Navigate to="/worker-dashboard" replace />;
     return children;
   };
 
@@ -107,10 +96,7 @@ function App() {
                 <ProtectedRoute>
                   <Profile 
                     user={user} 
-                    onUpdateUser={(newUser) => {
-                      setUser(newUser);
-                      localStorage.setItem("ampolleta_user", JSON.stringify(newUser));
-                    }} 
+                    onUpdateUser={updateUser} 
                   />
                 </ProtectedRoute>
               }

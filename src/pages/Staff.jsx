@@ -5,8 +5,11 @@ import Button from "../components/Button.jsx";
 import { supabase } from "../lib/supabase.js";
 import { User, Settings, Plus, Trash2, Power, Search, Filter, X } from "lucide-react";
 import StaffModal from "../components/StaffModal.jsx";
+import { useAuth } from "../hooks/useAuth.js";
+import { permissions } from "../lib/permissions.js";
 
 export default function Staff() {
+  const { user } = useAuth();
   const [staff, setStaff] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -35,17 +38,24 @@ export default function Staff() {
     setIsLoading(false);
   };
 
+  const rolePermissions = permissions[user?.systemRole] || permissions.viewer;
+
   const openAddModal = () => {
+    if (!rolePermissions.canCreate) return;
     setEditingStaff(null);
     setIsModalOpen(true);
   };
   const openEditModal = (member) => {
+    if (!rolePermissions.canEdit) return;
     setEditingStaff(member);
     setIsModalOpen(true);
   };
   const closeModal = () => setIsModalOpen(false);
 
   const handleStaffSubmit = async (staffData) => {
+    if (staffData.id && !rolePermissions.canEdit) return;
+    if (!staffData.id && !rolePermissions.canCreate) return;
+
     if (staffData.id) {
       const { data, error } = await supabase
         .from('profiles')
@@ -96,6 +106,7 @@ export default function Staff() {
   };
 
   const handleDelete = async (id) => {
+    if (!rolePermissions.canDelete) return;
     if (window.confirm("¿Estás seguro de que deseas eliminar a este miembro? (Solo se borrará su perfil, no su cuenta de acceso)")) {
       const { error } = await supabase.from('profiles').delete().eq('id', id);
       if (!error) fetchStaff();
@@ -103,6 +114,7 @@ export default function Staff() {
   };
 
   const handleToggleStatus = async (id, currentStatus) => {
+    if (!rolePermissions.canEdit) return;
     const newStatus = currentStatus === 'Inactivo' ? 'Activo' : 'Inactivo';
     const { error } = await supabase.from('profiles').update({ status: newStatus }).eq('id', id);
     if (!error) fetchStaff();
@@ -159,7 +171,12 @@ export default function Staff() {
                 </select>
               </div>
 
-              <Button variant="primary" className="flex items-center gap-2 justify-center" onClick={openAddModal}>
+              <Button 
+                variant="primary" 
+                className={`flex items-center gap-2 justify-center ${!rolePermissions.canCreate ? 'opacity-50 cursor-not-allowed' : ''}`} 
+                onClick={openAddModal}
+                title={!rolePermissions.canCreate ? "Disponible solo para administradores" : ""}
+              >
                 <Plus className="w-4 h-4" /> Añadir Staff
               </Button>
             </div>
@@ -207,20 +224,28 @@ export default function Staff() {
                       </td>
                       <td className="px-4 py-2">
                         <div className="flex space-x-2">
-                          <Button variant="secondary" size="sm" onClick={() => openEditModal(member)}>
+                          <Button 
+                            variant="secondary" 
+                            size="sm" 
+                            onClick={() => openEditModal(member)}
+                            className={!rolePermissions.canEdit ? "opacity-50 cursor-not-allowed" : ""}
+                            title={!rolePermissions.canEdit ? "Disponible solo para administradores" : ""}
+                          >
                             <Settings className="w-4 h-4" />
                           </Button>
                           <button
                             onClick={() => handleToggleStatus(member.id, member.status)}
-                            className={`p-2 rounded-lg transition-colors ${member.status === 'Inactivo' ? 'text-emerald-500 hover:bg-emerald-500/10' : 'text-amber-500 hover:bg-amber-500/10'}`}
-                            title={member.status === 'Inactivo' ? 'Activar Staff' : 'Desactivar Staff'}
+                            className={`p-2 rounded-lg transition-colors ${member.status === 'Inactivo' ? 'text-emerald-500 hover:bg-emerald-500/10' : 'text-amber-500 hover:bg-amber-500/10'} ${!rolePermissions.canEdit ? "opacity-50 cursor-not-allowed text-gray-500" : ""}`}
+                            title={!rolePermissions.canEdit ? "Disponible solo para administradores" : (member.status === 'Inactivo' ? 'Activar Staff' : 'Desactivar Staff')}
+                            disabled={!rolePermissions.canEdit}
                           >
                             <Power className="w-4 h-4" />
                           </button>
                           <button
                             onClick={() => handleDelete(member.id)}
-                            className="p-2 text-red-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
-                            title="Eliminar permanentemente"
+                            className={`p-2 rounded-lg transition-colors ${!rolePermissions.canDelete ? "opacity-50 cursor-not-allowed text-gray-500" : "text-red-500 hover:text-red-400 hover:bg-red-500/10"}`}
+                            title={!rolePermissions.canDelete ? "Disponible solo para administradores" : "Eliminar permanentemente"}
+                            disabled={!rolePermissions.canDelete}
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>

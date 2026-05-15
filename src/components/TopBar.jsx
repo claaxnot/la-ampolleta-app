@@ -101,11 +101,20 @@ export default function TopBar({ user, onToggleMenu }) {
           </AnimatePresence>
         </div>
 
+        {/* Viewer Badge */}
+        {user?.systemRole === 'viewer' && (
+          <div className="hidden sm:flex items-center">
+            <span className="px-3 py-1 bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-full text-xs font-semibold tracking-wide">
+              Modo Vista / Solo lectura
+            </span>
+          </div>
+        )}
+
         {/* User Profile Mini */}
         <div className="flex items-center gap-3 pl-4 md:pl-6 border-l border-white/10">
           <div className="flex flex-col items-end hidden sm:flex">
             <span className="text-sm font-medium text-white">{user?.name || (user?.systemRole === 'admin' ? 'Administrador' : 'Usuario')}</span>
-            <span className="text-xs text-gray-400 capitalize">{user?.role || user?.systemRole}</span>
+            <span className="text-xs text-gray-400 capitalize">{user?.role === 'viewer' ? 'Cliente Viewer' : (user?.role || user?.systemRole)}</span>
           </div>
           <div className="w-9 h-9 rounded-full bg-gray-800 border border-gray-700 flex items-center justify-center overflow-hidden">
             {user?.avatar_url || user?.avatar ? (

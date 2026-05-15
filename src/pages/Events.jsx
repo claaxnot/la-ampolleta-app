@@ -5,8 +5,9 @@ import EventToolbar from "../components/EventToolbar.jsx";
 import EventModal from "../components/EventModal.jsx";
 import EventDetails from "../components/EventDetails.jsx";
 import GlassCard from "../components/GlassCard.jsx";
+import { permissions } from "../lib/permissions.js";
 
-export default function Events() {
+export default function Events({ user }) {
   const [events, setEvents] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -19,7 +20,11 @@ export default function Events() {
   const handleSearch = (term) => setSearch(term);
   const handleFilter = (status) => setFilter(status);
 
+  const rolePermissions = permissions[user?.systemRole] || permissions.viewer;
+
   const openModal = (event = null) => {
+    if (!rolePermissions.canEdit && event) return;
+    if (!rolePermissions.canCreate && !event) return;
     setEditingEvent(event);
     setModalOpen(true);
   };
@@ -37,6 +42,9 @@ export default function Events() {
   };
 
   const handleSubmit = async (eventData) => {
+    if (eventData.id && !rolePermissions.canEdit) return;
+    if (!eventData.id && !rolePermissions.canCreate) return;
+
     const staffIds = eventData.staffIds || [];
     delete eventData.staffIds;
     delete eventData.assignedStaff;
@@ -79,6 +87,7 @@ export default function Events() {
   const closeDetails = () => setDetailsOpen(false);
 
   const handleDelete = async (id) => {
+    if (!rolePermissions.canDelete) return;
     if (window.confirm("¿Estás seguro de que deseas eliminar este evento?")) {
       const { error } = await supabase.from('events').delete().eq('id', id);
       if (!error) fetchEvents();
@@ -109,7 +118,7 @@ export default function Events() {
 
   return (
     <div className="p-8 min-h-screen text-white relative">
-      <EventToolbar onSearch={handleSearch} onFilter={handleFilter} onAdd={() => openModal()} />
+      <EventToolbar onSearch={handleSearch} onFilter={handleFilter} onAdd={() => openModal()} canCreate={rolePermissions.canCreate} />
       <div className="bg-black/40 backdrop-blur-3xl border border-white/10 rounded-3xl overflow-hidden shadow-[0_8px_32px_0_rgba(0,0,0,0.5)] relative z-10 mt-6">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
@@ -139,8 +148,22 @@ export default function Events() {
                     <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border ${getStatusColor(event.status)}`}>{event.status}</span>
                   </td>
                   <td className="p-4 flex gap-2">
-                    <button onClick={() => openModal(event)} className="text-primary hover:text-white transition-colors">Editar</button>
-                    <button onClick={() => handleDelete(event.id)} className="text-red-500 hover:text-red-300 transition-colors">Eliminar</button>
+                    <button 
+                      onClick={() => openModal(event)} 
+                      className={`transition-colors ${!rolePermissions.canEdit ? 'opacity-50 cursor-not-allowed text-gray-500' : 'text-primary hover:text-white'}`}
+                      title={!rolePermissions.canEdit ? "Disponible solo para administradores" : ""}
+                      disabled={!rolePermissions.canEdit}
+                    >
+                      Editar
+                    </button>
+                    <button 
+                      onClick={() => handleDelete(event.id)} 
+                      className={`transition-colors ${!rolePermissions.canDelete ? 'opacity-50 cursor-not-allowed text-gray-500' : 'text-red-500 hover:text-red-300'}`}
+                      title={!rolePermissions.canDelete ? "Disponible solo para administradores" : ""}
+                      disabled={!rolePermissions.canDelete}
+                    >
+                      Eliminar
+                    </button>
                   </td>
                 </tr>
               ))}

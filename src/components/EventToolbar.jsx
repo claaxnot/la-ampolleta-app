@@ -9,8 +9,9 @@ import Button from "./Button.jsx";
  *   onSearch(term: string)
  *   onFilter(status: string)
  *   onAdd()
+ *   canCreate(boolean)
  */
-export default function EventToolbar({ onSearch, onFilter, onAdd }) {
+export default function EventToolbar({ onSearch, onFilter, onAdd, canCreate = true }) {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
 
@@ -56,7 +57,18 @@ export default function EventToolbar({ onSearch, onFilter, onAdd }) {
         <option value="active">Activo</option>
         <option value="completed">Completado</option>
       </select>
-      <Button variant="primary" className="flex items-center gap-2" onClick={onAdd}>
+      <Button 
+        variant="primary" 
+        className={`flex items-center gap-2 ${!canCreate ? 'opacity-50 cursor-not-allowed' : ''}`} 
+        onClick={(e) => {
+          if (!canCreate) {
+            e.preventDefault();
+            return;
+          }
+          onAdd();
+        }}
+        title={!canCreate ? "Disponible solo para administradores" : ""}
+      >
         <Plus className="w-4 h-4" />
         Nuevo Evento
       </Button>

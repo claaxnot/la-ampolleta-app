@@ -18,6 +18,22 @@ export default function Login({ onLogin }) {
     setIsLoading(true);
     setError("");
 
+    // Temporary hardcoded demo login
+    if (email === "cliente@laampolleta.cl" && password === "demo123") {
+      const viewerInfo = {
+        id: "demo-viewer-id",
+        email: email,
+        systemRole: "viewer",
+        role: "viewer",
+        name: "Cliente Viewer",
+        avatar: null
+      };
+      onLogin(viewerInfo);
+      navigate("/dashboard");
+      setIsLoading(false);
+      return;
+    }
+
     try {
       const { data, error: authError } = await supabase.auth.signInWithPassword({
         email,
