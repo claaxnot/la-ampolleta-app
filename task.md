@@ -1,0 +1,14 @@
+- [/] Initialize Vite + React project in the workspace directory.
+- [/] Add Tailwind CSS configuration and dark theme styles.
+- [/] Create placeholder Firebase config file (src/firebaseConfig.js).
+- [ ] Implement email/password login UI and Firebase Auth integration.
+- [x] Build main Dashboard layout with dark gray background, white text, red accent (#d32f2f).
+- [ ] Develop Event Management components: EventList, EventForm (create/edit), EventDetail.
+- [ ] Develop Staff Management components: StaffList, StaffForm, StaffDetail.
+- [ ] Implement Availability Calendar component (date picker) for staff.
+- [ ] Implement Accept/Reject workflow for staff assignments.
+- [ ] Set up routing with React Router for Dashboard, Events, Staff, Calendar, Login.
+- [ ] Configure Netlify deployment (netlify.toml) with build command `npm run build`.
+- [ ] Add basic unit tests for key components.
+- [ ] Verify responsive design on desktop and mobile.
+- [ ] Prepare README with setup and deployment instructions.

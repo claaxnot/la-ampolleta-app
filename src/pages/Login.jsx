@@ -1,0 +1,128 @@
+import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { supabase } from "../lib/supabase.js";
+import { Lightbulb, Mail, Lock, ArrowRight, Eye, EyeOff } from "lucide-react";
+import GlassCard from "../components/GlassCard.jsx";
+import Button from "../components/Button.jsx";
+
+export default function Login({ onLogin }) {
+  const navigate = useNavigate();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError("");
+
+    try {
+      const { data, error: authError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (authError) throw authError;
+
+      // Fetch profile from database
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', data.user.id)
+        .single();
+
+      if (profileError) {
+        console.warn("Could not fetch profile", profileError);
+      }
+
+      const userInfo = {
+        id: data.user.id,
+        email: data.user.email,
+        systemRole: profile?.system_role || (data.user.email === 'admin@laampolleta.tv' ? 'admin' : 'worker'),
+        role: profile?.role || 'Staff',
+        name: profile?.name || data.user.email.split('@')[0],
+        avatar: profile?.avatar_url || null
+      };
+
+      onLogin(userInfo);
+
+      if (userInfo.systemRole === 'admin') {
+        navigate("/dashboard");
+      } else {
+        navigate("/worker-dashboard");
+      }
+
+    } catch (err) {
+      console.error("Auth error:", err.message);
+      setError("Credenciales inválidas. Verifica tu correo y contraseña.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="flex items-center justify-center min-h-screen bg-transparent text-white relative overflow-hidden">
+      <GlassCard className="w-full max-w-md p-8">
+        <div className="flex flex-col items-center mb-8">
+          <div className="w-16 h-16 bg-gradient-to-br from-primary/20 to-red-600/20 rounded-2xl flex items-center justify-center mb-4 shadow-lg border border-primary/20">
+            <Lightbulb className="w-8 h-8 text-primary" />
+          </div>
+          <h2 className="text-3xl font-bold text-white mb-1">Bienvenido</h2>
+          <p className="text-gray-400 text-sm">Ingresa a La Ampolleta Producciones</p>
+        </div>
+        {error && (
+          <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm text-center">
+            {error}
+          </div>
+        )}
+        <form onSubmit={handleSubmit} className="space-y-5">
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium text-gray-300 ml-1">Correo Electrónico</label>
+            <div className="relative">
+              <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
+              <input
+                type="email"
+                placeholder="correo@laampolleta.tv"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full pl-11 pr-4 py-3 bg-gray-800/50 border border-gray-700/50 rounded-xl focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50 transition-all text-white placeholder-gray-600"
+                required
+              />
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between ml-1">
+              <label className="text-sm font-medium text-gray-300">Contraseña</label>
+              <a href="#" className="text-xs text-primary hover:text-primary/80 transition-colors">¿Olvidaste tu contraseña?</a>
+            </div>
+            <div className="relative">
+              <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
+              <input
+                type={showPassword ? "text" : "password"}
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full pl-11 pr-12 py-3 bg-gray-800/50 border border-gray-700/50 rounded-xl focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50 transition-all text-white placeholder-gray-600"
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 transition-colors focus:outline-none"
+                title={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+              >
+                {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+              </button>
+            </div>
+          </div>
+          <Button type="submit" variant="primary" className="w-full justify-center py-3 text-sm font-semibold" disabled={isLoading}>
+            {isLoading ? "Conectando..." : "Iniciar Sesión"}
+            {!isLoading && <ArrowRight className="w-4 h-4 ml-2" />}
+          </Button>
+        </form>
+      </GlassCard>
+    </div>
+  );
+}
