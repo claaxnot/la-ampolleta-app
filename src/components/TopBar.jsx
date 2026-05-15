@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Bell, User as UserIcon } from "lucide-react";
+import { Bell, User as UserIcon, Menu } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
-export default function TopBar({ user }) {
+export default function TopBar({ user, onToggleMenu }) {
   const [showNotifications, setShowNotifications] = useState(false);
   const dropdownRef = useRef(null);
 
@@ -30,8 +30,17 @@ export default function TopBar({ user }) {
   }, []);
 
   return (
-    <div className="h-16 border-b border-white/5 flex items-center justify-end px-6 bg-gray-900/50 backdrop-blur-xl sticky top-0 z-40">
-      <div className="flex items-center gap-6">
+    <div className="h-16 border-b border-white/5 flex items-center justify-between px-4 md:px-6 bg-gray-900/50 backdrop-blur-xl sticky top-0 z-30">
+      
+      {/* Mobile Menu Button */}
+      <button 
+        onClick={onToggleMenu}
+        className="md:hidden p-2 text-gray-400 hover:text-white hover:bg-white/5 rounded-lg transition-colors focus:outline-none"
+      >
+        <Menu className="w-6 h-6" />
+      </button>
+
+      <div className="flex items-center gap-4 md:gap-6 ml-auto">
         
         {/* Notificaciones */}
         <div className="relative" ref={dropdownRef}>
@@ -93,8 +102,8 @@ export default function TopBar({ user }) {
         </div>
 
         {/* User Profile Mini */}
-        <div className="flex items-center gap-3 pl-6 border-l border-white/10">
-          <div className="flex flex-col items-end">
+        <div className="flex items-center gap-3 pl-4 md:pl-6 border-l border-white/10">
+          <div className="flex flex-col items-end hidden sm:flex">
             <span className="text-sm font-medium text-white">{user?.name || (user?.systemRole === 'admin' ? 'Administrador' : 'Usuario')}</span>
             <span className="text-xs text-gray-400 capitalize">{user?.role || user?.systemRole}</span>
           </div>

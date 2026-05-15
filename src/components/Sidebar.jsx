@@ -1,8 +1,8 @@
 import React from "react";
 import { NavLink } from "react-router-dom";
-import { LayoutDashboard, CalendarDays, Users, Calendar, LogOut, Lightbulb, User as UserIcon } from "lucide-react";
+import { LayoutDashboard, CalendarDays, Users, Calendar, LogOut, Lightbulb, User as UserIcon, X } from "lucide-react";
 
-export default function Sidebar({ user, onLogout }) {
+export default function Sidebar({ user, onLogout, isOpen, setIsOpen }) {
   const adminLinks = [
     { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
     { to: "/events", label: "Eventos", icon: CalendarDays },
@@ -19,21 +19,42 @@ export default function Sidebar({ user, onLogout }) {
   const links = user?.systemRole === 'worker' ? workerLinks : adminLinks;
 
   return (
-    <nav className="w-64 h-screen bg-black/40 backdrop-blur-3xl border-r border-white/10 text-gray-100 flex flex-col shadow-2xl relative overflow-hidden">
-      {/* Subtle background glow */}
-      <div className="absolute top-0 left-0 w-full h-32 bg-accent/10 blur-3xl rounded-full -translate-y-1/2"></div>
+    <>
+      {/* Mobile Overlay */}
+      {isOpen && (
+        <div 
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 md:hidden"
+          onClick={() => setIsOpen(false)}
+        />
+      )}
       
-      <div className="p-6 relative z-10">
-        <div className="flex items-center gap-3 justify-center mb-8">
-          <div className="p-2 bg-accent/20 rounded-xl">
-            <Lightbulb className="w-8 h-8 text-accent" />
-          </div>
-          <div className="flex flex-col">
-            <span className="text-xl font-bold tracking-tight text-white leading-tight">La Ampolleta</span>
-            <span className="text-xs text-accent uppercase tracking-wider font-semibold">Producciones</span>
+      <nav className={`
+        fixed md:relative inset-y-0 left-0 z-50 w-64 h-screen bg-black/80 md:bg-black/40 backdrop-blur-3xl border-r border-white/10 text-gray-100 flex flex-col shadow-2xl transition-transform duration-300 ease-in-out
+        ${isOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}
+      `}>
+        {/* Subtle background glow */}
+        <div className="absolute top-0 left-0 w-full h-32 bg-accent/10 blur-3xl rounded-full -translate-y-1/2"></div>
+        
+        <div className="p-6 relative z-10">
+          <div className="flex items-center justify-between md:justify-center mb-8">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-accent/20 rounded-xl">
+                <Lightbulb className="w-8 h-8 text-accent" />
+              </div>
+              <div className="flex flex-col">
+                <span className="text-xl font-bold tracking-tight text-white leading-tight">La Ampolleta</span>
+                <span className="text-xs text-accent uppercase tracking-wider font-semibold">Producciones</span>
+              </div>
+            </div>
+            {/* Close button for mobile */}
+            <button 
+              className="md:hidden text-gray-400 hover:text-white"
+              onClick={() => setIsOpen(false)}
+            >
+              <X className="w-6 h-6" />
+            </button>
           </div>
         </div>
-      </div>
 
       <ul className="flex-1 space-y-2 px-4 relative z-10">
         {links.map((link) => (
@@ -57,7 +78,10 @@ export default function Sidebar({ user, onLogout }) {
       
       <div className="p-4 relative z-10 border-t border-gray-800">
         <button
-          onClick={onLogout}
+          onClick={() => {
+            onLogout();
+            setIsOpen(false);
+          }}
           className="flex items-center justify-center gap-2 w-full py-3 px-4 text-sm font-medium text-red-400 hover:text-white hover:bg-red-500/20 rounded-xl transition-all duration-300"
         >
           <LogOut className="w-5 h-5" />
@@ -65,6 +89,7 @@ export default function Sidebar({ user, onLogout }) {
         </button>
       </div>
     </nav>
+    </>
   );
 }
 

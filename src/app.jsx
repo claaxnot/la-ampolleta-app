@@ -17,6 +17,8 @@ function App() {
     const savedUser = localStorage.getItem("ampolleta_user");
     return savedUser ? JSON.parse(savedUser) : null;
   });
+  const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
+
 
   const handleLogin = (userInfo) => {
     setUser(userInfo);
@@ -53,9 +55,9 @@ function App() {
       {/* Gradient / orb background */}
       <div className="absolute -top-20 -left-20 w-96 h-96 bg-red-600/20 rounded-full blur-3xl"></div>
       <div className="absolute -bottom-24 -right-24 w-[500px] h-[500px] bg-amber-500/15 rounded-full blur-3xl"></div>
-    {user && <Sidebar user={user} onLogout={handleLogout} />}
+    {user && <Sidebar user={user} onLogout={handleLogout} isOpen={mobileMenuOpen} setIsOpen={setMobileMenuOpen} />}
     <div className="flex-1 flex flex-col overflow-hidden">
-      {user && <TopBar user={user} />}
+      {user && <TopBar user={user} onToggleMenu={() => setMobileMenuOpen(true)} />}
       <div className="flex-1 overflow-auto">
         <Routes>
               <Route path="/login" element={<Login onLogin={handleLogin} />} />

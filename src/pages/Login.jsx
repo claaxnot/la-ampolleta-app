@@ -63,8 +63,8 @@ export default function Login({ onLogin }) {
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-transparent text-white relative overflow-hidden">
-      <GlassCard className="w-full max-w-md p-8">
+    <div className="flex items-center justify-center min-h-screen bg-transparent text-white relative overflow-hidden p-4 md:p-0">
+      <GlassCard className="w-full max-w-md p-6 md:p-8">
         <div className="flex flex-col items-center mb-8">
           <div className="w-16 h-16 bg-gradient-to-br from-primary/20 to-red-600/20 rounded-2xl flex items-center justify-center mb-4 shadow-lg border border-primary/20">
             <Lightbulb className="w-8 h-8 text-primary" />
