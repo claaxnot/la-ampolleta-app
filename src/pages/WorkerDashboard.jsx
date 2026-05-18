@@ -1230,6 +1230,11 @@ export default function WorkerDashboard({ user }) {
           return `${MONTH_NAMES[monthIndex]} ${year}`;
         };
 
+        const searchParams = new URLSearchParams(window.location.search);
+        const isRequireBankActive = searchParams.get("requireBank") === "true";
+        const isMissingBank = !workerProfile?.cuenta_destino || !workerProfile?.codigo_banco_destino;
+        const showBankWarning = isRequireBankActive && isMissingBank;
+
         const baselineRate = workerProfile?.monto_transferencia ? parseFloat(workerProfile.monto_transferencia) : 25000;
 
         const totalEarnedPaid = filteredCompletedEvents
@@ -1403,6 +1408,16 @@ export default function WorkerDashboard({ user }) {
                   <p className="text-xs text-gray-400 mb-6">
                     Mantén tus datos actualizados para recibir tus pagos masivos sin demoras.
                   </p>
+
+                  {showBankWarning && (
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      className="mb-4 p-3 rounded-xl text-xs font-semibold border bg-red-500/10 text-red-400 border-red-500/20 leading-relaxed animate-pulse"
+                    >
+                      ⚠️ <span className="font-extrabold uppercase">Obligatorio:</span> Por políticas de la productora, debes ingresar tus datos de transferencia bancaria para activar tu portal de eventos.
+                    </motion.div>
+                  )}
 
                   <form onSubmit={handleUpdateBankDetails} className="space-y-4">
                     <div className="flex flex-col">

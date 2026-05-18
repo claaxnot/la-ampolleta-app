@@ -39,8 +39,19 @@ function App() {
     if (user.systemRole === 'worker') {
       const missingAvatar = !user.avatar;
       const missingBank = !user.cuenta_destino || !user.codigo_banco_destino;
-      if (missingAvatar || missingBank) {
-        return <Navigate to={`/profile?requireAvatar=${missingAvatar}&requireBank=${missingBank}`} replace />;
+      
+      // Si falta el avatar, forzar la subida en /profile
+      if (missingAvatar) {
+        return <Navigate to="/profile?requireAvatar=true" replace />;
+      }
+      
+      // Si ya tiene el avatar pero falta el banco, redirigir a la pestaña de finanzas del dashboard
+      if (missingBank) {
+        const isAtDashboard = window.location.pathname === "/worker-dashboard";
+        const hasFinanzasTab = new URLSearchParams(window.location.search).get("tab") === "finanzas";
+        if (!isAtDashboard || !hasFinanzasTab) {
+          return <Navigate to="/worker-dashboard?tab=finanzas&requireBank=true" replace />;
+        }
       }
     }
     return children;
