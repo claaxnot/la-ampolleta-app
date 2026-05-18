@@ -56,7 +56,7 @@ export default function Login({ onLogin }) {
         console.warn("Could not fetch profile", profileError);
       }
 
-      if (profile?.status === 'Inactivo') {
+      if (profile?.status === 'Inactivo' && data.user.email !== 'admin@laampolleta.tv') {
         await supabase.auth.signOut();
         throw new Error("Tu cuenta se encuentra inactiva. Contacta al administrador para habilitar tu acceso.");
       }

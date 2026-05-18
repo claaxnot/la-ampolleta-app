@@ -39,8 +39,8 @@ export const AuthProvider = ({ children }) => {
 
         if (error) throw error;
 
-        // If inactive, log out immediately
-        if (profile?.status === 'Inactivo') {
+        // If inactive, log out immediately (exempting the system superadmin)
+        if (profile?.status === 'Inactivo' && user.email !== 'admin@laampolleta.tv') {
           console.warn("🔒 [SECURITY]: User account has been deactivated. Logging out.");
           logout();
           return;

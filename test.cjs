@@ -7,14 +7,13 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 async function run() {
   const { data, error } = await supabase
-    .from('notifications')
-    .select('*')
-    .limit(1);
+    .from('profiles')
+    .select('id, name, email, status, system_role');
 
   if (error) {
-    console.log("notifications table does not exist or error:", error.message);
+    console.log("Error selecting profiles:", error.message);
   } else {
-    console.log("notifications table exists!");
+    console.log("Profiles list:", data);
   }
 }
 
