@@ -122,7 +122,7 @@ export default function Finanzas() {
             status: a.payment_status || "Pendiente",
             assignment_status: a.status
           };
-        }).filter(a => a.assignment_status === "Aceptado" && a.is_finished); // Solo eventos terminados y aceptados
+        }).filter(a => (a.assignment_status === "Confirmado" || a.assignment_status === "Aceptado") && a.is_finished); // Solo eventos terminados y aceptados o confirmados
 
         setPayments(formatted);
         calculateStats(formatted);
@@ -170,7 +170,7 @@ export default function Finanzas() {
             status: "Pendiente", // Fallback por defecto
             assignment_status: a.status
           };
-        }).filter(a => a.assignment_status === "Aceptado" && a.is_finished);
+        }).filter(a => (a.assignment_status === "Confirmado" || a.assignment_status === "Aceptado") && a.is_finished);
 
         setPayments(formatted);
         calculateStats(formatted);
