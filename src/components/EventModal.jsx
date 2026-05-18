@@ -5,8 +5,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import GlassCard from "../components/GlassCard.jsx";
 import Button from "../components/Button.jsx";
-import { 
-  X, Search, Filter, Calendar, Clock, MapPin, 
+import {
+  X, Search, Filter, Calendar, Clock, MapPin,
   Users, UserCheck, Shield, ChevronDown, Check,
   AlertCircle, FileText, Activity, AlertTriangle, Settings, Sliders
 } from "lucide-react";
@@ -24,7 +24,7 @@ const eventSchema = z.object({
   description: z.string().optional(),
   status: z.string().min(1, "El estado es obligatorio"),
   staffIds: z.array(z.string()).default([]),
-  
+
   // Tipo de Evento
   type: z.string().default("Producción técnica"),
 
@@ -105,10 +105,10 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
   const [isLoadingAvailability, setIsLoadingAvailability] = useState(false);
   const [isSubmittingForm, setIsSubmittingForm] = useState(false);
   const [customRates, setCustomRates] = useState({});
-  
+
   // Drawer colapsable para configuración avanzada
   const [showAdvanced, setShowAdvanced] = useState(false);
-  
+
   // Searchable select para Supervisor
   const [supervisorSearch, setSupervisorSearch] = useState("");
   const [isSupervisorDropdownOpen, setIsSupervisorDropdownOpen] = useState(false);
@@ -135,9 +135,9 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
 
     if (eventType === "Anfitrionas" || eventType === "Promotoría") {
       setValue("priority", "Baja");
-      setValue("setup_time", ""); 
+      setValue("setup_time", "");
       setValue("supervisor_id", "");
-      
+
       // Sugerir citación de presentación 30 min antes si hay hora de inicio
       if (eventStartTime && eventStartTime.includes(":")) {
         const [h, m] = eventStartTime.split(":");
@@ -247,7 +247,7 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
       setSupervisorSearch("");
       setIsSupervisorDropdownOpen(false);
       setIsSubmittingForm(false);
-      
+
       const hasAdvancedFields = initialData.supervisor_id || initialData.call_time || initialData.setup_time || initialData.operational_notes;
       setShowAdvanced(!!hasAdvancedFields);
 
@@ -271,7 +271,7 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
           operational_notes: initialData.operational_notes || "",
           operational_info_pending: initialData.operational_info_pending || false
         });
-        
+
         if (initialData.id) {
           supabase.from('event_assignments').select('staff_id, custom_rate').eq('event_id', initialData.id).then(({ data }) => {
             if (data) {
@@ -291,7 +291,7 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
         reset({
           name: "", client: "", date: "", time: "", location: "",
           requiredStaff: 1, description: "", status: "Planificado", staffIds: [],
-          type: "Producción técnica", supervisor_id: "", call_time: "", 
+          type: "Producción técnica", supervisor_id: "", call_time: "",
           setup_time: "", end_time: "", priority: "Media", operational_notes: "",
           operational_info_pending: false
         });
@@ -301,13 +301,13 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
 
   const onSubmitForm = async (data) => {
     console.log("3️⃣ [VALIDATIONS PASSED] - Formulario válido. Preparando datos para el controlador padre:", data);
-    
+
     const eventData = { ...data };
     if (initialData.id) eventData.id = initialData.id;
     eventData.staffIds = data.staffIds || [];
     eventData.customRates = customRates;
     eventData.isAdvancedActive = showAdvanced;
-    
+
     setIsSubmittingForm(true);
     try {
       // Llamar al submit asíncrono de la página padre
@@ -325,7 +325,7 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
   const handleFormSubmit = (e) => {
     e.preventDefault();
     console.log("1️⃣ [SUBMIT START] - Iniciando envío del formulario");
-    
+
     // Obtener los datos actuales del formulario antes de validar
     const currentValues = {
       name: watch("name"),
@@ -346,11 +346,11 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
       },
       (formErrors) => {
         console.error("❌ [VALIDATION FAILED] - Errores de Zod detectados:", formErrors);
-        
+
         // Desplegar un toast visual indicando qué campo está fallando
         const firstErrorKey = Object.keys(formErrors)[0];
         const firstErrorMessage = formErrors[firstErrorKey]?.message || "Verifica los campos obligatorios";
-        
+
         toast.error(`Error de validación: ${firstErrorMessage}`, {
           duration: 4000,
           position: "top-center",
@@ -410,36 +410,36 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
             transition={{ duration: 0.2 }}
           >
             <GlassCard className="p-6 md:p-8 relative border border-white/10 shadow-2xl max-h-[90vh] overflow-y-auto">
-              
-              <button 
+
+              <button
                 type="button"
-                onClick={onClose} 
+                onClick={onClose}
                 className="absolute top-5 right-5 text-gray-400 hover:text-white transition-colors p-1 bg-white/5 rounded-full hover:bg-white/10 z-10"
               >
                 <X className="w-5 h-5" />
               </button>
-              
+
               <h2 className="text-2xl font-black mb-6 text-white tracking-tight flex items-center gap-2.5">
                 <span className="p-2 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20">
                   <Calendar className="w-6 h-6" />
                 </span>
                 {initialData.id ? "Editar Evento" : "Crear Nuevo Evento"}
               </h2>
-              
+
               <form onSubmit={handleFormSubmit} className="space-y-6">
-                
+
                 {/* 1️⃣ SECCIÓN BASE: INFORMACIÓN GENERAL (SIEMPRE VISIBLE) */}
                 <div className="border-b border-white/5 pb-5">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    
+
                     {/* Selector del Tipo de Evento */}
                     <div className="flex flex-col">
                       <label className="text-amber-400 mb-1.5 text-xs font-bold uppercase tracking-wider flex items-center gap-1" htmlFor="type">
                         <Sliders className="w-3.5 h-3.5" /> Tipo de Evento
                       </label>
-                      <select 
+                      <select
                         id="type"
-                        {...register("type")} 
+                        {...register("type")}
                         className="w-full bg-gray-800/80 border border-amber-500/30 rounded-xl p-2.5 text-sm text-amber-300 font-bold focus:outline-none focus:border-amber-500 transition-colors"
                       >
                         <option value="Producción técnica">Producción técnica</option>
@@ -454,33 +454,33 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
 
                     <div className="flex flex-col">
                       <label className="text-gray-300 mb-1.5 text-xs font-semibold" htmlFor="name">Nombre del Evento</label>
-                      <input 
-                        id="name" 
-                        placeholder="Ej: Arauco Talentos..." 
-                        {...register("name")} 
-                        className={`w-full bg-gray-800/50 border rounded-xl p-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-amber-500/50 transition-colors ${errors.name ? 'border-red-500 focus:ring-red-500' : 'border-gray-700'}`} 
+                      <input
+                        id="name"
+                        placeholder="Ej: Arauco Talentos..."
+                        {...register("name")}
+                        className={`w-full bg-gray-800/50 border rounded-xl p-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-amber-500/50 transition-colors ${errors.name ? 'border-red-500 focus:ring-red-500' : 'border-gray-700'}`}
                       />
                       {errors.name && <span className="text-red-400 text-xs mt-1">{errors.name.message}</span>}
                     </div>
-                    
+
                     <div className="flex flex-col">
                       <label className="text-gray-300 mb-1.5 text-xs font-semibold" htmlFor="client">Cliente</label>
-                      <input 
-                        id="client" 
-                        placeholder="Ej: Mall Arauco" 
-                        {...register("client")} 
-                        className={`w-full bg-gray-800/50 border rounded-xl p-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-amber-500/50 transition-colors ${errors.client ? 'border-red-500 focus:ring-red-500' : 'border-gray-700'}`} 
+                      <input
+                        id="client"
+                        placeholder="Ej: Mall Arauco"
+                        {...register("client")}
+                        className={`w-full bg-gray-800/50 border rounded-xl p-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-amber-500/50 transition-colors ${errors.client ? 'border-red-500 focus:ring-red-500' : 'border-gray-700'}`}
                       />
                       {errors.client && <span className="text-red-400 text-xs mt-1">{errors.client.message}</span>}
                     </div>
-                    
+
                     <div className="flex flex-col">
                       <label className="text-gray-300 mb-1.5 text-xs font-semibold" htmlFor="location">Ubicación</label>
-                      <input 
-                        id="location" 
-                        placeholder="Dirección o Recinto del evento" 
-                        {...register("location")} 
-                        className={`w-full bg-gray-800/50 border rounded-xl p-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-amber-500/50 transition-colors ${errors.location ? 'border-red-500 focus:ring-red-500' : 'border-gray-700'}`} 
+                      <input
+                        id="location"
+                        placeholder="Dirección o Recinto del evento"
+                        {...register("location")}
+                        className={`w-full bg-gray-800/50 border rounded-xl p-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-amber-500/50 transition-colors ${errors.location ? 'border-red-500 focus:ring-red-500' : 'border-gray-700'}`}
                       />
                       {errors.location && <span className="text-red-400 text-xs mt-1">{errors.location.message}</span>}
                     </div>
@@ -488,22 +488,22 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
                     <div className="grid grid-cols-2 gap-3">
                       <div className="flex flex-col">
                         <label className="text-gray-300 mb-1.5 text-xs font-semibold" htmlFor="date">Fecha</label>
-                        <input 
-                          id="date" 
-                          type="date" 
-                          {...register("date")} 
-                          className={`w-full bg-gray-800/50 border rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-amber-500/50 transition-colors ${errors.date ? 'border-red-500 focus:ring-red-500' : 'border-gray-700'}`} 
+                        <input
+                          id="date"
+                          type="date"
+                          {...register("date")}
+                          className={`w-full bg-gray-800/50 border rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-amber-500/50 transition-colors ${errors.date ? 'border-red-500 focus:ring-red-500' : 'border-gray-700'}`}
                         />
                         {errors.date && <span className="text-red-400 text-xs mt-1">{errors.date.message}</span>}
                       </div>
 
                       <div className="flex flex-col">
                         <label className="text-gray-300 mb-1.5 text-xs font-semibold" htmlFor="time">Hora Inicio</label>
-                        <input 
-                          id="time" 
-                          type="time" 
-                          {...register("time")} 
-                          className={`w-full bg-gray-800/50 border rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-amber-500/50 transition-colors ${errors.time ? 'border-red-500 focus:ring-red-500' : 'border-gray-700'}`} 
+                        <input
+                          id="time"
+                          type="time"
+                          {...register("time")}
+                          className={`w-full bg-gray-800/50 border rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-amber-500/50 transition-colors ${errors.time ? 'border-red-500 focus:ring-red-500' : 'border-gray-700'}`}
                         />
                         {errors.time && <span className="text-red-400 text-xs mt-1">{errors.time.message}</span>}
                       </div>
@@ -511,12 +511,12 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
 
                     <div className="flex flex-col">
                       <label className="text-gray-300 mb-1.5 text-xs font-semibold" htmlFor="requiredStaff">Staff Requerido</label>
-                      <input 
-                        id="requiredStaff" 
-                        type="number" 
-                        min="1" 
-                        {...register("requiredStaff")} 
-                        className={`w-full bg-gray-800/50 border rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-amber-500/50 transition-colors ${errors.requiredStaff ? 'border-red-500 focus:ring-red-500' : 'border-gray-700'}`} 
+                      <input
+                        id="requiredStaff"
+                        type="number"
+                        min="1"
+                        {...register("requiredStaff")}
+                        className={`w-full bg-gray-800/50 border rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-amber-500/50 transition-colors ${errors.requiredStaff ? 'border-red-500 focus:ring-red-500' : 'border-gray-700'}`}
                       />
                       {errors.requiredStaff && <span className="text-red-400 text-xs mt-1">{errors.requiredStaff.message}</span>}
                     </div>
@@ -524,11 +524,11 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
 
                   <div className="flex flex-col mt-4">
                     <label className="text-gray-300 mb-1.5 text-xs font-semibold" htmlFor="description">Descripción Breve</label>
-                    <textarea 
-                      id="description" 
-                      placeholder="Detalles rápidos y breves del evento..." 
-                      {...register("description")} 
-                      className="w-full h-16 bg-gray-800/50 border border-gray-700 rounded-xl p-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-amber-500/50" 
+                    <textarea
+                      id="description"
+                      placeholder="Detalles rápidos y breves del evento..."
+                      {...register("description")}
+                      className="w-full h-16 bg-gray-800/50 border border-gray-700 rounded-xl p-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-amber-500/50"
                     />
                   </div>
                 </div>
@@ -548,15 +548,15 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
                     </button>
 
                     <label className="flex items-center gap-2.5 cursor-pointer bg-white/5 hover:bg-white/10 px-3 py-2 rounded-xl border border-white/10 text-xs font-bold text-amber-300 transition-colors shadow-md select-none">
-                      <input 
+                      <input
                         type="checkbox"
                         {...register("operational_info_pending")}
-                        className="form-checkbox h-4 w-4 text-amber-500 bg-gray-700 border-gray-600 rounded focus:ring-amber-500/50" 
+                        className="form-checkbox h-4 w-4 text-amber-500 bg-gray-700 border-gray-600 rounded focus:ring-amber-500/50"
                       />
                       <span>Información operacional pendiente</span>
                     </label>
                   </div>
-                  
+
                   <AnimatePresence initial={false}>
                     {showAdvanced && (
                       <motion.div
@@ -568,22 +568,22 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
                         className="overflow-hidden"
                       >
                         <div className="pt-5 space-y-6">
-                          
+
                           {/* Subsección: Tiempos operacionales */}
                           <div className="bg-black/20 p-4 rounded-2xl border border-white/5 space-y-4">
                             <h4 className="text-[10px] font-extrabold text-amber-400 uppercase tracking-widest flex items-center gap-1.5">
                               <Clock className="w-3.5 h-3.5" /> Cronograma de Horarios
                             </h4>
-                            
+
                             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                               {showSetupField ? (
                                 <div className="flex flex-col">
                                   <label className="text-gray-400 mb-1.5 text-[11px] font-semibold" htmlFor="setup_time">Hora Montaje Técnico</label>
-                                  <input 
-                                    id="setup_time" 
-                                    type="time" 
-                                    {...register("setup_time")} 
-                                    className={`w-full bg-gray-800/50 border rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-amber-500/50 transition-colors ${errors.setup_time ? 'border-red-500 focus:ring-red-500' : 'border-gray-700'}`} 
+                                  <input
+                                    id="setup_time"
+                                    type="time"
+                                    {...register("setup_time")}
+                                    className={`w-full bg-gray-800/50 border rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-amber-500/50 transition-colors ${errors.setup_time ? 'border-red-500 focus:ring-red-500' : 'border-gray-700'}`}
                                   />
                                   {errors.setup_time && <span className="text-red-400 text-xs mt-1">{errors.setup_time.message}</span>}
                                 </div>
@@ -593,22 +593,22 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
 
                               <div className="flex flex-col">
                                 <label className="text-gray-400 mb-1.5 text-[11px] font-semibold" htmlFor="call_time">Hora Presentación (Citación)</label>
-                                <input 
-                                  id="call_time" 
-                                  type="time" 
-                                  {...register("call_time")} 
-                                  className={`w-full bg-gray-800/50 border rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-amber-500/50 transition-colors ${errors.call_time ? 'border-red-500 focus:ring-red-500' : 'border-gray-700'}`} 
+                                <input
+                                  id="call_time"
+                                  type="time"
+                                  {...register("call_time")}
+                                  className={`w-full bg-gray-800/50 border rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-amber-500/50 transition-colors ${errors.call_time ? 'border-red-500 focus:ring-red-500' : 'border-gray-700'}`}
                                 />
                                 {errors.call_time && <span className="text-red-400 text-xs mt-1">{errors.call_time.message}</span>}
                               </div>
 
                               <div className="flex flex-col">
                                 <label className="text-gray-400 mb-1.5 text-[11px] font-semibold" htmlFor="end_time">Hora Finalización Estimada</label>
-                                <input 
-                                  id="end_time" 
-                                  type="time" 
-                                  {...register("end_time")} 
-                                  className={`w-full bg-gray-800/50 border rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-amber-500/50 transition-colors ${errors.end_time ? 'border-red-500 focus:ring-red-500' : 'border-gray-700'}`} 
+                                <input
+                                  id="end_time"
+                                  type="time"
+                                  {...register("end_time")}
+                                  className={`w-full bg-gray-800/50 border rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-amber-500/50 transition-colors ${errors.end_time ? 'border-red-500 focus:ring-red-500' : 'border-gray-700'}`}
                                 />
                                 {errors.end_time && <span className="text-red-400 text-xs mt-1">{errors.end_time.message}</span>}
                               </div>
@@ -617,7 +617,7 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
 
                           {/* Subsección: Estado, Prioridad y Supervisor */}
                           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            
+
                             {/* Supervisor del Evento (Searchable Dropdown) */}
                             {showSupervisorField ? (
                               <div className="flex flex-col relative">
@@ -698,9 +698,9 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
 
                             <div className="flex flex-col">
                               <label className="text-gray-300 mb-1.5 text-xs font-semibold" htmlFor="status">Estado Operacional</label>
-                              <select 
-                                id="status" 
-                                {...register("status")} 
+                              <select
+                                id="status"
+                                {...register("status")}
                                 className="bg-gray-800/50 border border-gray-700 rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-amber-500/50 transition-colors"
                               >
                                 <option value="Planificado">Planificado</option>
@@ -713,9 +713,9 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
 
                             <div className="flex flex-col">
                               <label className="text-gray-300 mb-1.5 text-xs font-semibold" htmlFor="priority">Prioridad</label>
-                              <select 
-                                id="priority" 
-                                {...register("priority")} 
+                              <select
+                                id="priority"
+                                {...register("priority")}
                                 className="bg-gray-800/50 border border-gray-700 rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-amber-500/50 transition-colors"
                               >
                                 <option value="Baja">Baja (Gris)</option>
@@ -729,11 +729,11 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
                           {/* Notas operativas avanzadas */}
                           <div className="flex flex-col">
                             <label className="text-gray-300 mb-1.5 text-xs font-semibold" htmlFor="operational_notes">Notas de Logística & Acceso Técnico (Instrucciones Especiales)</label>
-                            <textarea 
-                              id="operational_notes" 
-                              placeholder="Ej: Acceso de carga por calle norte. Contacto cliente: +569... Exigir credenciales..." 
-                              {...register("operational_notes")} 
-                              className="w-full h-20 bg-gray-800/50 border border-gray-700 rounded-xl p-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-amber-500/50" 
+                            <textarea
+                              id="operational_notes"
+                              placeholder="Ej: Acceso de carga por calle norte. Contacto cliente: +569... Exigir credenciales..."
+                              {...register("operational_notes")}
+                              className="w-full h-20 bg-gray-800/50 border border-gray-700 rounded-xl p-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-amber-500/50"
                             />
                           </div>
 
@@ -762,7 +762,7 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
                         </span>
                       )}
                     </div>
-                    
+
                     <div className="flex flex-wrap gap-2 w-full md:w-auto items-center">
                       <label className="flex items-center gap-1.5 cursor-pointer bg-white/5 hover:bg-white/10 px-2.5 py-1.5 rounded-lg border border-white/5 text-[11px] font-bold text-gray-300 transition-all select-none">
                         <input
@@ -776,18 +776,18 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
 
                       <div className="relative flex-1 md:flex-initial">
                         <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
-                        <input 
-                          type="text" 
-                          placeholder="Buscar por nombre..." 
+                        <input
+                          type="text"
+                          placeholder="Buscar por nombre..."
                           value={staffSearch}
                           onChange={(e) => setStaffSearch(e.target.value)}
                           className="w-full pl-8 pr-2 py-1.5 bg-gray-800/80 border border-gray-700 rounded-lg text-xs text-white placeholder-gray-500 focus:outline-none focus:border-amber-500/50"
                         />
                       </div>
-                      
+
                       <div className="relative flex-1 md:flex-initial">
                         <Filter className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
-                        <select 
+                        <select
                           value={staffRole}
                           onChange={(e) => setStaffRole(e.target.value)}
                           className="w-full pl-8 pr-6 py-1.5 bg-gray-800/80 border border-gray-700 rounded-lg text-xs text-white focus:outline-none focus:border-amber-500/50 appearance-none capitalize"
@@ -825,11 +825,11 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
                         return (
                           <label key={staff.id} className="flex items-center justify-between text-gray-200 cursor-pointer hover:bg-white/5 p-2 rounded-lg transition-colors border border-transparent hover:border-white/5">
                             <div className="flex items-center space-x-3">
-                              <input 
-                                type="checkbox" 
+                              <input
+                                type="checkbox"
                                 checked={isChecked}
                                 onChange={() => toggleStaff(staff.id)}
-                                className="form-checkbox h-4 w-4 text-amber-500 bg-gray-700 border-gray-600 rounded focus:ring-amber-500/50" 
+                                className="form-checkbox h-4 w-4 text-amber-500 bg-gray-700 border-gray-600 rounded focus:ring-amber-500/50"
                               />
                               <span className="flex items-center gap-2">
                                 <img src={staff.avatar || "https://ui-avatars.com/api/?name=" + staff.name} alt="" className="w-6 h-6 rounded-full" />
@@ -857,7 +857,7 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
                         {selectedStaffIds.map(id => {
                           const staff = dbStaff.find(s => s.id === id);
                           if (!staff) return null;
-                          const baseline = staff.monto_transferencia ? parseInt(staff.monto_transferencia) : 35000;
+                          const baseline = staff.monto_transferencia ? parseInt(staff.monto_transferencia) : 25000;
                           return (
                             <div key={id} className="flex items-center justify-between gap-3 bg-gray-900/40 p-2 rounded-lg border border-white/5">
                               <div className="flex items-center gap-2 min-w-0">
