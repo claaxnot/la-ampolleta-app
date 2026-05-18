@@ -66,13 +66,54 @@ export default function WorkerDashboard({ user }) {
   // Real-time Notifications state (Con estado de lectura y animaciones)
   const [notifications, setNotifications] = useState([]);
 
-  const fallbackMockNotifications = [
-    { id: 1, title: "Actualización de Montaje", desc: "El montaje del concierto principal iniciará 30 min antes por pruebas técnicas.", type: "warning", time: "Hace 1 hora", read: false },
-    { id: 2, title: "Protocolo de Bodega", desc: "Recordar el uso obligatorio de calzado de seguridad en la carga de equipos.", type: "info", time: "Hace 2 horas", read: false },
-    { id: 3, title: "Documentación Pendiente", desc: "Sube tu boleta de honorarios de la producción anterior.", type: "danger", time: "Hace 1 día", read: true }
-  ];
+  const generateDynamicNotifications = (eventsList) => {
+    if (!eventsList || eventsList.length === 0) return [];
+    
+    const list = [];
+    eventsList.forEach(e => {
+      const isPending = e.assignment_status === "Pendiente";
+      
+      // 1. Notificación de Asignación
+      list.push({
+        id: `assign-${e.assignment_id}`,
+        title: isPending ? "📅 Nueva Asignación de Evento" : "✅ Asistencia Confirmada",
+        desc: isPending 
+          ? `Has sido asignado para el evento "${e.name}" el ${e.date}. Por favor responde a la citación.`
+          : `Confirmaste tu asistencia para el evento "${e.name}" el ${e.date}.`,
+        type: isPending ? "warning" : "info",
+        time: e.time ? `Showtime: ${e.time.slice(0, 5)}` : "Programado",
+        read: !isPending
+      });
 
-  const fetchMyDbNotifications = async (workerId) => {
+      // 2. Notificación de Citación
+      if (e.call_time) {
+        list.push({
+          id: `times-${e.assignment_id}`,
+          title: "⏱️ Citación y Horarios Definidos",
+          desc: `Citación: ${e.call_time.slice(0, 5)} hrs.${e.setup_time ? ` | Montaje: ${e.setup_time.slice(0, 5)} hrs.` : ''}`,
+          type: "info",
+          time: "Confirmado",
+          read: true
+        });
+      }
+
+      // 3. Notificación de Planificación Pendiente
+      if (e.operational_info_pending) {
+        list.push({
+          id: `pending-${e.assignment_id}`,
+          title: "⚠️ Planificación Operativa Pendiente",
+          desc: `Los horarios de montaje y citación para "${e.name}" aún están siendo validados por producción.`,
+          type: "danger",
+          time: "Pendiente",
+          read: false
+        });
+      }
+    });
+
+    return list;
+  };
+
+  const fetchMyDbNotifications = async (workerId, currentEventsList = []) => {
     try {
       const { data, error } = await supabase
         .from('notifications')
@@ -81,9 +122,9 @@ export default function WorkerDashboard({ user }) {
         .order('created_at', { ascending: false });
       
       if (error) {
-        console.warn("⚠️ [NOTIFICATIONS TABLE]: La tabla no existe o error en consulta, usando datos simulados:", error.message);
-        setNotifications(fallbackMockNotifications);
-      } else if (data) {
+        console.warn("⚠️ [NOTIFICATIONS TABLE]: La tabla no existe o error en consulta, usando notificaciones dinámicas reales.");
+        setNotifications(generateDynamicNotifications(currentEventsList));
+      } else if (data && data.length > 0) {
         const formatted = data.map(n => ({
           id: n.id,
           title: n.title,
@@ -93,10 +134,13 @@ export default function WorkerDashboard({ user }) {
           read: n.read
         }));
         setNotifications(formatted);
+      } else {
+        // Si la tabla está vacía, usar las notificaciones dinámicas reales de sus eventos asignados
+        setNotifications(generateDynamicNotifications(currentEventsList));
       }
     } catch (err) {
-      console.warn("⚠️ [NOTIFICATIONS TABLE]: Fallo de conexión, usando datos simulados:", err);
-      setNotifications(fallbackMockNotifications);
+      console.warn("⚠️ [NOTIFICATIONS TABLE]: Fallo de conexión, usando notificaciones dinámicas reales:", err);
+      setNotifications(generateDynamicNotifications(currentEventsList));
     }
   };
   
@@ -158,7 +202,6 @@ export default function WorkerDashboard({ user }) {
     if (user?.id) {
       fetchMyEvents(user.id);
       fetchMyAvailability(user.id);
-      fetchMyDbNotifications(user.id);
       
       // Cargar perfil real del trabajador
       supabase.from('profiles').select('*').eq('id', user.id).single().then(({ data }) => {
@@ -350,6 +393,7 @@ export default function WorkerDashboard({ user }) {
         ...assignment.events
       }));
       setAssignedEvents(formattedEvents);
+      fetchMyDbNotifications(workerId, formattedEvents);
     }
     setIsLoading(false);
   };
