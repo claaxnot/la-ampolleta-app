@@ -21,19 +21,16 @@ input[type="time"] {
   letter-spacing: 0.02em;
 }
 
-/* Cambiar el color gris genérico del icono nativo a un dorado/ámbar brillante */
+/* Ocultar el icono nativo feo pero mantenerlo 100% interactivo encima del icono personalizado Lucide */
 input[type="date"]::-webkit-calendar-picker-indicator,
 input[type="time"]::-webkit-calendar-picker-indicator {
-  filter: invert(0.85) sepia(1) saturate(5) hue-rotate(15deg) brightness(1.2);
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 24px;
+  height: 24px;
+  opacity: 0; /* Lo hace completamente invisible */
   cursor: pointer;
-  border-radius: 8px;
-  padding: 4px;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-input[type="date"]::-webkit-calendar-picker-indicator:hover,
-input[type="time"]::-webkit-calendar-picker-indicator:hover {
-  background: rgba(245, 158, 11, 0.15);
-  box-shadow: 0 0 10px rgba(245, 158, 11, 0.2);
-  transform: scale(1.15);
+  z-index: 10; /* Se superpone al vector Lucide para interceptar y disparar el click */
 }

@@ -489,23 +489,29 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
                     <div className="grid grid-cols-2 gap-3">
                       <div className="flex flex-col">
                         <label className="text-gray-300 mb-1.5 text-xs font-semibold" htmlFor="date">Fecha</label>
-                        <input
-                          id="date"
-                          type="date"
-                          {...register("date")}
-                          className={`w-full bg-gray-800/50 border rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-amber-500/50 transition-colors ${errors.date ? 'border-red-500 focus:ring-red-500' : 'border-gray-700'}`}
-                        />
+                        <div className="relative flex items-center">
+                          <input
+                            id="date"
+                            type="date"
+                            {...register("date")}
+                            className={`w-full bg-gray-800/50 border rounded-xl p-2.5 pr-10 text-sm text-white focus:outline-none focus:border-amber-500/50 transition-colors ${errors.date ? 'border-red-500 focus:ring-red-500' : 'border-gray-700'}`}
+                          />
+                          <Calendar className="absolute right-3.5 w-4 h-4 text-amber-400/80 pointer-events-none" />
+                        </div>
                         {errors.date && <span className="text-red-400 text-xs mt-1">{errors.date.message}</span>}
                       </div>
 
                       <div className="flex flex-col">
                         <label className="text-gray-300 mb-1.5 text-xs font-semibold" htmlFor="time">Hora Inicio</label>
-                        <input
-                          id="time"
-                          type="time"
-                          {...register("time")}
-                          className={`w-full bg-gray-800/50 border rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-amber-500/50 transition-colors ${errors.time ? 'border-red-500 focus:ring-red-500' : 'border-gray-700'}`}
-                        />
+                        <div className="relative flex items-center">
+                          <input
+                            id="time"
+                            type="time"
+                            {...register("time")}
+                            className={`w-full bg-gray-800/50 border rounded-xl p-2.5 pr-10 text-sm text-white focus:outline-none focus:border-amber-500/50 transition-colors ${errors.time ? 'border-red-500 focus:ring-red-500' : 'border-gray-700'}`}
+                          />
+                          <Clock className="absolute right-3.5 w-4 h-4 text-amber-400/80 pointer-events-none" />
+                        </div>
                         {errors.time && <span className="text-red-400 text-xs mt-1">{errors.time.message}</span>}
                       </div>
                     </div>
@@ -580,12 +586,15 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
                               {showSetupField ? (
                                 <div className="flex flex-col">
                                   <label className="text-gray-400 mb-1.5 text-[11px] font-semibold" htmlFor="setup_time">Hora Montaje Técnico</label>
-                                  <input
-                                    id="setup_time"
-                                    type="time"
-                                    {...register("setup_time")}
-                                    className={`w-full bg-gray-800/50 border rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-amber-500/50 transition-colors ${errors.setup_time ? 'border-red-500 focus:ring-red-500' : 'border-gray-700'}`}
-                                  />
+                                  <div className="relative flex items-center">
+                                    <input
+                                      id="setup_time"
+                                      type="time"
+                                      {...register("setup_time")}
+                                      className={`w-full bg-gray-800/50 border rounded-xl p-2.5 pr-10 text-sm text-white focus:outline-none focus:border-amber-500/50 transition-colors ${errors.setup_time ? 'border-red-500 focus:ring-red-500' : 'border-gray-700'}`}
+                                    />
+                                    <Clock className="absolute right-3.5 w-4 h-4 text-amber-400/80 pointer-events-none" />
+                                  </div>
                                   {errors.setup_time && <span className="text-red-400 text-xs mt-1">{errors.setup_time.message}</span>}
                                 </div>
                               ) : (
@@ -594,23 +603,29 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
 
                               <div className="flex flex-col">
                                 <label className="text-gray-400 mb-1.5 text-[11px] font-semibold" htmlFor="call_time">Hora Presentación (Citación)</label>
-                                <input
-                                  id="call_time"
-                                  type="time"
-                                  {...register("call_time")}
-                                  className={`w-full bg-gray-800/50 border rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-amber-500/50 transition-colors ${errors.call_time ? 'border-red-500 focus:ring-red-500' : 'border-gray-700'}`}
-                                />
+                                <div className="relative flex items-center">
+                                  <input
+                                    id="call_time"
+                                    type="time"
+                                    {...register("call_time")}
+                                    className={`w-full bg-gray-800/50 border rounded-xl p-2.5 pr-10 text-sm text-white focus:outline-none focus:border-amber-500/50 transition-colors ${errors.call_time ? 'border-red-500 focus:ring-red-500' : 'border-gray-700'}`}
+                                  />
+                                  <Clock className="absolute right-3.5 w-4 h-4 text-amber-400/80 pointer-events-none" />
+                                </div>
                                 {errors.call_time && <span className="text-red-400 text-xs mt-1">{errors.call_time.message}</span>}
                               </div>
 
                               <div className="flex flex-col">
                                 <label className="text-gray-400 mb-1.5 text-[11px] font-semibold" htmlFor="end_time">Hora Finalización Estimada</label>
-                                <input
-                                  id="end_time"
-                                  type="time"
-                                  {...register("end_time")}
-                                  className={`w-full bg-gray-800/50 border rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-amber-500/50 transition-colors ${errors.end_time ? 'border-red-500 focus:ring-red-500' : 'border-gray-700'}`}
-                                />
+                                <div className="relative flex items-center">
+                                  <input
+                                    id="end_time"
+                                    type="time"
+                                    {...register("end_time")}
+                                    className={`w-full bg-gray-800/50 border rounded-xl p-2.5 pr-10 text-sm text-white focus:outline-none focus:border-amber-500/50 transition-colors ${errors.end_time ? 'border-red-500 focus:ring-red-500' : 'border-gray-700'}`}
+                                  />
+                                  <Clock className="absolute right-3.5 w-4 h-4 text-amber-400/80 pointer-events-none" />
+                                </div>
                                 {errors.end_time && <span className="text-red-400 text-xs mt-1">{errors.end_time.message}</span>}
                               </div>
                             </div>
