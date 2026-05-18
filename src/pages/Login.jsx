@@ -10,6 +10,7 @@ export default function Login({ onLogin }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
@@ -17,6 +18,7 @@ export default function Login({ onLogin }) {
     e.preventDefault();
     setIsLoading(true);
     setError("");
+    setMessage("");
 
     // Temporary hardcoded demo login
     if (email === "cliente@laampolleta.cl" && password === "demo123") {
@@ -80,6 +82,31 @@ export default function Login({ onLogin }) {
     }
   };
 
+  const handleResetPassword = async (e) => {
+    e.preventDefault();
+    setError("");
+    setMessage("");
+
+    if (!email) {
+      setError("Por favor, ingresa tu correo electrónico para recuperar tu contraseña.");
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.origin + "/profile",
+      });
+      if (resetError) throw resetError;
+      setMessage("Se ha enviado un enlace de recuperación a tu correo. Por favor, revisa tu bandeja de entrada o spam.");
+    } catch (err) {
+      console.error("Reset error:", err.message);
+      setError("No se pudo enviar el correo de recuperación. Verifica la dirección o intenta nuevamente.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <div className="flex items-center justify-center min-h-screen bg-transparent text-white relative overflow-hidden p-4 md:p-0">
       <GlassCard className="w-full max-w-md p-6 md:p-8">
@@ -93,6 +120,11 @@ export default function Login({ onLogin }) {
         {error && (
           <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm text-center">
             {error}
+          </div>
+        )}
+        {message && (
+          <div className="mb-4 p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-400 text-sm text-center">
+            {message}
           </div>
         )}
         <form onSubmit={handleSubmit} className="space-y-5">
@@ -113,7 +145,13 @@ export default function Login({ onLogin }) {
           <div className="space-y-1.5">
             <div className="flex items-center justify-between ml-1">
               <label className="text-sm font-medium text-gray-300">Contraseña</label>
-              <a href="#" className="text-xs text-primary hover:text-primary/80 transition-colors">¿Olvidaste tu contraseña?</a>
+              <button 
+                type="button" 
+                onClick={handleResetPassword}
+                className="text-xs text-primary hover:text-primary/80 transition-colors bg-transparent border-none p-0 cursor-pointer"
+              >
+                ¿Olvidaste tu contraseña?
+              </button>
             </div>
             <div className="relative">
               <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
