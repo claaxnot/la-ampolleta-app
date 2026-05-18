@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate, Link } from "react-router-dom";
 
 import Sidebar from "./components/Sidebar.jsx";
 import TopBar from "./components/TopBar.jsx";
+import SessionTimeout from "./components/security/SessionTimeout.jsx";
 import Login from "./pages/Login.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
 import Events from "./pages/Events.jsx";
@@ -51,6 +52,7 @@ function App() {
     {user && <Sidebar user={user} onLogout={handleLogout} isOpen={mobileMenuOpen} setIsOpen={setMobileMenuOpen} />}
     <div className="flex-1 flex flex-col overflow-hidden">
       {user && <TopBar user={user} onToggleMenu={() => setMobileMenuOpen(true)} />}
+      {user && <SessionTimeout />}
       <div className="flex-1 overflow-auto">
         <Routes>
               <Route path="/login" element={<Login onLogin={handleLogin} />} />
