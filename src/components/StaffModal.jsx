@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import GlassCard from "../components/GlassCard.jsx";
+import { sanitizeRut, validateRut, formatRut } from "../utils/validateRut.js";
 import Button from "../components/Button.jsx";
 import { X } from "lucide-react";
 
