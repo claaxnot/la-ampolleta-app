@@ -104,6 +104,7 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
   const [assignedStaffMap, setAssignedStaffMap] = useState({});
   const [isLoadingAvailability, setIsLoadingAvailability] = useState(false);
   const [isSubmittingForm, setIsSubmittingForm] = useState(false);
+  const [customRates, setCustomRates] = useState({});
   
   // Drawer colapsable para configuración avanzada
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -272,13 +273,21 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
         });
         
         if (initialData.id) {
-          supabase.from('event_assignments').select('staff_id').eq('event_id', initialData.id).then(({ data }) => {
+          supabase.from('event_assignments').select('staff_id, custom_rate').eq('event_id', initialData.id).then(({ data }) => {
             if (data) {
               setValue("staffIds", data.map(a => a.staff_id));
+              const rates = {};
+              data.forEach(a => {
+                if (a.custom_rate !== null && a.custom_rate !== undefined) {
+                  rates[a.staff_id] = String(a.custom_rate);
+                }
+              });
+              setCustomRates(rates);
             }
           });
         }
       } else {
+        setCustomRates({});
         reset({
           name: "", client: "", date: "", time: "", location: "",
           requiredStaff: 1, description: "", status: "Planificado", staffIds: [],
@@ -296,6 +305,7 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
     const eventData = { ...data };
     if (initialData.id) eventData.id = initialData.id;
     eventData.staffIds = data.staffIds || [];
+    eventData.customRates = customRates;
     eventData.isAdvancedActive = showAdvanced;
     
     setIsSubmittingForm(true);
@@ -358,6 +368,11 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
     const current = selectedStaffIds || [];
     if (current.includes(id)) {
       setValue("staffIds", current.filter(sId => sId !== id), { shouldDirty: true });
+      setCustomRates(prev => {
+        const copy = { ...prev };
+        delete copy[id];
+        return copy;
+      });
     } else {
       const staff = dbStaff.find(s => s.id === id);
       const status = getStaffStatus(id);
@@ -832,6 +847,48 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
                       })
                     )}
                   </div>
+
+                  {selectedStaffIds.length > 0 && (
+                    <div className="mt-4 p-3.5 bg-black/40 rounded-xl border border-white/5">
+                      <h4 className="text-[11px] font-extrabold text-amber-400 uppercase tracking-widest mb-3 flex items-center gap-1.5">
+                        <Sliders className="w-3.5 h-3.5 text-amber-400" /> Tarifas de Turno para este Evento
+                      </h4>
+                      <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
+                        {selectedStaffIds.map(id => {
+                          const staff = dbStaff.find(s => s.id === id);
+                          if (!staff) return null;
+                          const baseline = staff.monto_transferencia ? parseInt(staff.monto_transferencia) : 35000;
+                          return (
+                            <div key={id} className="flex items-center justify-between gap-3 bg-gray-900/40 p-2 rounded-lg border border-white/5">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <img src={staff.avatar || "https://ui-avatars.com/api/?name=" + staff.name} alt="" className="w-5 h-5 rounded-full shrink-0" />
+                                <div className="flex flex-col min-w-0">
+                                  <span className="text-[11px] font-semibold text-gray-200 truncate">{staff.name}</span>
+                                  <span className="text-[9px] text-gray-400 font-medium">Tarifa base: ${baseline.toLocaleString('es-CL')}</span>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-1 shrink-0">
+                                <span className="text-xs text-gray-500 font-bold">$</span>
+                                <input
+                                  type="number"
+                                  placeholder={String(baseline)}
+                                  value={customRates[id] || ""}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    setCustomRates(prev => ({
+                                      ...prev,
+                                      [id]: val
+                                    }));
+                                  }}
+                                  className="w-24 bg-gray-800/80 border border-gray-700 rounded px-2 py-1 text-xs text-white text-right placeholder-gray-500 focus:outline-none focus:border-amber-500/50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex justify-end space-x-3 mt-6 pt-4 border-t border-gray-800">

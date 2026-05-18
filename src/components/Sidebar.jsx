@@ -1,8 +1,10 @@
 import React from "react";
-import { NavLink } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { LayoutDashboard, CalendarDays, Users, Calendar, LogOut, Lightbulb, User as UserIcon, X, DollarSign } from "lucide-react";
 
 export default function Sidebar({ user, onLogout, isOpen, setIsOpen }) {
+  const location = useLocation();
+
   const adminLinks = [
     { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
     { to: "/events", label: "Eventos", icon: CalendarDays },
@@ -14,10 +16,21 @@ export default function Sidebar({ user, onLogout, isOpen, setIsOpen }) {
 
   const workerLinks = [
     { to: "/worker-dashboard", label: "Mi Panel", icon: LayoutDashboard },
+    { to: "/worker-dashboard?tab=finanzas", label: "Finanzas", icon: DollarSign },
     { to: "/profile", label: "Mi Perfil", icon: UserIcon },
   ];
 
   const links = user?.systemRole === 'worker' ? workerLinks : adminLinks;
+
+  const isLinkActive = (to) => {
+    if (to === "/worker-dashboard") {
+      return location.pathname === "/worker-dashboard" && !location.search.includes("tab=finanzas");
+    }
+    if (to === "/worker-dashboard?tab=finanzas") {
+      return location.pathname === "/worker-dashboard" && location.search.includes("tab=finanzas");
+    }
+    return location.pathname === to;
+  };
 
   return (
     <>
@@ -58,23 +71,25 @@ export default function Sidebar({ user, onLogout, isOpen, setIsOpen }) {
         </div>
 
       <ul className="flex-1 space-y-2 px-4 relative z-10">
-        {links.map((link) => (
-          <li key={link.to}>
-            <NavLink
-              to={link.to}
-              className={({ isActive }) =>
-                `flex items-center gap-3 py-3 px-4 rounded-xl transition-all duration-300 ${
-                  isActive 
+        {links.map((link) => {
+          const active = isLinkActive(link.to);
+          return (
+            <li key={link.to}>
+              <Link
+                to={link.to}
+                onClick={() => setIsOpen(false)}
+                className={`flex items-center gap-3 py-3 px-4 rounded-xl transition-all duration-300 ${
+                  active 
                   ? "bg-accent/10 text-accent font-medium shadow-[inset_0_0_0_1px_rgba(245,158,11,0.2)]" 
                   : "text-gray-400 hover:bg-gray-800 hover:text-gray-200"
-                }`
-              }
-            >
-              <link.icon className="w-5 h-5" />
-              {link.label}
-            </NavLink>
-          </li>
-        ))}
+                }`}
+              >
+                <link.icon className="w-5 h-5" />
+                {link.label}
+              </Link>
+            </li>
+          );
+        })}
       </ul>
       
       <div className="p-4 relative z-10 border-t border-gray-800">

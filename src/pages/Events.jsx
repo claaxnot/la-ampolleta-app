@@ -67,6 +67,9 @@ export default function Events({ user }) {
     delete eventData.staffIds;
     delete eventData.assignedStaff;
 
+    const customRates = eventData.customRates || {};
+    delete eventData.customRates;
+
     // Extraer y borrar bandera del panel avanzado
     const isAdvancedActive = eventData.isAdvancedActive;
     delete eventData.isAdvancedActive;
@@ -131,9 +134,16 @@ export default function Events({ user }) {
         }
       }
 
-      // Insert new assignments
+      // Insert new assignments with optional custom rates
       if (eventId && staffIds.length > 0) {
-        const assignments = staffIds.map(id => ({ event_id: eventId, staff_id: id }));
+        const assignments = staffIds.map(id => {
+          const rateVal = customRates[id] ? parseFloat(customRates[id]) : null;
+          return { 
+            event_id: eventId, 
+            staff_id: id,
+            custom_rate: rateVal && !Number.isNaN(rateVal) ? rateVal : null
+          };
+        });
         const { error: assignError } = await supabase.from('event_assignments').insert(assignments);
         if (assignError) throw assignError;
         

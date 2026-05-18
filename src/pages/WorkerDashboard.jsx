@@ -56,8 +56,22 @@ export default function WorkerDashboard({ user }) {
   // Perfil del trabajador para consultar su rol real
   const [workerProfile, setWorkerProfile] = useState(null);
 
-  // Estados de Finanzas y Sub-pestañas
-  const [activeSubTab, setActiveSubTab] = useState("dashboard"); // "dashboard" | "finanzas"
+  // Estados de Finanzas y Sub-pestañas sincronizados con la URL
+  const [activeSubTab, setActiveSubTab] = useState(() => {
+    const searchParams = new URLSearchParams(window.location.search);
+    return searchParams.get("tab") === "finanzas" ? "finanzas" : "dashboard";
+  });
+
+  // Escuchar cambios en la URL (como cuando se hace clic en la barra lateral)
+  useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search);
+    const tabParam = searchParams.get("tab");
+    if (tabParam === "finanzas") {
+      setActiveSubTab("finanzas");
+    } else {
+      setActiveSubTab("dashboard");
+    }
+  }, [window.location.search]);
   const [bankForm, setBankForm] = useState({
     cuenta_destino: "",
     codigo_banco_destino: ""
