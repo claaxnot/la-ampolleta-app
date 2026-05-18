@@ -12,25 +12,4 @@
     background-attachment: fixed;
   }
 }
-
-/* Estilo premium de Calendarios y Relojes para la estética de La Ampolleta */
-input[type="date"],
-input[type="time"] {
-  color-scheme: dark; /* Fuerza al navegador a renderizar el calendario y el reloj flotante en modo oscuro */
-  font-family: inherit;
-  letter-spacing: 0.02em;
-}
-
-/* Ocultar el icono nativo feo pero mantenerlo 100% interactivo encima del icono personalizado Lucide */
-input[type="date"]::-webkit-calendar-picker-indicator,
-input[type="time"]::-webkit-calendar-picker-indicator {
-  position: absolute;
-  right: 12px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 24px;
-  height: 24px;
-  opacity: 0; /* Lo hace completamente invisible */
-  cursor: pointer;
-  z-index: 10; /* Se superpone al vector Lucide para interceptar y disparar el click */
-}
+/* Estilos generales y utilidades personalizadas */
