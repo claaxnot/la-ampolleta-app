@@ -1,6 +1,6 @@
 import React from "react";
 import { NavLink } from "react-router-dom";
-import { LayoutDashboard, CalendarDays, Users, Calendar, LogOut, Lightbulb, User as UserIcon, X } from "lucide-react";
+import { LayoutDashboard, CalendarDays, Users, Calendar, LogOut, Lightbulb, User as UserIcon, X, DollarSign } from "lucide-react";
 
 export default function Sidebar({ user, onLogout, isOpen, setIsOpen }) {
   const adminLinks = [
@@ -8,6 +8,7 @@ export default function Sidebar({ user, onLogout, isOpen, setIsOpen }) {
     { to: "/events", label: "Eventos", icon: CalendarDays },
     { to: "/staff", label: "Personal", icon: Users },
     { to: "/calendar", label: "Calendario", icon: Calendar },
+    { to: "/finanzas", label: "Finanzas", icon: DollarSign },
     { to: "/profile", label: "Mi Perfil", icon: UserIcon },
   ];
 

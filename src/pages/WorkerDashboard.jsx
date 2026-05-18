@@ -15,7 +15,12 @@ import {
   Check,
   BellOff,
   Sliders,
-  User
+  User,
+  DollarSign,
+  Building,
+  Wallet,
+  Landmark,
+  Coins
 } from "lucide-react";
 import GlassCard from "../components/GlassCard.jsx";
 import { supabase } from "../lib/supabase.js";
@@ -50,6 +55,14 @@ export default function WorkerDashboard({ user }) {
   
   // Perfil del trabajador para consultar su rol real
   const [workerProfile, setWorkerProfile] = useState(null);
+
+  // Estados de Finanzas y Sub-pestañas
+  const [activeSubTab, setActiveSubTab] = useState("dashboard"); // "dashboard" | "finanzas"
+  const [bankForm, setBankForm] = useState({
+    cuenta_destino: "",
+    codigo_banco_destino: ""
+  });
+  const [isUpdatingBank, setIsUpdatingBank] = useState(false);
 
   const getTimeAgo = (dateString) => {
     if (!dateString) return "Hace poco";
@@ -207,6 +220,10 @@ export default function WorkerDashboard({ user }) {
       supabase.from('profiles').select('*').eq('id', user.id).single().then(({ data }) => {
         if (data) {
           setWorkerProfile(data);
+          setBankForm({
+            cuenta_destino: data.cuenta_destino || "",
+            codigo_banco_destino: data.codigo_banco_destino || ""
+          });
         }
       });
 
@@ -587,7 +604,37 @@ export default function WorkerDashboard({ user }) {
         </div>
       </motion.div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 relative z-10">
+      {/* Selector de Pestañas Premium */}
+      <motion.div 
+        variants={itemVariants}
+        className="flex items-center gap-2 bg-gray-900/60 p-1.5 rounded-2xl border border-white/5 mb-6 backdrop-blur-sm max-w-md relative z-10"
+      >
+        <button
+          onClick={() => setActiveSubTab("dashboard")}
+          className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-sm font-bold transition-all duration-300 ${
+            activeSubTab === "dashboard"
+              ? "bg-amber-500/20 text-amber-300 border border-amber-500/30 shadow-[0_0_12px_rgba(245,158,11,0.15)]"
+              : "text-gray-400 hover:bg-white/5 hover:text-gray-200"
+          }`}
+        >
+          <CalendarDays className="w-4 h-4" />
+          Dashboard Principal
+        </button>
+        <button
+          onClick={() => setActiveSubTab("finanzas")}
+          className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-sm font-bold transition-all duration-300 ${
+            activeSubTab === "finanzas"
+              ? "bg-amber-500/20 text-amber-300 border border-amber-500/30 shadow-[0_0_12px_rgba(245,158,11,0.15)]"
+              : "text-gray-400 hover:bg-white/5 hover:text-gray-200"
+          }`}
+        >
+          <DollarSign className="w-4 h-4" />
+          Finanzas y Mis Datos
+        </button>
+      </motion.div>
+
+      {activeSubTab === "dashboard" && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 relative z-10">
         
         {/* Mis Asignaciones (Left Side) */}
         <motion.section variants={itemVariants} className="lg:col-span-2 flex flex-col gap-5">
@@ -1109,6 +1156,245 @@ export default function WorkerDashboard({ user }) {
         </motion.section>
 
       </div>
+      )}
+
+      {activeSubTab === "finanzas" && (() => {
+        const BANCOS_CHILE = [
+          { code: "1", name: "Banco de Chile / Edwards" },
+          { code: "9", name: "Banco Internacional" },
+          { code: "12", name: "Banco Estado" },
+          { code: "14", name: "Scotiabank Chile" },
+          { code: "16", name: "Banco BCI/Mach" },
+          { code: "28", name: "Banco Bice" },
+          { code: "31", name: "HSBC Bank (Chile)" },
+          { code: "37", name: "Banco Santander" },
+          { code: "39", name: "Banco Itaú" },
+          { code: "49", name: "Banco Security" },
+          { code: "51", name: "Banco Falabella" },
+          { code: "53", name: "Banco Ripley" },
+          { code: "55", name: "Banco Consorcio" },
+          { code: "59", name: "Banco BTG Pactual Chile" },
+          { code: "672", name: "Coopeuch" },
+          { code: "729", name: "Prepago Los Héroes" },
+          { code: "730", name: "Tenpo" },
+          { code: "732", name: "Prepago Los Andes (Tapp)" },
+          { code: "738", name: "Global 66" },
+          { code: "875", name: "Mercado Pago" },
+        ];
+
+        const completedEvents = assignedEvents.filter(event => {
+          const isFinished = event.date ? new Date(event.date) < new Date() : false;
+          return event.assignment_status === "Confirmado" && isFinished;
+        });
+
+        const baselineRate = workerProfile?.monto_transferencia ? parseFloat(workerProfile.monto_transferencia) : 35000;
+
+        const totalEarnedPaid = completedEvents
+          .filter(e => e.payment_status === "Pagado")
+          .reduce((sum, e) => sum + (e.custom_rate ? parseFloat(e.custom_rate) : baselineRate), 0);
+
+        const totalEarnedPending = completedEvents
+          .filter(e => e.payment_status !== "Pagado")
+          .reduce((sum, e) => sum + (e.custom_rate ? parseFloat(e.custom_rate) : baselineRate), 0);
+
+        const handleUpdateBankDetails = async (e) => {
+          e.preventDefault();
+          if (!bankForm.cuenta_destino || !bankForm.codigo_banco_destino) {
+            toast.error("Por favor completa todos los campos bancarios.");
+            return;
+          }
+
+          setIsUpdatingBank(true);
+          try {
+            const { error } = await supabase
+              .from('profiles')
+              .update({
+                cuenta_destino: bankForm.cuenta_destino,
+                codigo_banco_destino: bankForm.codigo_banco_destino
+              })
+              .eq('id', user.id);
+
+            if (error) throw error;
+
+            toast.success("¡Datos de transferencia actualizados con éxito!");
+            
+            setWorkerProfile(prev => ({
+              ...prev,
+              cuenta_destino: bankForm.cuenta_destino,
+              codigo_banco_destino: bankForm.codigo_banco_destino
+            }));
+          } catch (err) {
+            console.error("Error updating bank details:", err);
+            toast.error("Error al guardar tus datos de transferencia.");
+          } finally {
+            setIsUpdatingBank(false);
+          }
+        };
+
+        return (
+          <div className="space-y-6 relative z-10">
+            {/* Stats Cards */}
+            <motion.div variants={itemVariants} className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <GlassCard className="p-6 relative overflow-hidden">
+                <div className="absolute top-0 right-0 p-4 opacity-10">
+                  <CheckCircle className="w-20 h-20 text-emerald-500" />
+                </div>
+                <p className="text-xs text-gray-400 font-semibold uppercase tracking-wider">Total Cobrado (Liquidado)</p>
+                <h3 className="text-3xl font-extrabold text-emerald-400 mt-2">
+                  ${totalEarnedPaid.toLocaleString("es-CL")}
+                </h3>
+                <p className="text-xs text-gray-500 mt-2 font-medium">Eventos finalizados y pagados por la productora</p>
+              </GlassCard>
+
+              <GlassCard className="p-6 relative overflow-hidden">
+                <div className="absolute top-0 right-0 p-4 opacity-10">
+                  <Clock className="w-20 h-20 text-amber-500" />
+                </div>
+                <p className="text-xs text-gray-400 font-semibold uppercase tracking-wider">Pendiente de Pago</p>
+                <h3 className="text-3xl font-extrabold text-amber-400 mt-2">
+                  ${totalEarnedPending.toLocaleString("es-CL")}
+                </h3>
+                <p className="text-xs text-gray-500 mt-2 font-medium">Eventos realizados pendientes de transferencia</p>
+              </GlassCard>
+
+              <GlassCard className="p-6 relative overflow-hidden">
+                <div className="absolute top-0 right-0 p-4 opacity-10">
+                  <Wallet className="w-20 h-20 text-amber-500" />
+                </div>
+                <p className="text-xs text-gray-400 font-semibold uppercase tracking-wider">Monto Base de Cobro</p>
+                <h3 className="text-3xl font-extrabold text-amber-300 mt-2">
+                  ${baselineRate.toLocaleString("es-CL")}
+                </h3>
+                <p className="text-xs text-gray-500 mt-2 font-medium">Tu tarifa estándar registrada por turno / día</p>
+              </GlassCard>
+            </motion.div>
+
+            {/* Layout Dos Columnas */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Columna Izquierda: Historial de Pagos */}
+              <motion.section variants={itemVariants} className="lg:col-span-2 space-y-4">
+                <GlassCard className="p-6 border border-white/5">
+                  <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                    <Coins className="w-5 h-5 text-amber-400" />
+                    Historial de Pagos de Producciones
+                  </h3>
+                  
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse text-sm">
+                      <thead>
+                        <tr className="border-b border-white/10 text-gray-400 text-xs font-semibold uppercase bg-white/5">
+                          <th className="py-3 px-4">Evento</th>
+                          <th className="py-3 px-4">Fecha</th>
+                          <th className="py-3 px-4">Honorario</th>
+                          <th className="py-3 px-4 text-center">Estado Pago</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-white/5">
+                        {completedEvents.length === 0 ? (
+                          <tr>
+                            <td colSpan="4" className="py-8 text-center text-gray-500 italic">
+                              No tienes eventos completados registrados aún.
+                            </td>
+                          </tr>
+                        ) : (
+                          completedEvents.map(event => {
+                            const rate = event.custom_rate ? parseFloat(event.custom_rate) : baselineRate;
+                            const isPaid = event.payment_status === "Pagado";
+
+                            return (
+                              <tr key={event.id} className="hover:bg-white/5 transition-colors">
+                                <td className="py-3.5 px-4 font-bold text-gray-200">{event.name}</td>
+                                <td className="py-3.5 px-4 text-gray-400">{event.date}</td>
+                                <td className="py-3.5 px-4 font-extrabold text-amber-400">${rate.toLocaleString("es-CL")}</td>
+                                <td className="py-3.5 px-4 text-center">
+                                  <span className={`px-2.5 py-1 rounded-full text-2xs font-extrabold border ${
+                                    isPaid 
+                                      ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' 
+                                      : 'bg-red-500/10 border-red-500/30 text-red-400'
+                                  }`}>
+                                    {isPaid ? "Pagado" : "Pendiente"}
+                                  </span>
+                                </td>
+                              </tr>
+                            );
+                          })
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </GlassCard>
+              </motion.section>
+
+              {/* Columna Derecha: Datos de Transferencia */}
+              <motion.section variants={itemVariants} className="lg:col-span-1 space-y-4">
+                <GlassCard className="p-6 border border-white/5 relative overflow-hidden">
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-full blur-2xl pointer-events-none" />
+                  
+                  <h3 className="text-lg font-bold text-white mb-1 flex items-center gap-2">
+                    <Landmark className="w-5 h-5 text-amber-400" />
+                    Mis Datos de Transferencia
+                  </h3>
+                  <p className="text-xs text-gray-400 mb-6">
+                    Mantén tus datos actualizados para recibir tus pagos masivos sin demoras.
+                  </p>
+
+                  <form onSubmit={handleUpdateBankDetails} className="space-y-4">
+                    <div className="flex flex-col">
+                      <label htmlFor="w_banco" className="text-gray-300 mb-1 text-xs font-bold uppercase tracking-wider">Banco Destino</label>
+                      <select
+                        id="w_banco"
+                        value={bankForm.codigo_banco_destino}
+                        onChange={(e) => setBankForm({ ...bankForm, codigo_banco_destino: e.target.value })}
+                        className="w-full bg-gray-950/60 border border-white/10 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-amber-500 transition-all font-semibold"
+                        required
+                      >
+                        <option value="" disabled className="bg-gray-900 text-gray-500">Selecciona tu banco...</option>
+                        {BANCOS_CHILE.map(b => (
+                          <option key={b.code} value={b.code} className="bg-gray-900 text-white font-medium">{b.name}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="flex flex-col">
+                      <label htmlFor="w_cuenta" className="text-gray-300 mb-1 text-xs font-bold uppercase tracking-wider">Número de Cuenta</label>
+                      <input
+                        type="text"
+                        id="w_cuenta"
+                        value={bankForm.cuenta_destino}
+                        onChange={(e) => setBankForm({ ...bankForm, cuenta_destino: e.target.value })}
+                        placeholder="Ej: 123456789"
+                        className="w-full bg-gray-950/60 border border-white/10 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-amber-500 transition-all font-mono"
+                        required
+                      />
+                    </div>
+
+                    <div className="bg-amber-500/10 border border-amber-500/20 p-3 rounded-xl text-2xs text-amber-400 leading-relaxed">
+                      ⚠️ <span className="font-bold">Nota de Obligatoriedad:</span> Tus datos de transferencia son de carácter obligatorio para poder ver tu panel de eventos asignados. Cualquier cambio afectará tus próximos depósitos de honorarios.
+                    </div>
+
+                    <motion.button
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      type="submit"
+                      disabled={isUpdatingBank}
+                      className="w-full flex items-center justify-center gap-2 py-3 bg-amber-500 text-gray-900 font-extrabold rounded-xl hover:bg-amber-400 disabled:opacity-50 transition-all duration-300 text-sm shadow-lg shadow-amber-500/10 mt-2"
+                    >
+                      {isUpdatingBank ? (
+                        <span>Guardando...</span>
+                      ) : (
+                        <>
+                          <Check className="w-4 h-4" />
+                          Actualizar Datos Bancarios
+                        </>
+                      )}
+                    </motion.button>
+                  </form>
+                </GlassCard>
+              </motion.section>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Details Modal Adaptativo */}
       <AnimatePresence>

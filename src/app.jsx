@@ -12,6 +12,7 @@ import CalendarPage from "./pages/Calendar.jsx";
 import WorkerDashboard from "./pages/WorkerDashboard.jsx";
 import Profile from "./pages/Profile.jsx";
 import ResetPassword from "./pages/ResetPassword.jsx";
+import Finanzas from "./pages/Finanzas.jsx";
 
 import { useAuth } from "./hooks/useAuth.js";
 import { Toaster } from "react-hot-toast";
@@ -123,6 +124,14 @@ function App() {
               element={
                 <AdminRoute>
                   <CalendarPage />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/finanzas"
+              element={
+                <AdminRoute>
+                  <Finanzas />
                 </AdminRoute>
               }
             />
