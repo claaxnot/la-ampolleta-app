@@ -92,85 +92,104 @@ export default function ResetPassword() {
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-5">
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium text-gray-300 ml-1">Nueva Contraseña</label>
-            <div className="relative">
-              <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
-              <input
-                type={showPassword ? "text" : "password"}
-                placeholder="Mínimo 8 caracteres"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className={`w-full bg-gray-800/40 border border-gray-700 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/30 rounded-xl py-2.5 pl-12 pr-12 text-white placeholder-gray-500 transition-all duration-300`}
-                required
-                disabled={isLoading}
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white transition-colors"
-                disabled={isLoading}
-              >
-                {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-              </button>
+        {hasSession ? (
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-gray-300 ml-1">Nueva Contraseña</label>
+              <div className="relative">
+                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
+                <input
+                  type={showPassword ? "text" : "password"}
+                  placeholder="Mínimo 8 caracteres"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className={`w-full bg-gray-800/40 border border-gray-700 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/30 rounded-xl py-2.5 pl-12 pr-12 text-white placeholder-gray-500 transition-all duration-300`}
+                  required
+                  disabled={isLoading}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white transition-colors"
+                  disabled={isLoading}
+                >
+                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
+              </div>
             </div>
-          </div>
 
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium text-gray-300 ml-1">Confirmar Nueva Contraseña</label>
-            <div className="relative">
-              <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
-              <input
-                type={showConfirmPassword ? "text" : "password"}
-                placeholder="Repite la contraseña"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                className={`w-full bg-gray-800/40 border border-gray-700 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/30 rounded-xl py-2.5 pl-12 pr-12 text-white placeholder-gray-500 transition-all duration-300`}
-                required
-                disabled={isLoading}
-              />
-              <button
-                type="button"
-                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white transition-colors"
-                disabled={isLoading}
-              >
-                {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-              </button>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-gray-300 ml-1">Confirmar Nueva Contraseña</label>
+              <div className="relative">
+                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
+                <input
+                  type={showConfirmPassword ? "text" : "password"}
+                  placeholder="Repite la contraseña"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className={`w-full bg-gray-800/40 border border-gray-700 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/30 rounded-xl py-2.5 pl-12 pr-12 text-white placeholder-gray-500 transition-all duration-300`}
+                  required
+                  disabled={isLoading}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white transition-colors"
+                  disabled={isLoading}
+                >
+                  {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
+              </div>
             </div>
-          </div>
 
-          <Button
-            type="submit"
-            variant="primary"
-            className="w-full mt-2"
-            disabled={isLoading}
-          >
-            {isLoading ? (
-              <span className="flex items-center justify-center gap-2">
-                <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                Restableciendo...
-              </span>
-            ) : (
-              "Guardar Nueva Contraseña"
-            )}
-          </Button>
-
-          <div className="text-center mt-4">
-            <button
-              type="button"
-              onClick={() => navigate("/login")}
-              className="text-xs text-gray-400 hover:text-white transition-colors"
+            <Button
+              type="submit"
+              variant="primary"
+              className="w-full mt-2"
               disabled={isLoading}
             >
-              Volver al Inicio de Sesión
-            </button>
+              {isLoading ? (
+                <span className="flex items-center justify-center gap-2">
+                  <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Restableciendo...
+                </span>
+              ) : (
+                "Guardar Nueva Contraseña"
+              )}
+            </Button>
+
+            <div className="text-center mt-4">
+              <button
+                type="button"
+                onClick={() => navigate("/login")}
+                className="text-xs text-gray-400 hover:text-white transition-colors"
+                disabled={isLoading}
+              >
+                Volver al Inicio de Sesión
+              </button>
+            </div>
+          </form>
+        ) : (
+          <div className="space-y-5 text-center">
+            <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-xl text-amber-400 text-sm leading-relaxed">
+              ⚠️ Enlace inválido, incompleto o vencido. Por favor, solicita uno nuevo.
+            </div>
+            <p className="text-xs text-gray-400 leading-relaxed">
+              Por razones de seguridad, los enlaces para restablecer contraseña expiran rápidamente o solo pueden ser usados una vez.
+            </p>
+            <Button
+              type="button"
+              variant="primary"
+              className="w-full justify-center py-2.5 mt-2"
+              onClick={() => navigate("/login")}
+            >
+              Ir a Iniciar Sesión
+            </Button>
           </div>
-        </form>
+        )}
       </GlassCard>
     </div>
   );
