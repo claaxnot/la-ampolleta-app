@@ -39,9 +39,9 @@
 - [x] Adaptación completa para dispositivos móviles (Menú Hamburguesa, Sidebar tipo Drawer, grillas responsivas).
 
 - [x] **Filtrado Inteligente de Staff:** Mostrar quién está disponible (según su calendario) al momento de asignarlo a un evento en el EventModal, con alertas operacionales preventivas ante doble asignación o no disponibilidad.
+- [x] **Persistencia de Notificaciones:** Tabla física `notifications` en Supabase para conservar el historial de mensajes de los trabajadores (completamente funcional con tiempo real y tolerancia a fallos).
 
 ## 6. Pendientes y Tareas Futuras
 - [ ] **Módulo de Finanzas y Pagos (Admin/Worker):** Visualización de transferencias, generación de nóminas bancarias chilenas y carga de datos de cuenta del trabajador.
-- [ ] **Persistencia de Notificaciones:** Tabla física `notifications` en Supabase para conservar el historial de mensajes de los trabajadores.
 - [ ] **Subida de Boletas de Honorarios (Worker):** Módulo para subir boletas en formato PDF cuando el evento finalice.
 - [ ] Escribir archivo README.md completo con instrucciones de configuración local y variables de entorno.
