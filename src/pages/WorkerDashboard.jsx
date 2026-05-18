@@ -1008,9 +1008,9 @@ export default function WorkerDashboard({ user }) {
               <div className="flex justify-between items-center mb-4">
                 <p className="text-xs font-extrabold uppercase tracking-wider text-amber-400">Definir Disponibilidad</p>
                 <div className="flex gap-2.5 items-center text-xs text-gray-400">
-                   <button onClick={handlePrevMonth} className="hover:text-white transition-colors bg-white/5 hover:bg-white/10 w-6 h-6 flex items-center justify-center rounded-lg border border-white/5 transition-all duration-300">&lt;</button>
+                   <button onClick={handlePrevMonth} className="hover:text-white bg-white/5 hover:bg-white/10 w-6 h-6 flex items-center justify-center rounded-lg border border-white/5 transition-all duration-300">&lt;</button>
                    <span className="w-18 text-center font-bold text-gray-200 capitalize">{MONTH_NAMES[currentMonth].slice(0,3)} {currentYear}</span>
-                   <button onClick={handleNextMonth} className="hover:text-white transition-colors bg-white/5 hover:bg-white/10 w-6 h-6 flex items-center justify-center rounded-lg border border-white/5 transition-all duration-300">&gt;</button>
+                   <button onClick={handleNextMonth} className="hover:text-white bg-white/5 hover:bg-white/10 w-6 h-6 flex items-center justify-center rounded-lg border border-white/5 transition-all duration-300">&gt;</button>
                 </div>
               </div>
               
