@@ -53,7 +53,7 @@ export default function Staff() {
       .select('*')
       .neq('email', 'admin@laampolleta.tv')
       .order('created_at', { ascending: false });
-    
+
     if (data) {
       setStaff(data);
     }
@@ -81,6 +81,12 @@ export default function Staff() {
     setIsSaving(true);
     const loadingToast = toast.loading(staffData.id ? "Actualizando miembro de staff..." : "Creando cuenta de staff...");
 
+    // Helper para normalizar RUT
+    const normalizeRut = (rut) =>
+      rut.replace(/\./g, "").trim().toLowerCase();
+
+    const normalizedRut = normalizeRut(staffData.rut || "");
+
     try {
       if (staffData.id) {
         // Edit mode
@@ -88,7 +94,7 @@ export default function Staff() {
           .from('profiles')
           .update({
             name: staffData.name,
-            rut: staffData.rut,
+            rut: normalizedRut,
             role: staffData.role,
             cuenta_origen: staffData.cuenta_origen,
             cuenta_destino: staffData.cuenta_destino,
@@ -100,7 +106,7 @@ export default function Staff() {
           .eq('id', staffData.id);
 
         if (error) throw error;
-        
+
         toast.success("Staff actualizado correctamente.", { id: loadingToast });
         fetchStaff();
         closeModal();
@@ -109,7 +115,7 @@ export default function Staff() {
         const { data: existingRut } = await supabase
           .from('profiles')
           .select('id')
-          .eq('rut', staffData.rut)
+          .eq('rut', normalizedRut)
           .maybeSingle();
 
         const { data: existingEmail } = await supabase
@@ -130,11 +136,8 @@ export default function Staff() {
           return;
         }
 
-        // Generate password using the exact requested formula:
-        // const cleanRut = rut.replace(/\./g, '').trim().toUpperCase();
-        // const password = `Ampolleta${cleanRut.split('-')[0]}`;
-        const cleanRut = staffData.rut.replace(/\./g, '').trim().toUpperCase();
-        const defaultPassword = `Ampolleta${cleanRut.split('-')[0]}`;
+        // Generate password using the exact requested formula (no points, no hyphen, no verifier, no prefix):
+        const defaultPassword = normalizedRut.split('-')[0];
 
         const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
         const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -158,7 +161,7 @@ export default function Staff() {
 
         const { error: profileError } = await supabase.from('profiles').update({
           name: staffData.name,
-          rut: staffData.rut,
+          rut: normalizedRut,
           role: staffData.role,
           cuenta_origen: staffData.cuenta_origen,
           cuenta_destino: staffData.cuenta_destino,
@@ -171,7 +174,7 @@ export default function Staff() {
         if (profileError) throw profileError;
 
         toast.success(
-          `Staff creado. Credenciales: Correo: ${staffData.email} | Contraseña: ${defaultPassword}`, 
+          `Staff creado. Credenciales: Correo: ${staffData.email} | Contraseña: ${defaultPassword}`,
           { id: loadingToast, duration: 8000 }
         );
         fetchStaff();
@@ -283,16 +286,16 @@ export default function Staff() {
                 </select>
               </div>
 
-              <Button 
-                variant="primary" 
-                className={`flex items-center gap-2 justify-center ${!rolePermissions.canCreate ? 'opacity-50 cursor-not-allowed' : ''}`} 
+              <Button
+                variant="primary"
+                className={`flex items-center gap-2 justify-center ${!rolePermissions.canCreate ? 'opacity-50 cursor-not-allowed' : ''}`}
                 onClick={openAddModal}
                 title={!rolePermissions.canCreate ? "Disponible solo para administradores" : ""}
               >
                 <Plus className="w-4 h-4" /> Añadir Staff
               </Button>
-              <Button 
-                variant="secondary" 
+              <Button
+                variant="secondary"
                 className="flex items-center gap-2 justify-center border-amber-500/50 text-amber-500 hover:bg-amber-500/10"
                 onClick={exportToExcel}
               >
@@ -323,87 +326,87 @@ export default function Staff() {
                     const isConfirmed = !!(member.avatar_url || member.cuenta_destino);
                     return (
                       <tr key={member.id} className="hover:bg-gray-800/30 transition-colors">
-                      <td className="px-4 py-2 flex items-center space-x-3 text-gray-100">
-                        <div
-                          className="w-10 h-10 rounded-full overflow-hidden border border-gray-600 cursor-pointer relative group"
-                          onClick={() => setSelectedPhoto(member.avatar_url || "https://ui-avatars.com/api/?name=" + member.name)}
-                        >
-                          <img src={member.avatar_url || "https://ui-avatars.com/api/?name=" + member.name} alt={member.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300" />
-                          <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                            <Search className="w-4 h-4 text-white" />
+                        <td className="px-4 py-2 flex items-center space-x-3 text-gray-100">
+                          <div
+                            className="w-10 h-10 rounded-full overflow-hidden border border-gray-600 cursor-pointer relative group"
+                            onClick={() => setSelectedPhoto(member.avatar_url || "https://ui-avatars.com/api/?name=" + member.name)}
+                          >
+                            <img src={member.avatar_url || "https://ui-avatars.com/api/?name=" + member.name} alt={member.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300" />
+                            <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                              <Search className="w-4 h-4 text-white" />
+                            </div>
                           </div>
-                        </div>
-                        <span className="font-medium">{member.name}</span>
-                      </td>
-                      <td className="px-4 py-2 text-gray-300 text-sm">{member.rut || "-"}</td>
-                      <td className="px-4 py-2 text-gray-300 text-sm">{member.email || "-"}</td>
-                      <td className="px-4 py-2 text-gray-100 capitalize">{member.role}</td>
-                      <td className="px-4 py-2">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${member.status === 'Inactivo' ? 'bg-gray-500/20 text-gray-400 border-gray-500/30' : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'}`}>
-                          {member.status}
-                        </span>
-                      </td>
-                      <td className="px-4 py-2">
-                        <div className="flex items-center space-x-2">
-                          <motion.div layout className="flex items-center">
-                            {isConfirmed ? (
-                              <motion.span 
-                                initial={{ opacity: 0, scale: 0.9 }}
-                                animate={{ opacity: 1, scale: 1 }}
-                                className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shadow-[0_0_10px_rgba(16,185,129,0.1)]"
-                              >
-                                Cuenta activa
-                              </motion.span>
-                            ) : (
-                              <motion.button
-                                initial={{ opacity: 0, scale: 0.9 }}
-                                animate={{ opacity: 1, scale: 1 }}
-                                onClick={() => handleResendEmail(member.email)}
-                                disabled={resendingEmails[member.email] || !rolePermissions.canEdit}
-                                className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/20 hover:bg-amber-500/20 hover:border-amber-500/40 hover:shadow-[0_0_10px_rgba(245,158,11,0.2)] active:scale-95 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed`}
-                                title={!rolePermissions.canEdit ? "Disponible solo para administradores" : "Reenviar correo de activación"}
-                              >
-                                {resendingEmails[member.email] ? (
-                                  <svg className="animate-spin h-3.5 w-3.5 text-amber-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                  </svg>
-                                ) : (
-                                  <Mail className="w-3.5 h-3.5" />
-                                )}
-                                <span>Reenviar</span>
-                              </motion.button>
-                            )}
-                          </motion.div>
+                          <span className="font-medium">{member.name}</span>
+                        </td>
+                        <td className="px-4 py-2 text-gray-300 text-sm">{member.rut || "-"}</td>
+                        <td className="px-4 py-2 text-gray-300 text-sm">{member.email || "-"}</td>
+                        <td className="px-4 py-2 text-gray-100 capitalize">{member.role}</td>
+                        <td className="px-4 py-2">
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${member.status === 'Inactivo' ? 'bg-gray-500/20 text-gray-400 border-gray-500/30' : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'}`}>
+                            {member.status}
+                          </span>
+                        </td>
+                        <td className="px-4 py-2">
+                          <div className="flex items-center space-x-2">
+                            <motion.div layout className="flex items-center">
+                              {isConfirmed ? (
+                                <motion.span
+                                  initial={{ opacity: 0, scale: 0.9 }}
+                                  animate={{ opacity: 1, scale: 1 }}
+                                  className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shadow-[0_0_10px_rgba(16,185,129,0.1)]"
+                                >
+                                  Cuenta activa
+                                </motion.span>
+                              ) : (
+                                <motion.button
+                                  initial={{ opacity: 0, scale: 0.9 }}
+                                  animate={{ opacity: 1, scale: 1 }}
+                                  onClick={() => handleResendEmail(member.email)}
+                                  disabled={resendingEmails[member.email] || !rolePermissions.canEdit}
+                                  className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/20 hover:bg-amber-500/20 hover:border-amber-500/40 hover:shadow-[0_0_10px_rgba(245,158,11,0.2)] active:scale-95 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed`}
+                                  title={!rolePermissions.canEdit ? "Disponible solo para administradores" : "Reenviar correo de activación"}
+                                >
+                                  {resendingEmails[member.email] ? (
+                                    <svg className="animate-spin h-3.5 w-3.5 text-amber-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                  ) : (
+                                    <Mail className="w-3.5 h-3.5" />
+                                  )}
+                                  <span>Reenviar</span>
+                                </motion.button>
+                              )}
+                            </motion.div>
 
-                          <Button 
-                            variant="secondary" 
-                            size="sm" 
-                            onClick={() => openEditModal(member)}
-                            className={!rolePermissions.canEdit ? "opacity-50 cursor-not-allowed" : ""}
-                            title={!rolePermissions.canEdit ? "Disponible solo para administradores" : ""}
-                          >
-                            <Settings className="w-4 h-4" />
-                          </Button>
-                          <button
-                            onClick={() => handleToggleStatus(member.id, member.status)}
-                            className={`p-2 rounded-lg transition-colors ${member.status === 'Inactivo' ? 'text-emerald-500 hover:bg-emerald-500/10' : 'text-amber-500 hover:bg-amber-500/10'} ${!rolePermissions.canEdit ? "opacity-50 cursor-not-allowed text-gray-500" : ""}`}
-                            title={!rolePermissions.canEdit ? "Disponible solo para administradores" : (member.status === 'Inactivo' ? 'Activar Staff' : 'Desactivar Staff')}
-                            disabled={!rolePermissions.canEdit}
-                          >
-                            <Power className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => handleDelete(member.id)}
-                            className={`p-2 rounded-lg transition-colors ${!rolePermissions.canDelete ? "opacity-50 cursor-not-allowed text-gray-500" : "text-red-500 hover:text-red-400 hover:bg-red-500/10"}`}
-                            title={!rolePermissions.canDelete ? "Disponible solo para administradores" : "Eliminar permanentemente"}
-                            disabled={!rolePermissions.canDelete}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={() => openEditModal(member)}
+                              className={!rolePermissions.canEdit ? "opacity-50 cursor-not-allowed" : ""}
+                              title={!rolePermissions.canEdit ? "Disponible solo para administradores" : ""}
+                            >
+                              <Settings className="w-4 h-4" />
+                            </Button>
+                            <button
+                              onClick={() => handleToggleStatus(member.id, member.status)}
+                              className={`p-2 rounded-lg transition-colors ${member.status === 'Inactivo' ? 'text-emerald-500 hover:bg-emerald-500/10' : 'text-amber-500 hover:bg-amber-500/10'} ${!rolePermissions.canEdit ? "opacity-50 cursor-not-allowed text-gray-500" : ""}`}
+                              title={!rolePermissions.canEdit ? "Disponible solo para administradores" : (member.status === 'Inactivo' ? 'Activar Staff' : 'Desactivar Staff')}
+                              disabled={!rolePermissions.canEdit}
+                            >
+                              <Power className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => handleDelete(member.id)}
+                              className={`p-2 rounded-lg transition-colors ${!rolePermissions.canDelete ? "opacity-50 cursor-not-allowed text-gray-500" : "text-red-500 hover:text-red-400 hover:bg-red-500/10"}`}
+                              title={!rolePermissions.canDelete ? "Disponible solo para administradores" : "Eliminar permanentemente"}
+                              disabled={!rolePermissions.canDelete}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
                     );
                   })}
                 </tbody>

@@ -4,6 +4,7 @@ import { supabase } from "../lib/supabase.js";
 import { Lightbulb, Mail, Lock, ArrowRight, Eye, EyeOff } from "lucide-react";
 import GlassCard from "../components/GlassCard.jsx";
 import Button from "../components/Button.jsx";
+import { toast } from "react-hot-toast";
 
 export default function Login({ onLogin }) {
   const navigate = useNavigate();
@@ -75,8 +76,26 @@ export default function Login({ onLogin }) {
       }
 
     } catch (err) {
-      console.error("Auth error:", err.message);
-      setError("Credenciales inválidas. Verifica tu correo y contraseña.");
+      console.log("Auth Error Details:", err);
+      
+      const errMessage = err?.message || "";
+      let elegantErrorMessage = "Credenciales incorrectas. Verifica tu correo y contraseña.";
+      
+      if (errMessage.toLowerCase().includes("confirm")) {
+        elegantErrorMessage = "Tu cuenta de correo electrónico aún no ha sido confirmada. Revisa tu bandeja de entrada.";
+        toast.error("📧 " + elegantErrorMessage, { duration: 6000 });
+      } else if (errMessage.toLowerCase().includes("invalid") || errMessage.toLowerCase().includes("credentials")) {
+        elegantErrorMessage = "Correo o contraseña incorrectos. Por favor, inténtalo de nuevo.";
+        toast.error("🔑 " + elegantErrorMessage, { duration: 4000 });
+      } else if (errMessage.toLowerCase().includes("not found") || errMessage.toLowerCase().includes("user not found")) {
+        elegantErrorMessage = "Esta cuenta no está registrada. Contacta al administrador.";
+        toast.error("👤 " + elegantErrorMessage, { duration: 4000 });
+      } else {
+        elegantErrorMessage = errMessage;
+        toast.error("🚨 " + elegantErrorMessage, { duration: 4000 });
+      }
+      
+      setError(elegantErrorMessage);
     } finally {
       setIsLoading(false);
     }
