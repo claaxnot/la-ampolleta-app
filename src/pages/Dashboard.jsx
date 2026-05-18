@@ -6,6 +6,7 @@ import { CalendarDays, Users, Zap, Bell, ArrowRight, Download, Activity, Clock }
 import StatCard from "../components/StatCard.jsx";
 import GlassCard from "../components/GlassCard.jsx";
 import EventDetails from "../components/EventDetails.jsx";
+import { toast } from "react-hot-toast";
 
 // Variants for framer-motion staggered animations
 const containerVariants = {
@@ -247,7 +248,7 @@ export default function Dashboard() {
             </div>
             
             <button 
-              onClick={() => alert("El historial completo estará disponible próximamente.")}
+              onClick={() => toast.success("El historial completo estará disponible próximamente.")}
               className="mt-6 w-full py-2.5 rounded-xl bg-gray-800/50 hover:bg-gray-700/50 text-gray-300 border border-gray-700 transition-colors text-sm font-medium"
             >
               Ver todo el historial

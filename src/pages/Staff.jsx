@@ -8,11 +8,13 @@ import * as XLSX from "xlsx";
 import StaffModal from "../components/StaffModal.jsx";
 import { useAuth } from "../hooks/useAuth.js";
 import { permissions } from "../lib/permissions.js";
+import { toast } from "react-hot-toast";
 
 export default function Staff() {
   const { user } = useAuth();
   const [staff, setStaff] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingStaff, setEditingStaff] = useState(null);
 
@@ -57,53 +59,85 @@ export default function Staff() {
     if (staffData.id && !rolePermissions.canEdit) return;
     if (!staffData.id && !rolePermissions.canCreate) return;
 
-    if (staffData.id) {
-      const { data, error } = await supabase
-        .from('profiles')
-        .update({
-          name: staffData.name,
-          rut: staffData.rut,
-          role: staffData.role,
-          cuenta_origen: staffData.cuenta_origen,
-          cuenta_destino: staffData.cuenta_destino,
-          codigo_banco_destino: staffData.codigo_banco_destino,
-          monto_transferencia: staffData.monto_transferencia,
-          glosa_transferencia: staffData.glosa_transferencia,
-          mensaje_beneficiario: staffData.mensaje_beneficiario
-        })
-        .eq('id', staffData.id);
+    setIsSaving(true);
+    const loadingToast = toast.loading(staffData.id ? "Actualizando miembro de staff..." : "Creando cuenta de staff...");
 
-      if (!error) {
+    try {
+      if (staffData.id) {
+        // Edit mode
+        const { error } = await supabase
+          .from('profiles')
+          .update({
+            name: staffData.name,
+            rut: staffData.rut,
+            role: staffData.role,
+            cuenta_origen: staffData.cuenta_origen,
+            cuenta_destino: staffData.cuenta_destino,
+            codigo_banco_destino: staffData.codigo_banco_destino,
+            monto_transferencia: staffData.monto_transferencia,
+            glosa_transferencia: staffData.glosa_transferencia,
+            mensaje_beneficiario: staffData.mensaje_beneficiario
+          })
+          .eq('id', staffData.id);
+
+        if (error) throw error;
+        
+        toast.success("Staff actualizado correctamente.", { id: loadingToast });
         fetchStaff();
+        closeModal();
       } else {
-        alert("Error al actualizar: " + error.message);
-      }
-    } else {
-      // Create new user using a temporary client to prevent admin logout
-      const defaultPassword = staffData.rut.split('-')[0] || "Ampolleta2026";
+        // Check duplicates
+        const { data: existingRut } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('rut', staffData.rut)
+          .maybeSingle();
 
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+        const { data: existingEmail } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('email', staffData.email)
+          .maybeSingle();
 
-      // Dynamic import
-      const { createClient } = await import('@supabase/supabase-js');
-      const tempClient = createClient(supabaseUrl, supabaseAnonKey, {
-        auth: { persistSession: false, autoRefreshToken: false }
-      });
+        if (existingRut) {
+          toast.error("El RUT ya está registrado.", { id: loadingToast });
+          setIsSaving(false);
+          return;
+        }
 
-      const { data: authData, error: authError } = await tempClient.auth.signUp({
-        email: staffData.email,
-        password: defaultPassword,
-      });
+        if (existingEmail) {
+          toast.error("El correo ya está registrado.", { id: loadingToast });
+          setIsSaving(false);
+          return;
+        }
 
-      if (authError) {
-        alert("Error creando la cuenta en Auth: " + authError.message);
-        return;
-      }
+        // Generate password using the exact requested formula:
+        // const cleanRut = rut.replace(/\./g, '').trim().toUpperCase();
+        // const password = `Ampolleta${cleanRut.split('-')[0]}`;
+        const cleanRut = staffData.rut.replace(/\./g, '').trim().toUpperCase();
+        const defaultPassword = `Ampolleta${cleanRut.split('-')[0]}`;
 
-      // Wait 1.5s for the database trigger to create the profile, then update the rest of the fields
-      setTimeout(async () => {
-        await supabase.from('profiles').update({
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+        const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+        const { createClient } = await import('@supabase/supabase-js');
+        const tempClient = createClient(supabaseUrl, supabaseAnonKey, {
+          auth: { persistSession: false, autoRefreshToken: false }
+        });
+
+        const { data: authData, error: authError } = await tempClient.auth.signUp({
+          email: staffData.email,
+          password: defaultPassword,
+        });
+
+        if (authError) {
+          throw new Error("Error en autenticación: " + authError.message);
+        }
+
+        // Wait 1.5s for the database trigger to create the profile, then update the rest of the fields
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+
+        const { error: profileError } = await supabase.from('profiles').update({
           name: staffData.name,
           rut: staffData.rut,
           role: staffData.role,
@@ -114,19 +148,34 @@ export default function Staff() {
           glosa_transferencia: staffData.glosa_transferencia,
           mensaje_beneficiario: staffData.mensaje_beneficiario
         }).eq('email', staffData.email);
-        fetchStaff();
-      }, 1500);
 
-      alert(`Staff creado. Credenciales: Correo: ${staffData.email} | Contraseña: ${defaultPassword}`);
+        if (profileError) throw profileError;
+
+        toast.success(
+          `Staff creado. Credenciales: Correo: ${staffData.email} | Contraseña: ${defaultPassword}`, 
+          { id: loadingToast, duration: 8000 }
+        );
+        fetchStaff();
+        closeModal();
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error(err.message || "Error al procesar la operación", { id: loadingToast });
+    } finally {
+      setIsSaving(false);
     }
-    closeModal();
   };
 
   const handleDelete = async (id) => {
     if (!rolePermissions.canDelete) return;
     if (window.confirm("¿Estás seguro de que deseas eliminar a este miembro? (Solo se borrará su perfil, no su cuenta de acceso)")) {
       const { error } = await supabase.from('profiles').delete().eq('id', id);
-      if (!error) fetchStaff();
+      if (!error) {
+        toast.success("Miembro de staff eliminado.");
+        fetchStaff();
+      } else {
+        toast.error("Error al eliminar: " + error.message);
+      }
     }
   };
 
@@ -134,7 +183,12 @@ export default function Staff() {
     if (!rolePermissions.canEdit) return;
     const newStatus = currentStatus === 'Inactivo' ? 'Activo' : 'Inactivo';
     const { error } = await supabase.from('profiles').update({ status: newStatus }).eq('id', id);
-    if (!error) fetchStaff();
+    if (!error) {
+      toast.success(`Estado actualizado a ${newStatus}`);
+      fetchStaff();
+    } else {
+      toast.error("Error al cambiar estado: " + error.message);
+    }
   };
 
   const uniqueRoles = [...new Set(staff.map(s => s.role?.toLowerCase() || ''))].filter(Boolean);
@@ -310,6 +364,7 @@ export default function Staff() {
         onClose={closeModal}
         onSubmit={handleStaffSubmit}
         initialData={editingStaff || {}}
+        isLoading={isSaving}
       />
 
       {/* Modal de Foto Ampliada */}

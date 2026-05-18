@@ -11,7 +11,11 @@ import { X } from "lucide-react";
 // Validación estricta con Zod
 const staffSchema = z.object({
   name: z.string().min(3, "El nombre debe tener al menos 3 caracteres"),
-  rut: z.string().regex(/^[0-9\.]+-[0-9kK]{1}$/, "Formato de RUT inválido (ej: 12345678-9)"),
+  rut: z.string()
+    .min(1, "El RUT es obligatorio")
+    .refine((val) => validateRut(val), {
+      message: "RUT chileno inválido (ej: 12345678-9)",
+    }),
   email: z.string().email("Debe ser un correo electrónico válido"),
   role: z.string().min(2, "El rol es obligatorio"),
   cuenta_origen: z.string().optional(),
@@ -22,11 +26,13 @@ const staffSchema = z.object({
   mensaje_beneficiario: z.string().optional(),
 });
 
-export default function StaffModal({ isOpen, onClose, onSubmit, initialData = {} }) {
+export default function StaffModal({ isOpen, onClose, onSubmit, initialData = {}, isLoading = false }) {
   const {
     register,
     handleSubmit,
     reset,
+    setValue,
+    watch,
     formState: { errors }
   } = useForm({
     resolver: zodResolver(staffSchema),
@@ -43,6 +49,17 @@ export default function StaffModal({ isOpen, onClose, onSubmit, initialData = {}
       mensaje_beneficiario: "",
     }
   });
+
+  const watchName = watch("name");
+  const watchRut = watch("rut");
+  const watchEmail = watch("email");
+  const watchRole = watch("role");
+
+  const handleRutChange = (e) => {
+    const rawVal = e.target.value;
+    const formatted = formatRut(rawVal);
+    setValue("rut", formatted, { shouldValidate: true });
+  };
 
   // Sync initial data for edit mode or reset on open/close
   useEffect(() => {
@@ -105,7 +122,13 @@ export default function StaffModal({ isOpen, onClose, onSubmit, initialData = {}
                       id="name"
                       placeholder="Ej: Juan Perez"
                       {...register("name")}
-                      className={`w-full bg-gray-800/50 border rounded-xl p-2 text-white placeholder-gray-500 transition-colors ${errors.name ? 'border-red-500 focus:border-red-500 focus:ring-1 focus:ring-red-500' : 'border-gray-700'}`}
+                      className={`w-full bg-gray-800/50 border rounded-xl p-2 text-white placeholder-gray-500 transition-all duration-300 ${
+                        errors.name 
+                          ? 'border-red-500/50 focus:border-red-500 focus:ring-2 focus:ring-red-500/30' 
+                          : watchName && watchName.length >= 3
+                            ? 'border-emerald-500/50 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30'
+                            : 'border-gray-700 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/30'
+                      }`}
                     />
                     {errors.name && <span className="text-red-400 text-xs mt-1">{errors.name.message}</span>}
                   </div>
@@ -115,8 +138,16 @@ export default function StaffModal({ isOpen, onClose, onSubmit, initialData = {}
                     <input
                       id="rut"
                       placeholder="12345678-9"
-                      {...register("rut")}
-                      className={`w-full bg-gray-800/50 border rounded-xl p-2 text-white placeholder-gray-500 transition-colors ${errors.rut ? 'border-red-500 focus:border-red-500 focus:ring-1 focus:ring-red-500' : 'border-gray-700'}`}
+                      {...register("rut", {
+                        onChange: handleRutChange
+                      })}
+                      className={`w-full bg-gray-800/50 border rounded-xl p-2 text-white placeholder-gray-500 transition-all duration-300 ${
+                        errors.rut 
+                          ? 'border-red-500/50 focus:border-red-500 focus:ring-2 focus:ring-red-500/30' 
+                          : watchRut && validateRut(watchRut)
+                            ? 'border-emerald-500/50 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30'
+                            : 'border-gray-700 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/30'
+                      }`}
                     />
                     {errors.rut && <span className="text-red-400 text-xs mt-1">{errors.rut.message}</span>}
                   </div>
@@ -128,7 +159,13 @@ export default function StaffModal({ isOpen, onClose, onSubmit, initialData = {}
                       type="email"
                       placeholder="correo@ejemplo.com"
                       {...register("email")}
-                      className={`w-full bg-gray-800/50 border rounded-xl p-2 text-white placeholder-gray-500 transition-colors ${errors.email ? 'border-red-500 focus:border-red-500 focus:ring-1 focus:ring-red-500' : 'border-gray-700'}`}
+                      className={`w-full bg-gray-800/50 border rounded-xl p-2 text-white placeholder-gray-500 transition-all duration-300 ${
+                        errors.email 
+                          ? 'border-red-500/50 focus:border-red-500 focus:ring-2 focus:ring-red-500/30' 
+                          : watchEmail && z.string().email().safeParse(watchEmail).success
+                            ? 'border-emerald-500/50 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30'
+                            : 'border-gray-700 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/30'
+                      }`}
                     />
                     {errors.email && <span className="text-red-400 text-xs mt-1">{errors.email.message}</span>}
                   </div>
@@ -139,7 +176,13 @@ export default function StaffModal({ isOpen, onClose, onSubmit, initialData = {}
                       id="role"
                       placeholder="Ej: Montajista"
                       {...register("role")}
-                      className={`w-full bg-gray-800/50 border rounded-xl p-2 text-white placeholder-gray-500 transition-colors ${errors.role ? 'border-red-500 focus:border-red-500 focus:ring-1 focus:ring-red-500' : 'border-gray-700'}`}
+                      className={`w-full bg-gray-800/50 border rounded-xl p-2 text-white placeholder-gray-500 transition-all duration-300 ${
+                        errors.role 
+                          ? 'border-red-500/50 focus:border-red-500 focus:ring-2 focus:ring-red-500/30' 
+                          : watchRole && watchRole.length >= 2
+                            ? 'border-emerald-500/50 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30'
+                            : 'border-gray-700 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/30'
+                      }`}
                     />
                     {errors.role && <span className="text-red-400 text-xs mt-1">{errors.role.message}</span>}
                   </div>
@@ -176,8 +219,20 @@ export default function StaffModal({ isOpen, onClose, onSubmit, initialData = {}
                 </div>
 
                 <div className="flex justify-end space-x-3 mt-6">
-                  <Button type="button" variant="secondary" onClick={onClose}>Cancelar</Button>
-                  <Button type="submit" variant="primary">{initialData.id ? "Actualizar" : "Crear"}</Button>
+                  <Button type="button" variant="secondary" onClick={onClose} disabled={isLoading}>Cancelar</Button>
+                  <Button type="submit" variant="primary" disabled={isLoading}>
+                    {isLoading ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        {initialData.id ? "Guardando..." : "Creando..."}
+                      </span>
+                    ) : (
+                      initialData.id ? "Actualizar" : "Crear"
+                    )}
+                  </Button>
                 </div>
               </form>
             </GlassCard>

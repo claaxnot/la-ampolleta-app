@@ -13,6 +13,7 @@ import WorkerDashboard from "./pages/WorkerDashboard.jsx";
 import Profile from "./pages/Profile.jsx";
 
 import { useAuth } from "./hooks/useAuth.js";
+import { Toaster } from "react-hot-toast";
 
 function App() {
   const { user, login: handleLogin, logout: handleLogout, updateUser } = useAuth();
@@ -45,6 +46,33 @@ function App() {
 
   return (
     <BrowserRouter>
+      <Toaster 
+        position="bottom-right" 
+        toastOptions={{
+          style: {
+            background: 'rgba(17, 24, 39, 0.85)',
+            color: '#fff',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+            backdropFilter: 'blur(12px)',
+            borderRadius: '16px',
+            fontSize: '14px',
+            padding: '12px 20px',
+            boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.5)',
+          },
+          success: {
+            iconTheme: {
+              primary: '#10b981',
+              secondary: '#fff',
+            },
+          },
+          error: {
+            iconTheme: {
+              primary: '#ef4444',
+              secondary: '#fff',
+            },
+          },
+        }} 
+      />
       <div className="relative flex h-screen bg-gray-900 text-white font-sans antialiased overflow-hidden">
       {/* Gradient / orb background */}
       <div className="absolute -top-20 -left-20 w-96 h-96 bg-red-600/20 rounded-full blur-3xl"></div>
