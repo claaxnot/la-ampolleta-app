@@ -57,6 +57,32 @@ export default function WorkerDashboard({ user }) {
   const [workerProfile, setWorkerProfile] = useState(null);
   const [financeMonthFilter, setFinanceMonthFilter] = useState("all");
 
+  const completedEvents = React.useMemo(() => {
+    return assignedEvents.filter(event => {
+      const isFinished = event.date ? new Date(event.date) < new Date() : false;
+      return event.assignment_status === "Confirmado" && isFinished;
+    });
+  }, [assignedEvents]);
+
+  // Obtener los periodos únicos de meses para rellenar el dropdown
+  const uniqueFinanceMonths = React.useMemo(() => {
+    const periods = new Set();
+    completedEvents.forEach(e => {
+      if (e.date) {
+        const [year, month] = e.date.split("-");
+        if (year && month) {
+          periods.add(`${year}-${month}`);
+        }
+      }
+    });
+    return Array.from(periods).sort().reverse();
+  }, [completedEvents]);
+
+  const filteredCompletedEvents = React.useMemo(() => {
+    if (financeMonthFilter === "all") return completedEvents;
+    return completedEvents.filter(e => e.date && e.date.startsWith(financeMonthFilter));
+  }, [completedEvents, financeMonthFilter]);
+
   // Estados de Finanzas y Sub-pestañas sincronizados con la URL
   const [activeSubTab, setActiveSubTab] = useState(() => {
     const searchParams = new URLSearchParams(window.location.search);
@@ -1197,36 +1223,12 @@ export default function WorkerDashboard({ user }) {
           { code: "875", name: "Mercado Pago" },
         ];
 
-        const completedEvents = assignedEvents.filter(event => {
-          const isFinished = event.date ? new Date(event.date) < new Date() : false;
-          return event.assignment_status === "Confirmado" && isFinished;
-        });
-
-        // Obtener los periodos únicos de meses para rellenar el dropdown
-        const uniqueFinanceMonths = React.useMemo(() => {
-          const periods = new Set();
-          completedEvents.forEach(e => {
-            if (e.date) {
-              const [year, month] = e.date.split("-");
-              if (year && month) {
-                periods.add(`${year}-${month}`);
-              }
-            }
-          });
-          return Array.from(periods).sort().reverse();
-        }, [completedEvents]);
-
         const formatPeriod = (period) => {
           if (!period || period === "all") return "Todos los meses";
           const [year, monthStr] = period.split("-");
           const monthIndex = parseInt(monthStr, 10) - 1;
           return `${MONTH_NAMES[monthIndex]} ${year}`;
         };
-
-        const filteredCompletedEvents = React.useMemo(() => {
-          if (financeMonthFilter === "all") return completedEvents;
-          return completedEvents.filter(e => e.date && e.date.startsWith(financeMonthFilter));
-        }, [completedEvents, financeMonthFilter]);
 
         const baselineRate = workerProfile?.monto_transferencia ? parseFloat(workerProfile.monto_transferencia) : 25000;
 
