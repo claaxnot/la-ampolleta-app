@@ -6,6 +6,7 @@ import EventDetails from "../components/EventDetails.jsx";
 import GlassCard from "../components/GlassCard.jsx";
 import { permissions } from "../lib/permissions.js";
 import { toast } from "react-hot-toast";
+import { Copy } from "lucide-react";
 
 export default function Events({ user }) {
   const [events, setEvents] = useState([]);
@@ -22,10 +23,21 @@ export default function Events({ user }) {
 
   const rolePermissions = permissions[user?.systemRole] || permissions.viewer;
 
-  const openModal = (event = null) => {
+  const openModal = (event = null, isDuplicate = false) => {
     if (event) {
-      if (!rolePermissions.canEdit) return;
-      setEditingEvent(event);
+      if (isDuplicate) {
+        if (!rolePermissions.canCreate) return;
+        setEditingEvent({
+          ...event,
+          id: undefined,
+          name: `${event.name} (Copia)`,
+          isDuplicate: true,
+          duplicateFromId: event.id
+        });
+      } else {
+        if (!rolePermissions.canEdit) return;
+        setEditingEvent(event);
+      }
     } else {
       if (!rolePermissions.canCreate) return;
       setEditingEvent(null);
@@ -237,19 +249,28 @@ export default function Events({ user }) {
                   <td className="p-4">
                     <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border ${getStatusColor(event.status)}`}>{event.status}</span>
                   </td>
-                  <td className="p-4 flex gap-2">
+                  <td className="p-4 flex items-center gap-3">
                     <button 
                       onClick={() => openModal(event)} 
-                      className={`transition-colors ${!rolePermissions.canEdit ? 'opacity-50 cursor-not-allowed text-gray-500' : 'text-primary hover:text-white'}`}
-                      title={!rolePermissions.canEdit ? "Disponible solo para administradores" : ""}
+                      className={`transition-colors ${!rolePermissions.canEdit ? 'opacity-50 cursor-not-allowed text-gray-500' : 'text-primary hover:text-white font-medium text-sm'}`}
+                      title={!rolePermissions.canEdit ? "Disponible solo para administradores" : "Editar evento"}
                       disabled={!rolePermissions.canEdit}
                     >
                       Editar
                     </button>
                     <button 
+                      onClick={() => openModal(event, true)} 
+                      className={`transition-colors flex items-center gap-1 ${!rolePermissions.canCreate ? 'opacity-50 cursor-not-allowed text-gray-500' : 'text-emerald-400 hover:text-emerald-300 font-medium text-sm'}`}
+                      title={!rolePermissions.canCreate ? "Disponible solo para administradores" : "Duplicar este evento"}
+                      disabled={!rolePermissions.canCreate}
+                    >
+                      <Copy className="w-3.5 h-3.5" />
+                      <span>Duplicar</span>
+                    </button>
+                    <button 
                       onClick={() => handleDelete(event.id)} 
-                      className={`transition-colors ${!rolePermissions.canDelete ? 'opacity-50 cursor-not-allowed text-gray-500' : 'text-red-500 hover:text-red-300'}`}
-                      title={!rolePermissions.canDelete ? "Disponible solo para administradores" : ""}
+                      className={`transition-colors ${!rolePermissions.canDelete ? 'opacity-50 cursor-not-allowed text-gray-500' : 'text-red-500 hover:text-red-300 font-medium text-sm'}`}
+                      title={!rolePermissions.canDelete ? "Disponible solo para administradores" : "Eliminar evento"}
                       disabled={!rolePermissions.canDelete}
                     >
                       Eliminar

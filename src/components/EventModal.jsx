@@ -272,8 +272,9 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
           operational_info_pending: initialData.operational_info_pending || false
         });
 
-        if (initialData.id) {
-          supabase.from('event_assignments').select('staff_id, custom_rate').eq('event_id', initialData.id).then(({ data }) => {
+        const targetIdForAssignments = initialData.id || initialData.duplicateFromId;
+        if (targetIdForAssignments) {
+          supabase.from('event_assignments').select('staff_id, custom_rate').eq('event_id', targetIdForAssignments).then(({ data }) => {
             if (data) {
               setValue("staffIds", data.map(a => a.staff_id));
               const rates = {};
@@ -423,7 +424,7 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
                 <span className="p-2 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20">
                   <Calendar className="w-6 h-6" />
                 </span>
-                {initialData.id ? "Editar Evento" : "Crear Nuevo Evento"}
+                {initialData.id ? "Editar Evento" : initialData.isDuplicate ? "Duplicar Evento" : "Crear Nuevo Evento"}
               </h2>
 
               <form onSubmit={handleFormSubmit} className="space-y-6">
