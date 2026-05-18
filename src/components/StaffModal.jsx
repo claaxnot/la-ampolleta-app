@@ -34,7 +34,7 @@ export default function StaffModal({ isOpen, onClose, onSubmit, initialData = {}
       rut: "",
       email: "",
       role: "",
-      cuenta_origen: "",
+      cuenta_origen: "72052242",
       cuenta_destino: "",
       codigo_banco_destino: "",
       monto_transferencia: "",
@@ -52,7 +52,7 @@ export default function StaffModal({ isOpen, onClose, onSubmit, initialData = {}
           rut: initialData.rut || "",
           email: initialData.email || "",
           role: initialData.role || "",
-          cuenta_origen: initialData.cuenta_origen || "",
+          cuenta_origen: initialData.cuenta_origen || "72052242",
           cuenta_destino: initialData.cuenta_destino || "",
           codigo_banco_destino: initialData.codigo_banco_destino || "",
           monto_transferencia: initialData.monto_transferencia || "",
@@ -60,7 +60,7 @@ export default function StaffModal({ isOpen, onClose, onSubmit, initialData = {}
           mensaje_beneficiario: initialData.mensaje_beneficiario || "",
         });
       } else {
-        reset({ name: "", rut: "", email: "", role: "", cuenta_origen: "", cuenta_destino: "", codigo_banco_destino: "", monto_transferencia: "", glosa_transferencia: "", mensaje_beneficiario: "" });
+        reset({ name: "", rut: "", email: "", role: "", cuenta_origen: "72052242", cuenta_destino: "", codigo_banco_destino: "", monto_transferencia: "", glosa_transferencia: "", mensaje_beneficiario: "" });
       }
     }
   }, [initialData, isOpen, reset]);
@@ -145,7 +145,7 @@ export default function StaffModal({ isOpen, onClose, onSubmit, initialData = {}
                 </div>
 
                 <div className="mt-6 border-t border-gray-700 pt-4">
-                  <h3 className="text-lg font-semibold text-amber-500 mb-4">Datos Bancarios (Internos)</h3>
+                  <h3 className="text-lg font-semibold text-amber-500 mb-4">Datos Bancarios</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="flex flex-col">
                       <label htmlFor="cuenta_origen" className="text-gray-300 mb-1 text-sm">Cuenta Origen</label>
