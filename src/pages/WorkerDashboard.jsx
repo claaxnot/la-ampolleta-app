@@ -64,11 +64,13 @@ export default function WorkerDashboard({ user }) {
   };
 
   // Real-time Notifications state (Con estado de lectura y animaciones)
-  const [notifications, setNotifications] = useState([
+  const [notifications, setNotifications] = useState([]);
+
+  const fallbackMockNotifications = [
     { id: 1, title: "Actualización de Montaje", desc: "El montaje del concierto principal iniciará 30 min antes por pruebas técnicas.", type: "warning", time: "Hace 1 hora", read: false },
     { id: 2, title: "Protocolo de Bodega", desc: "Recordar el uso obligatorio de calzado de seguridad en la carga de equipos.", type: "info", time: "Hace 2 horas", read: false },
     { id: 3, title: "Documentación Pendiente", desc: "Sube tu boleta de honorarios de la producción anterior.", type: "danger", time: "Hace 1 día", read: true }
-  ]);
+  ];
 
   const fetchMyDbNotifications = async (workerId) => {
     try {
@@ -78,7 +80,10 @@ export default function WorkerDashboard({ user }) {
         .eq('user_id', workerId)
         .order('created_at', { ascending: false });
       
-      if (!error && data && data.length > 0) {
+      if (error) {
+        console.warn("⚠️ [NOTIFICATIONS TABLE]: La tabla no existe o error en consulta, usando datos simulados:", error.message);
+        setNotifications(fallbackMockNotifications);
+      } else if (data) {
         const formatted = data.map(n => ({
           id: n.id,
           title: n.title,
@@ -90,7 +95,8 @@ export default function WorkerDashboard({ user }) {
         setNotifications(formatted);
       }
     } catch (err) {
-      console.warn("⚠️ [NOTIFICATIONS TABLE]: No se pudo cargar notificaciones de BD, usando datos temporales:", err);
+      console.warn("⚠️ [NOTIFICATIONS TABLE]: Fallo de conexión, usando datos simulados:", err);
+      setNotifications(fallbackMockNotifications);
     }
   };
   
