@@ -56,6 +56,11 @@ export default function Login({ onLogin }) {
         console.warn("Could not fetch profile", profileError);
       }
 
+      if (profile?.status === 'Inactivo') {
+        await supabase.auth.signOut();
+        throw new Error("Tu cuenta se encuentra inactiva. Contacta al administrador para habilitar tu acceso.");
+      }
+
       const userInfo = {
         id: data.user.id,
         email: data.user.email,
