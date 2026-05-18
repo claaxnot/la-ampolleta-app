@@ -96,7 +96,12 @@ export default function WorkerDashboard({ user }) {
         status,
         event_id,
         events (
-          id, name, date, time, location, client, status, description
+          id, name, date, time, location, client, status, description,
+          call_time, setup_time, end_time, priority, operational_notes,
+          supervisor_id,
+          profiles:supervisor_id (
+            name
+          )
         )
       `)
       .eq('staff_id', workerId);
@@ -333,12 +338,10 @@ export default function WorkerDashboard({ user }) {
                 statusBadge = "bg-red-500/20 text-red-300 border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.1)]";
               }
 
-              // Presentation time is 2 hours before the event time
-              const presentationTime = event.time ? (() => {
-                const [h, m] = event.time.split(':');
-                const hr = (parseInt(h) - 2 + 24) % 24;
-                return `${String(hr).padStart(2, '0')}:${m || '00'} hrs`;
-              })() : 'Por definir';
+              // Real presentation time and supervisor name from DB
+              const presentationTime = event.call_time ? `${event.call_time.slice(0, 5)} hrs` : 'Por definir';
+              const supervisorName = event.profiles?.name || 'Por definir';
+              const priorityName = event.priority || 'Media';
 
               return (
                 <motion.div
@@ -351,7 +354,17 @@ export default function WorkerDashboard({ user }) {
                     <div className="flex flex-col lg:flex-row justify-between gap-6">
                       <div className="flex-1 space-y-4">
                         <div className="flex items-center justify-between flex-wrap gap-2">
-                          <h3 className="text-xl font-bold text-white tracking-wide">{event.name}</h3>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h3 className="text-xl font-bold text-white tracking-wide">{event.name}</h3>
+                            <span className={`text-[10px] px-2 py-0.5 rounded border font-semibold ${
+                              priorityName === "Crítica" ? "bg-red-500/20 text-red-300 border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.1)]" :
+                              priorityName === "Alta" ? "bg-amber-500/20 text-amber-300 border-amber-500/30" :
+                              priorityName === "Media" ? "bg-blue-500/20 text-blue-300 border-blue-500/30" :
+                              "bg-gray-500/20 text-gray-400 border-gray-500/30"
+                            }`}>
+                              Prioridad {priorityName}
+                            </span>
+                          </div>
                           <span className={`px-3 py-1 rounded-full text-xs font-semibold border capitalize ${statusBadge}`}>
                             Asistencia: {event.assignment_status}
                           </span>
@@ -384,8 +397,8 @@ export default function WorkerDashboard({ user }) {
 
                           <div className="flex flex-col gap-0.5">
                             <span className="text-[10px] text-gray-500 uppercase tracking-wider font-extrabold">Supervisor</span>
-                            <span className="flex items-center gap-1.5 font-semibold text-gray-100">
-                              👤 Carlos Ampolleta
+                            <span className="flex items-center gap-1.5 font-semibold text-gray-100 truncate">
+                              👤 {supervisorName}
                             </span>
                           </div>
 
@@ -399,10 +412,17 @@ export default function WorkerDashboard({ user }) {
                           <div className="flex flex-col gap-0.5">
                             <span className="text-[10px] text-gray-500 uppercase tracking-wider font-extrabold">Showtime</span>
                             <span className="flex items-center gap-1.5 font-semibold text-gray-100">
-                              🎬 {event.time}
+                              🎬 {event.time ? event.time.slice(0, 5) : 'Por definir'}
                             </span>
                           </div>
                         </div>
+
+                        {/* Notas operativas rápidas si existen */}
+                        {event.operational_notes && (
+                          <div className="text-xs bg-amber-500/5 text-amber-300 border border-amber-500/10 p-3 rounded-xl leading-relaxed">
+                            <strong>⚠️ Notas de Operación:</strong> {event.operational_notes}
+                          </div>
+                        )}
                       </div>
 
                       <div className="flex flex-row lg:flex-col justify-end items-center gap-3 mt-4 lg:mt-0 lg:self-center w-full lg:w-auto">
@@ -478,26 +498,26 @@ export default function WorkerDashboard({ user }) {
                           <div className="relative group">
                             <div className="absolute -left-[30px] top-1.5 w-4 h-4 rounded-full bg-emerald-500 border-4 border-gray-950 shadow-[0_0_10px_rgba(16,185,129,0.5)] group-hover:scale-125 transition-transform duration-300" />
                             <div className="flex items-center justify-between text-xs md:text-sm">
-                              <span className="font-bold text-emerald-300 font-mono">17:00</span>
-                              <span className="text-gray-200">Llegada al recinto y check-in inicial</span>
-                              <span className="text-[10px] bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded border border-emerald-500/20 font-medium">Llegada</span>
+                              <span className="font-bold text-emerald-300 font-mono">{event.setup_time ? event.setup_time.slice(0, 5) : 'Por definir'}</span>
+                              <span className="text-gray-200">Inicio de montaje técnico y descarga</span>
+                              <span className="text-[10px] bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded border border-emerald-500/20 font-medium">Montaje</span>
                             </div>
                           </div>
 
                           <div className="relative group">
                             <div className="absolute -left-[30px] top-1.5 w-4 h-4 rounded-full bg-amber-500 border-4 border-gray-950 shadow-[0_0_10px_rgba(245,158,11,0.5)] group-hover:scale-125 transition-transform duration-300" />
                             <div className="flex items-center justify-between text-xs md:text-sm">
-                              <span className="font-bold text-amber-300 font-mono">18:00</span>
-                              <span className="text-gray-200">Montaje y pruebas técnicas</span>
-                              <span className="text-[10px] bg-amber-500/10 text-amber-400 px-2 py-0.5 rounded border border-amber-500/20 font-medium">Montaje</span>
+                              <span className="font-bold text-amber-300 font-mono">{event.call_time ? event.call_time.slice(0, 5) : 'Por definir'}</span>
+                              <span className="text-gray-200">Hora de presentación (Call Time)</span>
+                              <span className="text-[10px] bg-amber-500/10 text-amber-400 px-2 py-0.5 rounded border border-amber-500/20 font-medium">Llegada</span>
                             </div>
                           </div>
 
                           <div className="relative group">
                             <div className="absolute -left-[30px] top-1.5 w-4 h-4 rounded-full bg-blue-500 border-4 border-gray-950 shadow-[0_0_10px_rgba(59,130,246,0.5)] group-hover:scale-125 transition-transform duration-300" />
                             <div className="flex items-center justify-between text-xs md:text-sm">
-                              <span className="font-bold text-blue-300 font-mono">20:00</span>
-                              <span className="text-gray-200">Inicio del evento (Showtime)</span>
+                              <span className="font-bold text-blue-300 font-mono">{event.time ? event.time.slice(0, 5) : 'Por definir'}</span>
+                              <span className="text-gray-200">Inicio de show / Transmisión principal</span>
                               <span className="text-[10px] bg-blue-500/10 text-blue-400 px-2 py-0.5 rounded border border-blue-500/20 font-medium">Showtime</span>
                             </div>
                           </div>
@@ -505,9 +525,9 @@ export default function WorkerDashboard({ user }) {
                           <div className="relative group">
                             <div className="absolute -left-[30px] top-1.5 w-4 h-4 rounded-full bg-red-500 border-4 border-gray-950 shadow-[0_0_10px_rgba(239,68,68,0.5)] group-hover:scale-125 transition-transform duration-300" />
                             <div className="flex items-center justify-between text-xs md:text-sm">
-                              <span className="font-bold text-red-300 font-mono">00:00</span>
+                              <span className="font-bold text-red-300 font-mono">{event.end_time ? event.end_time.slice(0, 5) : 'Por definir'}</span>
                               <span className="text-gray-200">Finalización del evento y desmontaje</span>
-                              <span className="text-[10px] bg-red-500/10 text-red-400 px-2 py-0.5 rounded border border-red-500/20 font-medium">Desmontaje</span>
+                              <span className="text-[10px] bg-red-500/10 text-red-400 px-2 py-0.5 rounded border border-red-500/20 font-medium">Término</span>
                             </div>
                           </div>
                         </div>
@@ -710,13 +730,30 @@ export default function WorkerDashboard({ user }) {
                 <div className="bg-white/5 p-4 rounded-xl space-y-2 border border-white/5 shadow-inner">
                   <p><strong className="text-amber-400">Cliente:</strong> {selectedDetailedEvent.client || 'Por definir'}</p>
                   <p><strong className="text-amber-400">Ubicación:</strong> {selectedDetailedEvent.location}</p>
-                  <p><strong className="text-amber-400">Hora de Montaje:</strong> 2 horas antes ({selectedDetailedEvent.time})</p>
-                  <p><strong className="text-amber-400">Estado del Evento:</strong> {selectedDetailedEvent.status}</p>
+                  <p><strong className="text-amber-400">Prioridad:</strong> {selectedDetailedEvent.priority || 'Media'}</p>
+                  <p><strong className="text-amber-400">Estado Operacional:</strong> {selectedDetailedEvent.status}</p>
                 </div>
+
+                <div className="bg-black/30 p-4 rounded-xl space-y-1.5 border border-white/5 text-xs">
+                  <h4 className="font-bold text-white uppercase tracking-wider text-amber-400 mb-1.5">⏱ Horarios de Producción</h4>
+                  <p><strong className="text-gray-400">Montaje:</strong> {selectedDetailedEvent.setup_time ? selectedDetailedEvent.setup_time.slice(0, 5) : 'Por definir'} hrs</p>
+                  <p><strong className="text-gray-400">Presentación:</strong> {selectedDetailedEvent.call_time ? selectedDetailedEvent.call_time.slice(0, 5) : 'Por definir'} hrs</p>
+                  <p><strong className="text-gray-400">Inicio Show:</strong> {selectedDetailedEvent.time ? selectedDetailedEvent.time.slice(0, 5) : 'Por definir'} hrs</p>
+                  <p><strong className="text-gray-400">Término Show:</strong> {selectedDetailedEvent.end_time ? selectedDetailedEvent.end_time.slice(0, 5) : 'Por definir'} hrs</p>
+                </div>
+
+                {selectedDetailedEvent.operational_notes && (
+                  <div className="space-y-1">
+                    <h4 className="font-bold text-white text-xs uppercase tracking-wider text-amber-400">⚠️ Notas Operativas:</h4>
+                    <p className="text-amber-200 bg-amber-950/20 p-3 rounded-xl border border-amber-500/10 leading-relaxed text-xs">
+                      {selectedDetailedEvent.operational_notes}
+                    </p>
+                  </div>
+                )}
 
                 <div className="space-y-1">
                   <h4 className="font-bold text-white text-xs uppercase tracking-wider text-amber-400">Descripción del Evento:</h4>
-                  <p className="text-gray-400 italic bg-black/20 p-3 rounded-xl border border-white/5 leading-relaxed">
+                  <p className="text-gray-400 italic bg-black/20 p-3 rounded-xl border border-white/5 leading-relaxed text-xs">
                     {selectedDetailedEvent.description || "Sin descripción adicional proporcionada para esta fecha de producción."}
                   </p>
                 </div>

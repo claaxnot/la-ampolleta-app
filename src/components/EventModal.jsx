@@ -5,20 +5,53 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import GlassCard from "../components/GlassCard.jsx";
 import Button from "../components/Button.jsx";
-import { X, Search, Filter } from "lucide-react";
+import { 
+  X, Search, Filter, Calendar, Clock, MapPin, 
+  Users, UserCheck, Shield, ChevronDown, Check,
+  AlertCircle, FileText, Activity, AlertTriangle
+} from "lucide-react";
 import { supabase } from "../lib/supabase.js";
 
-// Zod Schema para validaciones estrictas del evento
+// Zod Schema con validaciones operacionales estrictas
 const eventSchema = z.object({
   name: z.string().min(3, "El nombre debe tener al menos 3 caracteres"),
   client: z.string().min(2, "El nombre del cliente es obligatorio"),
   date: z.string().min(1, "Selecciona una fecha"),
-  time: z.string().min(1, "Ingresa una hora válida"),
+  time: z.string().min(1, "La hora de inicio es obligatoria"),
   location: z.string().min(3, "La ubicación es obligatoria"),
   requiredStaff: z.coerce.number().min(1, "Debe requerir al menos 1 persona"),
   description: z.string().optional(),
-  status: z.enum(["Planificado", "Confirmado", "Activo", "Completado"]),
+  status: z.enum(["Planificado", "Confirmado", "En progreso", "Finalizado", "Cancelado"]),
   staffIds: z.array(z.string()),
+  
+  // Nuevos campos operacionales
+  supervisor_id: z.string().nullable().optional(),
+  call_time: z.string().min(1, "La hora de presentación es obligatoria"),
+  setup_time: z.string().min(1, "La hora de montaje es obligatoria"),
+  end_time: z.string().min(1, "La hora de finalización es obligatoria"),
+  priority: z.enum(["Baja", "Media", "Alta", "Crítica"]),
+  operational_notes: z.string().optional(),
+}).refine((data) => {
+  // Validar: hora presentación < hora inicio
+  if (!data.call_time || !data.time) return true;
+  return data.call_time < data.time;
+}, {
+  message: "La hora de presentación debe ser anterior a la hora de inicio",
+  path: ["call_time"]
+}).refine((data) => {
+  // Validar: hora montaje <= presentación
+  if (!data.setup_time || !data.call_time) return true;
+  return data.setup_time <= data.call_time;
+}, {
+  message: "La hora de montaje debe ser anterior o igual a la de presentación",
+  path: ["setup_time"]
+}).refine((data) => {
+  // Validar: hora finalización > inicio
+  if (!data.end_time || !data.time) return true;
+  return data.end_time > data.time;
+}, {
+  message: "La hora de finalización debe ser posterior a la de inicio del evento",
+  path: ["end_time"]
 });
 
 export default function EventModal({ isOpen, onClose, onSubmit, initialData = {} }) {
@@ -41,11 +74,18 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
       description: "",
       status: "Planificado",
       staffIds: [],
+      supervisor_id: "",
+      call_time: "",
+      setup_time: "",
+      end_time: "",
+      priority: "Media",
+      operational_notes: ""
     }
   });
 
-  const selectedStaffIds = watch("staffIds");
+  const selectedStaffIds = watch("staffIds") || [];
   const eventDate = watch("date");
+  const selectedSupervisorId = watch("supervisor_id");
 
   const [staffSearch, setStaffSearch] = useState("");
   const [staffRole, setStaffRole] = useState("");
@@ -53,10 +93,18 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
   const [availabilityMap, setAvailabilityMap] = useState({});
   const [assignedStaffMap, setAssignedStaffMap] = useState({});
   const [isLoadingAvailability, setIsLoadingAvailability] = useState(false);
+  
+  // Searchable select para Supervisor
+  const [supervisorSearch, setSupervisorSearch] = useState("");
+  const [isSupervisorDropdownOpen, setIsSupervisorDropdownOpen] = useState(false);
 
   useEffect(() => {
     const fetchStaff = async () => {
-      const { data } = await supabase.from('profiles').select('*').eq('status', 'Activo').neq('email', 'admin@laampolleta.tv');
+      const { data } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('status', 'Activo')
+        .neq('email', 'admin@laampolleta.tv');
       if (data) setDbStaff(data);
     };
     fetchStaff();
@@ -136,8 +184,9 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
     const matchesSearch = s.name?.toLowerCase().includes(staffSearch.toLowerCase());
     const matchesRole = staffRole === "" ? true : s.role?.toLowerCase() === staffRole;
 
-    // Show selected ones ALWAYS so the admin can manage them,
-    // otherwise show ONLY available workers if date is set
+    // Solo mostrar trabajadores disponibles para la fecha seleccionada.
+    // Ocultar trabajadores ocupados (busy), no disponibles o asignados a otro evento.
+    // Mostrar SIEMPRE si ya están seleccionados en este evento específico (para poder editarlos)
     const isChecked = selectedStaffIds.includes(s.id);
     const status = getStaffStatus(s.id);
     const isStaffAvailable = !eventDate || isChecked || status === "Disponible";
@@ -147,9 +196,18 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
 
   const availableCount = activeStaff.filter(s => !eventDate || getStaffStatus(s.id) === "Disponible").length;
 
+  const filteredSupervisors = dbStaff.filter(s => 
+    s.name?.toLowerCase().includes(supervisorSearch.toLowerCase())
+  );
+
+  const selectedSupervisor = dbStaff.find(s => s.id === selectedSupervisorId);
+
   // Sync initial data for edit mode or reset when opening
   useEffect(() => {
     if (isOpen) {
+      setSupervisorSearch("");
+      setIsSupervisorDropdownOpen(false);
+      
       if (initialData && Object.keys(initialData).length > 0) {
         reset({
           name: initialData.name || "",
@@ -160,7 +218,13 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
           requiredStaff: initialData.required_staff || initialData.requiredStaff || 1,
           description: initialData.description || "",
           status: initialData.status || "Planificado",
-          staffIds: [], // We fetch them below
+          staffIds: [],
+          supervisor_id: initialData.supervisor_id || "",
+          call_time: initialData.call_time || "",
+          setup_time: initialData.setup_time || "",
+          end_time: initialData.end_time || "",
+          priority: initialData.priority || "Media",
+          operational_notes: initialData.operational_notes || ""
         });
         
         // Fetch assigned staff for this event
@@ -174,7 +238,9 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
       } else {
         reset({
           name: "", client: "", date: "", time: "", location: "",
-          requiredStaff: 1, description: "", status: "Planificado", staffIds: []
+          requiredStaff: 1, description: "", status: "Planificado", staffIds: [],
+          supervisor_id: "", call_time: "", setup_time: "", end_time: "",
+          priority: "Media", operational_notes: ""
         });
       }
     }
@@ -183,7 +249,8 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
   const onSubmitForm = (data) => {
     const eventData = { ...data };
     if (initialData.id) eventData.id = initialData.id;
-    // Pasa los staffIds a la función padre para procesar la asignación
+    // Map empty string supervisor to null for DB foreign key safety
+    if (!eventData.supervisor_id) eventData.supervisor_id = null;
     eventData.staffIds = data.staffIds || [];
     
     onSubmit(eventData);
@@ -203,147 +270,335 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
     <AnimatePresence>
       {isOpen && (
         <motion.div
-          className="fixed inset-0 flex items-center justify-center z-50 bg-black/60 backdrop-blur overflow-y-auto"
+          className="fixed inset-0 flex items-center justify-center z-50 bg-black/80 backdrop-blur overflow-y-auto p-4 md:p-6"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
         >
           <motion.div
-            className="relative w-full max-w-2xl mx-4 my-8"
-            initial={{ scale: 0.9, opacity: 0 }}
+            className="relative w-full max-w-3xl my-auto"
+            initial={{ scale: 0.95, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0.9, opacity: 0 }}
+            exit={{ scale: 0.95, opacity: 0 }}
             transition={{ duration: 0.2 }}
           >
-            <GlassCard className="p-6 relative">
-              <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-white transition-colors">
+            <GlassCard className="p-6 md:p-8 relative border border-white/10 shadow-2xl max-h-[90vh] overflow-y-auto">
+              
+              <button 
+                type="button"
+                onClick={onClose} 
+                className="absolute top-5 right-5 text-gray-400 hover:text-white transition-colors p-1 bg-white/5 rounded-full hover:bg-white/10"
+              >
                 <X className="w-5 h-5" />
               </button>
-              <h2 className="text-2xl font-bold mb-6 text-white">
-                {initialData.id ? "Editar Evento" : "Crear Nuevo Evento"}
+              
+              <h2 className="text-2xl font-black mb-6 text-white tracking-tight flex items-center gap-2.5">
+                <span className="p-2 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                  <Calendar className="w-6 h-6" />
+                </span>
+                {initialData.id ? "Editar Evento Operacional" : "Crear Nuevo Evento Operacional"}
               </h2>
               
-              <form onSubmit={handleSubmit(onSubmitForm)} className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="flex flex-col">
-                    <label className="text-gray-300 mb-1" htmlFor="name">Nombre del Evento</label>
-                    <input 
-                      id="name" 
-                      placeholder="Ej: Concierto..." 
-                      {...register("name")} 
-                      className={`w-full bg-gray-800/50 border rounded-xl p-2 text-white placeholder-gray-500 ${errors.name ? 'border-red-500 focus:ring-red-500' : 'border-gray-700'}`} 
-                    />
-                    {errors.name && <span className="text-red-400 text-xs mt-1">{errors.name.message}</span>}
-                  </div>
-                  
-                  <div className="flex flex-col">
-                    <label className="text-gray-300 mb-1" htmlFor="client">Cliente</label>
-                    <input 
-                      id="client" 
-                      placeholder="Empresa o Persona" 
-                      {...register("client")} 
-                      className={`w-full bg-gray-800/50 border rounded-xl p-2 text-white placeholder-gray-500 ${errors.client ? 'border-red-500 focus:ring-red-500' : 'border-gray-700'}`} 
-                    />
-                    {errors.client && <span className="text-red-400 text-xs mt-1">{errors.client.message}</span>}
-                  </div>
-                  
-                  <div className="flex flex-col">
-                    <label className="text-gray-300 mb-1" htmlFor="date">Fecha</label>
-                    <input 
-                      id="date" 
-                      type="date" 
-                      {...register("date")} 
-                      className={`w-full bg-gray-800/50 border rounded-xl p-2 text-white ${errors.date ? 'border-red-500 focus:ring-red-500' : 'border-gray-700'}`} 
-                    />
-                    {errors.date && <span className="text-red-400 text-xs mt-1">{errors.date.message}</span>}
-                  </div>
-                  
-                  <div className="flex flex-col">
-                    <label className="text-gray-300 mb-1" htmlFor="time">Hora</label>
-                    <input 
-                      id="time" 
-                      type="time" 
-                      {...register("time")} 
-                      className={`w-full bg-gray-800/50 border rounded-xl p-2 text-white ${errors.time ? 'border-red-500 focus:ring-red-500' : 'border-gray-700'}`} 
-                    />
-                    {errors.time && <span className="text-red-400 text-xs mt-1">{errors.time.message}</span>}
-                  </div>
-                  
-                  <div className="flex flex-col">
-                    <label className="text-gray-300 mb-1" htmlFor="location">Ubicación</label>
-                    <input 
-                      id="location" 
-                      placeholder="Dirección del evento" 
-                      {...register("location")} 
-                      className={`w-full bg-gray-800/50 border rounded-xl p-2 text-white placeholder-gray-500 ${errors.location ? 'border-red-500 focus:ring-red-500' : 'border-gray-700'}`} 
-                    />
-                    {errors.location && <span className="text-red-400 text-xs mt-1">{errors.location.message}</span>}
-                  </div>
-                  
-                  <div className="flex flex-col">
-                    <label className="text-gray-300 mb-1" htmlFor="requiredStaff">Staff requerido</label>
-                    <input 
-                      id="requiredStaff" 
-                      type="number" 
-                      min="1" 
-                      {...register("requiredStaff")} 
-                      className={`w-full bg-gray-800/50 border rounded-xl p-2 text-white ${errors.requiredStaff ? 'border-red-500 focus:ring-red-500' : 'border-gray-700'}`} 
-                    />
-                    {errors.requiredStaff && <span className="text-red-400 text-xs mt-1">{errors.requiredStaff.message}</span>}
-                  </div>
-                </div>
+              <form onSubmit={handleSubmit(onSubmitForm)} className="space-y-6">
                 
-                <div className="flex flex-col">
-                  <label className="text-gray-300 mb-1" htmlFor="description">Descripción</label>
-                  <textarea 
-                    id="description" 
-                    placeholder="Detalles adicionales..." 
-                    {...register("description")} 
-                    className="w-full h-24 bg-gray-800/50 border border-gray-700 rounded-xl p-2 text-white placeholder-gray-500" 
-                  />
+                {/* 1️⃣ SECCIÓN: INFORMACIÓN GENERAL */}
+                <div className="border-b border-white/5 pb-5">
+                  <h3 className="text-xs font-extrabold text-amber-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                    <FileText className="w-4 h-4" /> Información General
+                  </h3>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="flex flex-col">
+                      <label className="text-gray-300 mb-1.5 text-xs font-semibold" htmlFor="name">Nombre del Evento</label>
+                      <input 
+                        id="name" 
+                        placeholder="Ej: Producción Live Lollapalooza..." 
+                        {...register("name")} 
+                        className={`w-full bg-gray-800/50 border rounded-xl p-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-amber-500/50 transition-colors ${errors.name ? 'border-red-500 focus:ring-red-500' : 'border-gray-700'}`} 
+                      />
+                      {errors.name && <span className="text-red-400 text-xs mt-1">{errors.name.message}</span>}
+                    </div>
+                    
+                    <div className="flex flex-col">
+                      <label className="text-gray-300 mb-1.5 text-xs font-semibold" htmlFor="client">Cliente</label>
+                      <input 
+                        id="client" 
+                        placeholder="Ej: TVN Chile" 
+                        {...register("client")} 
+                        className={`w-full bg-gray-800/50 border rounded-xl p-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-amber-500/50 transition-colors ${errors.client ? 'border-red-500 focus:ring-red-500' : 'border-gray-700'}`} 
+                      />
+                      {errors.client && <span className="text-red-400 text-xs mt-1">{errors.client.message}</span>}
+                    </div>
+                    
+                    <div className="flex flex-col">
+                      <label className="text-gray-300 mb-1.5 text-xs font-semibold" htmlFor="location">Ubicación</label>
+                      <input 
+                        id="location" 
+                        placeholder="Dirección o Recinto del evento" 
+                        {...register("location")} 
+                        className={`w-full bg-gray-800/50 border rounded-xl p-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-amber-500/50 transition-colors ${errors.location ? 'border-red-500 focus:ring-red-500' : 'border-gray-700'}`} 
+                      />
+                      {errors.location && <span className="text-red-400 text-xs mt-1">{errors.location.message}</span>}
+                    </div>
+
+                    <div className="flex flex-col">
+                      <label className="text-gray-300 mb-1.5 text-xs font-semibold" htmlFor="requiredStaff">Staff Requerido</label>
+                      <input 
+                        id="requiredStaff" 
+                        type="number" 
+                        min="1" 
+                        {...register("requiredStaff")} 
+                        className={`w-full bg-gray-800/50 border rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-amber-500/50 transition-colors ${errors.requiredStaff ? 'border-red-500 focus:ring-red-500' : 'border-gray-700'}`} 
+                      />
+                      {errors.requiredStaff && <span className="text-red-400 text-xs mt-1">{errors.requiredStaff.message}</span>}
+                    </div>
+                  </div>
                 </div>
-                
-                <div className="flex items-center space-x-4">
-                  <label className="text-gray-300" htmlFor="status">Estado:</label>
-                  <select 
-                    id="status" 
-                    {...register("status")} 
-                    className="bg-gray-800/50 border border-gray-700 rounded-xl p-2 text-white focus:ring-1 focus:ring-primary"
-                  >
-                    <option value="Planificado">Planificado</option>
-                    <option value="Confirmado">Confirmado</option>
-                    <option value="Activo">Activo</option>
-                    <option value="Completado">Completado</option>
-                  </select>
+
+                {/* 2️⃣ SECCIÓN: HORARIOS DE LA PRODUCCIÓN */}
+                <div className="border-b border-white/5 pb-5">
+                  <h3 className="text-xs font-extrabold text-amber-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                    <Clock className="w-4 h-4" /> Horarios de la Producción
+                  </h3>
+
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                    <div className="flex flex-col col-span-2 md:col-span-1">
+                      <label className="text-gray-300 mb-1.5 text-xs font-semibold" htmlFor="date">Fecha del Evento</label>
+                      <input 
+                        id="date" 
+                        type="date" 
+                        {...register("date")} 
+                        className={`w-full bg-gray-800/50 border rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-amber-500/50 transition-colors ${errors.date ? 'border-red-500 focus:ring-red-500' : 'border-gray-700'}`} 
+                      />
+                      {errors.date && <span className="text-red-400 text-xs mt-1">{errors.date.message}</span>}
+                    </div>
+
+                    <div className="flex flex-col">
+                      <label className="text-gray-300 mb-1.5 text-xs font-semibold" htmlFor="setup_time">Hora Montaje</label>
+                      <input 
+                        id="setup_time" 
+                        type="time" 
+                        {...register("setup_time")} 
+                        className={`w-full bg-gray-800/50 border rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-amber-500/50 transition-colors ${errors.setup_time ? 'border-red-500 focus:ring-red-500' : 'border-gray-700'}`} 
+                      />
+                      {errors.setup_time && <span className="text-red-400 text-xs mt-1">{errors.setup_time.message}</span>}
+                    </div>
+
+                    <div className="flex flex-col">
+                      <label className="text-gray-300 mb-1.5 text-xs font-semibold" htmlFor="call_time">Hora Presentación</label>
+                      <input 
+                        id="call_time" 
+                        type="time" 
+                        {...register("call_time")} 
+                        className={`w-full bg-gray-800/50 border rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-amber-500/50 transition-colors ${errors.call_time ? 'border-red-500 focus:ring-red-500' : 'border-gray-700'}`} 
+                      />
+                      {errors.call_time && <span className="text-red-400 text-xs mt-1">{errors.call_time.message}</span>}
+                    </div>
+
+                    <div className="flex flex-col">
+                      <label className="text-gray-300 mb-1.5 text-xs font-semibold" htmlFor="time">Hora Inicio Show</label>
+                      <input 
+                        id="time" 
+                        type="time" 
+                        {...register("time")} 
+                        className={`w-full bg-gray-800/50 border rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-amber-500/50 transition-colors ${errors.time ? 'border-red-500 focus:ring-red-500' : 'border-gray-700'}`} 
+                      />
+                      {errors.time && <span className="text-red-400 text-xs mt-1">{errors.time.message}</span>}
+                    </div>
+
+                    <div className="flex flex-col">
+                      <label className="text-gray-300 mb-1.5 text-xs font-semibold" htmlFor="end_time">Hora Término</label>
+                      <input 
+                        id="end_time" 
+                        type="time" 
+                        {...register("end_time")} 
+                        className={`w-full bg-gray-800/50 border rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-amber-500/50 transition-colors ${errors.end_time ? 'border-red-500 focus:ring-red-500' : 'border-gray-700'}`} 
+                      />
+                      {errors.end_time && <span className="text-red-400 text-xs mt-1">{errors.end_time.message}</span>}
+                    </div>
+                  </div>
                 </div>
-                          {/* Staff assignment */}
+
+                {/* 3️⃣ SECCIÓN: ESTADO, PRIORIDAD Y COORDINACIÓN */}
+                <div className="border-b border-white/5 pb-5">
+                  <h3 className="text-xs font-extrabold text-amber-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                    <Activity className="w-4 h-4" /> Configuración & Coordinación
+                  </h3>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    
+                    {/* Supervisor del Evento (Searchable Dropdown) */}
+                    <div className="flex flex-col relative">
+                      <label className="text-gray-300 mb-1.5 text-xs font-semibold" htmlFor="supervisor_id">Supervisor del Evento</label>
+                      <div className="relative">
+                        <button
+                          type="button"
+                          onClick={() => setIsSupervisorDropdownOpen(!isSupervisorDropdownOpen)}
+                          className="w-full bg-gray-800/50 border border-gray-700 rounded-xl p-2.5 text-sm text-white flex items-center justify-between text-left focus:outline-none focus:border-amber-500/50 transition-colors"
+                        >
+                          {selectedSupervisor ? (
+                            <span className="flex items-center gap-2">
+                              <img src={selectedSupervisor.avatar || "https://ui-avatars.com/api/?name=" + selectedSupervisor.name} alt="" className="w-5 h-5 rounded-full" />
+                              <span className="truncate max-w-[130px] font-medium">{selectedSupervisor.name}</span>
+                            </span>
+                          ) : (
+                            <span className="text-gray-500 font-medium">Asignar supervisor...</span>
+                          )}
+                          <ChevronDown className="w-4 h-4 text-gray-400 shrink-0" />
+                        </button>
+
+                        <AnimatePresence>
+                          {isSupervisorDropdownOpen && (
+                            <motion.div
+                              initial={{ opacity: 0, y: -8 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              exit={{ opacity: 0, y: -8 }}
+                              className="absolute z-50 w-full mt-2 bg-gray-900 border border-white/10 rounded-2xl p-3 shadow-2xl backdrop-blur-md max-h-48 overflow-y-auto"
+                            >
+                              <div className="relative mb-2">
+                                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-500" />
+                                <input
+                                  type="text"
+                                  placeholder="Buscar por nombre..."
+                                  value={supervisorSearch}
+                                  onChange={(e) => setSupervisorSearch(e.target.value)}
+                                  className="w-full pl-8 pr-3 py-1.5 bg-black/40 border border-gray-700 rounded-lg text-xs text-white placeholder-gray-500 focus:outline-none focus:border-amber-500/50"
+                                />
+                              </div>
+                              <div className="space-y-1">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setValue("supervisor_id", "");
+                                    setIsSupervisorDropdownOpen(false);
+                                  }}
+                                  className="w-full text-left px-2.5 py-2 text-xs text-red-400 hover:bg-white/5 rounded-lg transition-colors font-medium flex items-center justify-between"
+                                >
+                                  <span>Sin Supervisor</span>
+                                  {!selectedSupervisorId && <Check className="w-3.5 h-3.5" />}
+                                </button>
+                                {filteredSupervisors.map(s => (
+                                  <button
+                                    key={s.id}
+                                    type="button"
+                                    onClick={() => {
+                                      setValue("supervisor_id", s.id);
+                                      setIsSupervisorDropdownOpen(false);
+                                    }}
+                                    className="w-full text-left px-2.5 py-2 text-xs text-gray-200 hover:bg-white/5 rounded-lg transition-colors flex items-center justify-between gap-2"
+                                  >
+                                    <span className="flex items-center gap-2">
+                                      <img src={s.avatar || "https://ui-avatars.com/api/?name=" + s.name} alt="" className="w-5 h-5 rounded-full" />
+                                      <span className="truncate">{s.name} ({s.role})</span>
+                                    </span>
+                                    {selectedSupervisorId === s.id && <Check className="w-3.5 h-3.5 text-amber-400" />}
+                                  </button>
+                                ))}
+                              </div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col">
+                      <label className="text-gray-300 mb-1.5 text-xs font-semibold" htmlFor="status">Estado Operacional</label>
+                      <select 
+                        id="status" 
+                        {...register("status")} 
+                        className="bg-gray-800/50 border border-gray-700 rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-amber-500/50 transition-colors"
+                      >
+                        <option value="Planificado">Planificado</option>
+                        <option value="Confirmado">Confirmado</option>
+                        <option value="En progreso">En progreso</option>
+                        <option value="Finalizado">Finalizado</option>
+                        <option value="Cancelado">Cancelado</option>
+                      </select>
+                    </div>
+
+                    <div className="flex flex-col">
+                      <label className="text-gray-300 mb-1.5 text-xs font-semibold" htmlFor="priority">Prioridad</label>
+                      <select 
+                        id="priority" 
+                        {...register("priority")} 
+                        className="bg-gray-800/50 border border-gray-700 rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-amber-500/50 transition-colors"
+                      >
+                        <option value="Baja">Baja (Gris)</option>
+                        <option value="Media">Media (Azul)</option>
+                        <option value="Alta">Alta (Amarillo)</option>
+                        <option value="Crítica">Crítica (Rojo)</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 4️⃣ SECCIÓN: NOTAS OPERATIVAS & DESCRIPCIÓN */}
+                <div className="border-b border-white/5 pb-5">
+                  <h3 className="text-xs font-extrabold text-amber-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                    <FileText className="w-4 h-4" /> Notas de Campo & Descripción
+                  </h3>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="flex flex-col">
+                      <label className="text-gray-300 mb-1.5 text-xs font-semibold" htmlFor="description">Detalles de la Producción</label>
+                      <textarea 
+                        id="description" 
+                        placeholder="Descripción general, requerimientos logísticos..." 
+                        {...register("description")} 
+                        className="w-full h-24 bg-gray-800/50 border border-gray-700 rounded-xl p-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-amber-500/50" 
+                      />
+                    </div>
+                    
+                    <div className="flex flex-col">
+                      <label className="text-gray-300 mb-1.5 text-xs font-semibold" htmlFor="operational_notes">Notas Operativas (Acceso, Contactos, Instrucciones)</label>
+                      <textarea 
+                        id="operational_notes" 
+                        placeholder="Ej: Acceso de carga por calle norte. Contacto cliente: 912345678. Exigir credenciales..." 
+                        {...register("operational_notes")} 
+                        className="w-full h-24 bg-gray-800/50 border border-gray-700 rounded-xl p-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-amber-500/50" 
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* 5️⃣ SECCIÓN: ASIGNACIÓN DE STAFF CON VALIDACIÓN DE DISPONIBILIDAD */}
                 <div>
-                  <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-2 gap-2">
+                  <h3 className="text-xs font-extrabold text-amber-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                    <Users className="w-4 h-4" /> Asignación de Staff
+                  </h3>
+
+                  <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-3 gap-2">
                     <div className="flex items-center gap-2">
-                      <label className="text-gray-300">Asignar Staff:</label>
-                      {eventDate && (
-                        <span className="text-xs bg-amber-500/10 text-amber-300 border border-amber-500/20 px-2 py-0.5 rounded-full font-medium">
-                          {availableCount} {availableCount === 1 ? 'trabajador disponible' : 'trabajadores disponibles'}
+                      <span className="text-xs text-gray-300 font-semibold">Trabajadores Disponibles:</span>
+                      {eventDate ? (
+                        <span className="text-xs bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 px-2 py-0.5 rounded-full font-bold shadow-inner">
+                          {availableCount} {availableCount === 1 ? 'disponible' : 'disponibles'}
+                        </span>
+                      ) : (
+                        <span className="text-xs bg-white/5 text-gray-400 border border-white/5 px-2 py-0.5 rounded-full font-medium">
+                          Selecciona una fecha
                         </span>
                       )}
                     </div>
+                    
                     <div className="flex flex-wrap gap-2 w-full md:w-auto">
                       <div className="relative flex-1 md:flex-initial">
-                        <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
                         <input 
                           type="text" 
-                          placeholder="Buscar nombre..." 
+                          placeholder="Buscar por nombre..." 
                           value={staffSearch}
                           onChange={(e) => setStaffSearch(e.target.value)}
-                          className="w-full pl-8 pr-2 py-1.5 bg-gray-800/80 border border-gray-700 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-primary/50"
+                          className="w-full pl-8 pr-2 py-1.5 bg-gray-800/80 border border-gray-700 rounded-lg text-xs text-white placeholder-gray-500 focus:outline-none focus:border-amber-500/50"
                         />
                       </div>
+                      
                       <div className="relative flex-1 md:flex-initial">
-                        <Filter className="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+                        <Filter className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
                         <select 
                           value={staffRole}
                           onChange={(e) => setStaffRole(e.target.value)}
-                          className="w-full pl-8 pr-6 py-1.5 bg-gray-800/80 border border-gray-700 rounded-lg text-sm text-white focus:outline-none focus:border-primary/50 appearance-none capitalize"
+                          className="w-full pl-8 pr-6 py-1.5 bg-gray-800/80 border border-gray-700 rounded-lg text-xs text-white focus:outline-none focus:border-amber-500/50 appearance-none capitalize"
                         >
                           <option value="">Todos los roles</option>
                           {uniqueRoles.map(role => (
@@ -354,11 +609,19 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2 bg-black/20 p-3 rounded-xl border border-white/5 max-h-48 overflow-y-auto">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2 bg-black/30 p-3.5 rounded-xl border border-white/5 max-h-48 overflow-y-auto">
                     {isLoadingAvailability ? (
-                      <p className="text-gray-400 text-sm col-span-2 text-center py-4">Consultando disponibilidad...</p>
+                      <p className="text-gray-400 text-xs col-span-2 text-center py-4 flex items-center justify-center gap-2">
+                        <svg className="animate-spin h-4 w-4 text-amber-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Consultando estado de disponibilidad real...
+                      </p>
                     ) : filteredStaff.length === 0 ? (
-                      <p className="text-gray-400 text-sm col-span-2 text-center py-4">No hay staff disponible que coincida con los filtros.</p>
+                      <p className="text-gray-400 text-xs col-span-2 text-center py-4">
+                        No hay trabajadores disponibles que coincidan con la búsqueda.
+                      </p>
                     ) : (
                       filteredStaff.map((staff) => {
                         const isChecked = selectedStaffIds.includes(staff.id);
@@ -374,16 +637,16 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
                                 type="checkbox" 
                                 checked={isChecked}
                                 onChange={() => toggleStaff(staff.id)}
-                                className="form-checkbox h-4 w-4 text-primary bg-gray-700 border-gray-600 rounded" 
+                                className="form-checkbox h-4 w-4 text-amber-500 bg-gray-700 border-gray-600 rounded focus:ring-amber-500/50" 
                               />
                               <span className="flex items-center gap-2">
                                 <img src={staff.avatar || "https://ui-avatars.com/api/?name=" + staff.name} alt="" className="w-6 h-6 rounded-full" />
-                                <span className="truncate max-w-[125px]">{staff.name}</span>
-                                <span className="text-xs text-gray-400 capitalize">({staff.role})</span>
+                                <span className="truncate max-w-[125px] text-xs font-semibold">{staff.name}</span>
+                                <span className="text-[10px] text-gray-400 capitalize">({staff.role})</span>
                               </span>
                             </div>
                             {eventDate && (
-                              <span className={`px-2 py-0.5 text-[10px] rounded-full border font-semibold ${badgeColor}`}>
+                              <span className={`px-2 py-0.5 text-[9px] rounded-full border font-bold ${badgeColor}`}>
                                 {status}
                               </span>
                             )}
@@ -393,12 +656,14 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
                     )}
                   </div>
                 </div>
-                
+
                 <div className="flex justify-end space-x-3 mt-6 pt-4 border-t border-gray-800">
                   <Button type="button" variant="secondary" onClick={onClose}>Cancelar</Button>
-                  <Button type="submit" variant="primary">{initialData.id ? "Actualizar" : "Crear"}</Button>
+                  <Button type="submit" variant="primary">{initialData.id ? "Actualizar Evento" : "Crear Evento"}</Button>
                 </div>
+
               </form>
+
             </GlassCard>
           </motion.div>
         </motion.div>
