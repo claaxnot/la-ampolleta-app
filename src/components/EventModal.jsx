@@ -8,11 +8,11 @@ import Button from "../components/Button.jsx";
 import { 
   X, Search, Filter, Calendar, Clock, MapPin, 
   Users, UserCheck, Shield, ChevronDown, Check,
-  AlertCircle, FileText, Activity, AlertTriangle
+  AlertCircle, FileText, Activity, AlertTriangle, Settings, Sliders
 } from "lucide-react";
 import { supabase } from "../lib/supabase.js";
 
-// Zod Schema con validaciones operacionales estrictas
+// Zod Schema con validaciones operacionales estrictas y seguras
 const eventSchema = z.object({
   name: z.string().min(3, "El nombre debe tener al menos 3 caracteres"),
   client: z.string().min(2, "El nombre del cliente es obligatorio"),
@@ -24,11 +24,22 @@ const eventSchema = z.object({
   status: z.enum(["Planificado", "Confirmado", "En progreso", "Finalizado", "Cancelado"]),
   staffIds: z.array(z.string()),
   
-  // Nuevos campos operacionales
+  // Tipo de Evento
+  type: z.enum([
+    "Producción técnica", 
+    "Evento corporativo", 
+    "Activación", 
+    "Anfitrionas", 
+    "Promotoría", 
+    "Streaming", 
+    "Otro"
+  ]),
+
+  // Campos operacionales avanzados (opcionales para eventos simples)
   supervisor_id: z.string().nullable().optional(),
-  call_time: z.string().min(1, "La hora de presentación es obligatoria"),
-  setup_time: z.string().min(1, "La hora de montaje es obligatoria"),
-  end_time: z.string().min(1, "La hora de finalización es obligatoria"),
+  call_time: z.string().optional().or(z.literal("")),
+  setup_time: z.string().optional().or(z.literal("")),
+  end_time: z.string().optional().or(z.literal("")),
   priority: z.enum(["Baja", "Media", "Alta", "Crítica"]),
   operational_notes: z.string().optional(),
 }).refine((data) => {
@@ -74,6 +85,7 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
       description: "",
       status: "Planificado",
       staffIds: [],
+      type: "Producción técnica",
       supervisor_id: "",
       call_time: "",
       setup_time: "",
@@ -86,6 +98,8 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
   const selectedStaffIds = watch("staffIds") || [];
   const eventDate = watch("date");
   const selectedSupervisorId = watch("supervisor_id");
+  const eventType = watch("type") || "Producción técnica";
+  const eventStartTime = watch("time");
 
   const [staffSearch, setStaffSearch] = useState("");
   const [staffRole, setStaffRole] = useState("");
@@ -94,9 +108,16 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
   const [assignedStaffMap, setAssignedStaffMap] = useState({});
   const [isLoadingAvailability, setIsLoadingAvailability] = useState(false);
   
+  // Drawer colapsable para configuración avanzada
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  
   // Searchable select para Supervisor
   const [supervisorSearch, setSupervisorSearch] = useState("");
   const [isSupervisorDropdownOpen, setIsSupervisorDropdownOpen] = useState(false);
+
+  // Ocultar dinámicamente según Tipo de Evento
+  const showSetupField = eventType !== "Anfitrionas" && eventType !== "Promotoría" && eventType !== "Otro";
+  const showSupervisorField = eventType !== "Anfitrionas" && eventType !== "Promotoría";
 
   useEffect(() => {
     const fetchStaff = async () => {
@@ -109,6 +130,32 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
     };
     fetchStaff();
   }, []);
+
+  // Autocompletado inteligente al cambiar Tipo de Evento
+  useEffect(() => {
+    if (!isOpen) return;
+
+    if (eventType === "Anfitrionas" || eventType === "Promotoría") {
+      setValue("priority", "Baja");
+      setValue("setup_time", ""); 
+      setValue("supervisor_id", "");
+      
+      // Sugerir citación de presentación 30 min antes si hay hora de inicio
+      if (eventStartTime && eventStartTime.includes(":")) {
+        const [h, m] = eventStartTime.split(":");
+        let hr = parseInt(h);
+        let min = parseInt(m) - 30;
+        if (min < 0) {
+          min += 60;
+          hr = (hr - 1 + 24) % 24;
+        }
+        const callTimeSuggest = `${String(hr).padStart(2, '0')}:${String(min).padStart(2, '0')}`;
+        setValue("call_time", callTimeSuggest);
+      }
+    } else if (eventType === "Producción técnica" || eventType === "Streaming") {
+      setValue("priority", "Media");
+    }
+  }, [eventType, setValue, isOpen, eventStartTime]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -184,9 +231,6 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
     const matchesSearch = s.name?.toLowerCase().includes(staffSearch.toLowerCase());
     const matchesRole = staffRole === "" ? true : s.role?.toLowerCase() === staffRole;
 
-    // Solo mostrar trabajadores disponibles para la fecha seleccionada.
-    // Ocultar trabajadores ocupados (busy), no disponibles o asignados a otro evento.
-    // Mostrar SIEMPRE si ya están seleccionados en este evento específico (para poder editarlos)
     const isChecked = selectedStaffIds.includes(s.id);
     const status = getStaffStatus(s.id);
     const isStaffAvailable = !eventDate || isChecked || status === "Disponible";
@@ -208,6 +252,10 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
       setSupervisorSearch("");
       setIsSupervisorDropdownOpen(false);
       
+      // Auto expandir si el evento ya tenía campos avanzados configurados
+      const hasAdvancedFields = initialData.supervisor_id || initialData.call_time || initialData.setup_time || initialData.operational_notes;
+      setShowAdvanced(!!hasAdvancedFields);
+
       if (initialData && Object.keys(initialData).length > 0) {
         reset({
           name: initialData.name || "",
@@ -219,6 +267,7 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
           description: initialData.description || "",
           status: initialData.status || "Planificado",
           staffIds: [],
+          type: initialData.type || "Producción técnica",
           supervisor_id: initialData.supervisor_id || "",
           call_time: initialData.call_time || "",
           setup_time: initialData.setup_time || "",
@@ -239,8 +288,8 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
         reset({
           name: "", client: "", date: "", time: "", location: "",
           requiredStaff: 1, description: "", status: "Planificado", staffIds: [],
-          supervisor_id: "", call_time: "", setup_time: "", end_time: "",
-          priority: "Media", operational_notes: ""
+          type: "Producción técnica", supervisor_id: "", call_time: "", 
+          setup_time: "", end_time: "", priority: "Media", operational_notes: ""
         });
       }
     }
@@ -249,7 +298,6 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
   const onSubmitForm = (data) => {
     const eventData = { ...data };
     if (initialData.id) eventData.id = initialData.id;
-    // Map empty string supervisor to null for DB foreign key safety
     if (!eventData.supervisor_id) eventData.supervisor_id = null;
     eventData.staffIds = data.staffIds || [];
     
@@ -270,7 +318,7 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
     <AnimatePresence>
       {isOpen && (
         <motion.div
-          className="fixed inset-0 flex items-center justify-center z-50 bg-black/80 backdrop-blur overflow-y-auto p-4 md:p-6"
+          className="fixed inset-0 flex items-center justify-center z-50 bg-black/85 backdrop-blur overflow-y-auto p-4 md:p-6"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -287,7 +335,7 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
               <button 
                 type="button"
                 onClick={onClose} 
-                className="absolute top-5 right-5 text-gray-400 hover:text-white transition-colors p-1 bg-white/5 rounded-full hover:bg-white/10"
+                className="absolute top-5 right-5 text-gray-400 hover:text-white transition-colors p-1 bg-white/5 rounded-full hover:bg-white/10 z-10"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -296,18 +344,35 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
                 <span className="p-2 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20">
                   <Calendar className="w-6 h-6" />
                 </span>
-                {initialData.id ? "Editar Evento Operacional" : "Crear Nuevo Evento Operacional"}
+                {initialData.id ? "Editar Evento" : "Crear Nuevo Evento"}
               </h2>
               
               <form onSubmit={handleSubmit(onSubmitForm)} className="space-y-6">
                 
-                {/* 1️⃣ SECCIÓN: INFORMACIÓN GENERAL */}
+                {/* 1️⃣ SECCIÓN BASE: INFORMACIÓN GENERAL (SIEMPRE VISIBLE) */}
                 <div className="border-b border-white/5 pb-5">
-                  <h3 className="text-xs font-extrabold text-amber-400 uppercase tracking-widest mb-4 flex items-center gap-2">
-                    <FileText className="w-4 h-4" /> Información General
-                  </h3>
-                  
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    
+                    {/* Selector del Tipo de Evento */}
+                    <div className="flex flex-col">
+                      <label className="text-amber-400 mb-1.5 text-xs font-bold uppercase tracking-wider flex items-center gap-1" htmlFor="type">
+                        <Sliders className="w-3.5 h-3.5" /> Tipo de Evento
+                      </label>
+                      <select 
+                        id="type"
+                        {...register("type")} 
+                        className="w-full bg-gray-800/80 border border-amber-500/30 rounded-xl p-2.5 text-sm text-amber-300 font-bold focus:outline-none focus:border-amber-500 transition-colors"
+                      >
+                        <option value="Producción técnica">Producción técnica</option>
+                        <option value="Evento corporativo">Evento corporativo</option>
+                        <option value="Activación">Activación</option>
+                        <option value="Anfitrionas">Anfitrionas (Modelo/Promotora)</option>
+                        <option value="Promotoría">Promotoría</option>
+                        <option value="Streaming">Streaming / Streaming Live</option>
+                        <option value="Otro">Otro</option>
+                      </select>
+                    </div>
+
                     <div className="flex flex-col">
                       <label className="text-gray-300 mb-1.5 text-xs font-semibold" htmlFor="name">Nombre del Evento</label>
                       <input 
@@ -341,6 +406,30 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
                       {errors.location && <span className="text-red-400 text-xs mt-1">{errors.location.message}</span>}
                     </div>
 
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="flex flex-col">
+                        <label className="text-gray-300 mb-1.5 text-xs font-semibold" htmlFor="date">Fecha</label>
+                        <input 
+                          id="date" 
+                          type="date" 
+                          {...register("date")} 
+                          className={`w-full bg-gray-800/50 border rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-amber-500/50 transition-colors ${errors.date ? 'border-red-500 focus:ring-red-500' : 'border-gray-700'}`} 
+                        />
+                        {errors.date && <span className="text-red-400 text-xs mt-1">{errors.date.message}</span>}
+                      </div>
+
+                      <div className="flex flex-col">
+                        <label className="text-gray-300 mb-1.5 text-xs font-semibold" htmlFor="time">Hora Inicio</label>
+                        <input 
+                          id="time" 
+                          type="time" 
+                          {...register("time")} 
+                          className={`w-full bg-gray-800/50 border rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-amber-500/50 transition-colors ${errors.time ? 'border-red-500 focus:ring-red-500' : 'border-gray-700'}`} 
+                        />
+                        {errors.time && <span className="text-red-400 text-xs mt-1">{errors.time.message}</span>}
+                      </div>
+                    </div>
+
                     <div className="flex flex-col">
                       <label className="text-gray-300 mb-1.5 text-xs font-semibold" htmlFor="requiredStaff">Staff Requerido</label>
                       <input 
@@ -353,215 +442,218 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
                       {errors.requiredStaff && <span className="text-red-400 text-xs mt-1">{errors.requiredStaff.message}</span>}
                     </div>
                   </div>
-                </div>
 
-                {/* 2️⃣ SECCIÓN: HORARIOS DE LA PRODUCCIÓN */}
-                <div className="border-b border-white/5 pb-5">
-                  <h3 className="text-xs font-extrabold text-amber-400 uppercase tracking-widest mb-4 flex items-center gap-2">
-                    <Clock className="w-4 h-4" /> Horarios de la Producción
-                  </h3>
-
-                  <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                    <div className="flex flex-col col-span-2 md:col-span-1">
-                      <label className="text-gray-300 mb-1.5 text-xs font-semibold" htmlFor="date">Fecha del Evento</label>
-                      <input 
-                        id="date" 
-                        type="date" 
-                        {...register("date")} 
-                        className={`w-full bg-gray-800/50 border rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-amber-500/50 transition-colors ${errors.date ? 'border-red-500 focus:ring-red-500' : 'border-gray-700'}`} 
-                      />
-                      {errors.date && <span className="text-red-400 text-xs mt-1">{errors.date.message}</span>}
-                    </div>
-
-                    <div className="flex flex-col">
-                      <label className="text-gray-300 mb-1.5 text-xs font-semibold" htmlFor="setup_time">Hora Montaje</label>
-                      <input 
-                        id="setup_time" 
-                        type="time" 
-                        {...register("setup_time")} 
-                        className={`w-full bg-gray-800/50 border rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-amber-500/50 transition-colors ${errors.setup_time ? 'border-red-500 focus:ring-red-500' : 'border-gray-700'}`} 
-                      />
-                      {errors.setup_time && <span className="text-red-400 text-xs mt-1">{errors.setup_time.message}</span>}
-                    </div>
-
-                    <div className="flex flex-col">
-                      <label className="text-gray-300 mb-1.5 text-xs font-semibold" htmlFor="call_time">Hora Presentación</label>
-                      <input 
-                        id="call_time" 
-                        type="time" 
-                        {...register("call_time")} 
-                        className={`w-full bg-gray-800/50 border rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-amber-500/50 transition-colors ${errors.call_time ? 'border-red-500 focus:ring-red-500' : 'border-gray-700'}`} 
-                      />
-                      {errors.call_time && <span className="text-red-400 text-xs mt-1">{errors.call_time.message}</span>}
-                    </div>
-
-                    <div className="flex flex-col">
-                      <label className="text-gray-300 mb-1.5 text-xs font-semibold" htmlFor="time">Hora Inicio Show</label>
-                      <input 
-                        id="time" 
-                        type="time" 
-                        {...register("time")} 
-                        className={`w-full bg-gray-800/50 border rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-amber-500/50 transition-colors ${errors.time ? 'border-red-500 focus:ring-red-500' : 'border-gray-700'}`} 
-                      />
-                      {errors.time && <span className="text-red-400 text-xs mt-1">{errors.time.message}</span>}
-                    </div>
-
-                    <div className="flex flex-col">
-                      <label className="text-gray-300 mb-1.5 text-xs font-semibold" htmlFor="end_time">Hora Término</label>
-                      <input 
-                        id="end_time" 
-                        type="time" 
-                        {...register("end_time")} 
-                        className={`w-full bg-gray-800/50 border rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-amber-500/50 transition-colors ${errors.end_time ? 'border-red-500 focus:ring-red-500' : 'border-gray-700'}`} 
-                      />
-                      {errors.end_time && <span className="text-red-400 text-xs mt-1">{errors.end_time.message}</span>}
-                    </div>
+                  <div className="flex flex-col mt-4">
+                    <label className="text-gray-300 mb-1.5 text-xs font-semibold" htmlFor="description">Descripción Breve</label>
+                    <textarea 
+                      id="description" 
+                      placeholder="Detalles rápidos y breves del evento..." 
+                      {...register("description")} 
+                      className="w-full h-16 bg-gray-800/50 border border-gray-700 rounded-xl p-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-amber-500/50" 
+                    />
                   </div>
                 </div>
 
-                {/* 3️⃣ SECCIÓN: ESTADO, PRIORIDAD Y COORDINACIÓN */}
-                <div className="border-b border-white/5 pb-5">
-                  <h3 className="text-xs font-extrabold text-amber-400 uppercase tracking-widest mb-4 flex items-center gap-2">
-                    <Activity className="w-4 h-4" /> Configuración & Coordinación
-                  </h3>
+                {/* 2️⃣ SECCIÓN DE CONFIGURACIÓN OPERACIONAL AVANZADA (COLAPSABLE CON FRAMER MOTION) */}
+                <div className="border-b border-white/5 pb-4">
+                  <button
+                    type="button"
+                    onClick={() => setShowAdvanced(!showAdvanced)}
+                    className="flex items-center gap-2 px-3 py-2 bg-white/5 hover:bg-white/10 rounded-xl border border-white/10 text-xs font-bold uppercase tracking-wider text-amber-400 transition-colors focus:outline-none shadow-md"
+                  >
+                    <span>{showAdvanced ? "▼ Ocultar Configuración Avanzada" : "▶ Mostrar Configuración Avanzada"}</span>
+                    <span className="text-[10px] text-gray-400 normal-case font-medium">
+                      ({showAdvanced ? "Haga clic para cerrar" : "Supervisor, horarios detallados, notas"})
+                    </span>
+                  </button>
+                  
+                  <AnimatePresence initial={false}>
+                    {showAdvanced && (
+                      <motion.div
+                        key="advanced-drawer"
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: "auto", opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.3, ease: "easeInOut" }}
+                        className="overflow-hidden"
+                      >
+                        <div className="pt-5 space-y-6">
+                          
+                          {/* Subsección: Tiempos operacionales */}
+                          <div className="bg-black/20 p-4 rounded-2xl border border-white/5 space-y-4">
+                            <h4 className="text-[10px] font-extrabold text-amber-400 uppercase tracking-widest flex items-center gap-1.5">
+                              <Clock className="w-3.5 h-3.5" /> Cronograma de Horarios
+                            </h4>
+                            
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                              {showSetupField ? (
+                                <div className="flex flex-col">
+                                  <label className="text-gray-400 mb-1.5 text-[11px] font-semibold" htmlFor="setup_time">Hora Montaje Técnico</label>
+                                  <input 
+                                    id="setup_time" 
+                                    type="time" 
+                                    {...register("setup_time")} 
+                                    className={`w-full bg-gray-800/50 border rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-amber-500/50 transition-colors ${errors.setup_time ? 'border-red-500 focus:ring-red-500' : 'border-gray-700'}`} 
+                                  />
+                                  {errors.setup_time && <span className="text-red-400 text-xs mt-1">{errors.setup_time.message}</span>}
+                                </div>
+                              ) : (
+                                <div className="hidden" />
+                              )}
 
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    
-                    {/* Supervisor del Evento (Searchable Dropdown) */}
-                    <div className="flex flex-col relative">
-                      <label className="text-gray-300 mb-1.5 text-xs font-semibold" htmlFor="supervisor_id">Supervisor del Evento</label>
-                      <div className="relative">
-                        <button
-                          type="button"
-                          onClick={() => setIsSupervisorDropdownOpen(!isSupervisorDropdownOpen)}
-                          className="w-full bg-gray-800/50 border border-gray-700 rounded-xl p-2.5 text-sm text-white flex items-center justify-between text-left focus:outline-none focus:border-amber-500/50 transition-colors"
-                        >
-                          {selectedSupervisor ? (
-                            <span className="flex items-center gap-2">
-                              <img src={selectedSupervisor.avatar || "https://ui-avatars.com/api/?name=" + selectedSupervisor.name} alt="" className="w-5 h-5 rounded-full" />
-                              <span className="truncate max-w-[130px] font-medium">{selectedSupervisor.name}</span>
-                            </span>
-                          ) : (
-                            <span className="text-gray-500 font-medium">Asignar supervisor...</span>
-                          )}
-                          <ChevronDown className="w-4 h-4 text-gray-400 shrink-0" />
-                        </button>
-
-                        <AnimatePresence>
-                          {isSupervisorDropdownOpen && (
-                            <motion.div
-                              initial={{ opacity: 0, y: -8 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              exit={{ opacity: 0, y: -8 }}
-                              className="absolute z-50 w-full mt-2 bg-gray-900 border border-white/10 rounded-2xl p-3 shadow-2xl backdrop-blur-md max-h-48 overflow-y-auto"
-                            >
-                              <div className="relative mb-2">
-                                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-500" />
-                                <input
-                                  type="text"
-                                  placeholder="Buscar por nombre..."
-                                  value={supervisorSearch}
-                                  onChange={(e) => setSupervisorSearch(e.target.value)}
-                                  className="w-full pl-8 pr-3 py-1.5 bg-black/40 border border-gray-700 rounded-lg text-xs text-white placeholder-gray-500 focus:outline-none focus:border-amber-500/50"
+                              <div className="flex flex-col">
+                                <label className="text-gray-400 mb-1.5 text-[11px] font-semibold" htmlFor="call_time">Hora Presentación (Citación)</label>
+                                <input 
+                                  id="call_time" 
+                                  type="time" 
+                                  {...register("call_time")} 
+                                  className={`w-full bg-gray-800/50 border rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-amber-500/50 transition-colors ${errors.call_time ? 'border-red-500 focus:ring-red-500' : 'border-gray-700'}`} 
                                 />
+                                {errors.call_time && <span className="text-red-400 text-xs mt-1">{errors.call_time.message}</span>}
                               </div>
-                              <div className="space-y-1">
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setValue("supervisor_id", "");
-                                    setIsSupervisorDropdownOpen(false);
-                                  }}
-                                  className="w-full text-left px-2.5 py-2 text-xs text-red-400 hover:bg-white/5 rounded-lg transition-colors font-medium flex items-center justify-between"
-                                >
-                                  <span>Sin Supervisor</span>
-                                  {!selectedSupervisorId && <Check className="w-3.5 h-3.5" />}
-                                </button>
-                                {filteredSupervisors.map(s => (
+
+                              <div className="flex flex-col">
+                                <label className="text-gray-400 mb-1.5 text-[11px] font-semibold" htmlFor="end_time">Hora Finalización Estimada</label>
+                                <input 
+                                  id="end_time" 
+                                  type="time" 
+                                  {...register("end_time")} 
+                                  className={`w-full bg-gray-800/50 border rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-amber-500/50 transition-colors ${errors.end_time ? 'border-red-500 focus:ring-red-500' : 'border-gray-700'}`} 
+                                />
+                                {errors.end_time && <span className="text-red-400 text-xs mt-1">{errors.end_time.message}</span>}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Subsección: Estado, Prioridad y Supervisor */}
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            
+                            {/* Supervisor del Evento (Searchable Dropdown) */}
+                            {showSupervisorField ? (
+                              <div className="flex flex-col relative">
+                                <label className="text-gray-300 mb-1.5 text-xs font-semibold" htmlFor="supervisor_id">Supervisor Operativo</label>
+                                <div className="relative">
                                   <button
-                                    key={s.id}
                                     type="button"
-                                    onClick={() => {
-                                      setValue("supervisor_id", s.id);
-                                      setIsSupervisorDropdownOpen(false);
-                                    }}
-                                    className="w-full text-left px-2.5 py-2 text-xs text-gray-200 hover:bg-white/5 rounded-lg transition-colors flex items-center justify-between gap-2"
+                                    onClick={() => setIsSupervisorDropdownOpen(!isSupervisorDropdownOpen)}
+                                    className="w-full bg-gray-800/50 border border-gray-700 rounded-xl p-2.5 text-sm text-white flex items-center justify-between text-left focus:outline-none focus:border-amber-500/50 transition-colors"
                                   >
-                                    <span className="flex items-center gap-2">
-                                      <img src={s.avatar || "https://ui-avatars.com/api/?name=" + s.name} alt="" className="w-5 h-5 rounded-full" />
-                                      <span className="truncate">{s.name} ({s.role})</span>
-                                    </span>
-                                    {selectedSupervisorId === s.id && <Check className="w-3.5 h-3.5 text-amber-400" />}
+                                    {selectedSupervisor ? (
+                                      <span className="flex items-center gap-2">
+                                        <img src={selectedSupervisor.avatar || "https://ui-avatars.com/api/?name=" + selectedSupervisor.name} alt="" className="w-5 h-5 rounded-full" />
+                                        <span className="truncate max-w-[130px] font-medium">{selectedSupervisor.name}</span>
+                                      </span>
+                                    ) : (
+                                      <span className="text-gray-500 font-medium">Asignar supervisor...</span>
+                                    )}
+                                    <ChevronDown className="w-4 h-4 text-gray-400 shrink-0" />
                                   </button>
-                                ))}
+
+                                  <AnimatePresence>
+                                    {isSupervisorDropdownOpen && (
+                                      <motion.div
+                                        initial={{ opacity: 0, y: -8 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        exit={{ opacity: 0, y: -8 }}
+                                        className="absolute z-50 w-full mt-2 bg-gray-900 border border-white/10 rounded-2xl p-3 shadow-2xl backdrop-blur-md max-h-48 overflow-y-auto"
+                                      >
+                                        <div className="relative mb-2">
+                                          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-500" />
+                                          <input
+                                            type="text"
+                                            placeholder="Buscar supervisor..."
+                                            value={supervisorSearch}
+                                            onChange={(e) => setSupervisorSearch(e.target.value)}
+                                            className="w-full pl-8 pr-3 py-1.5 bg-black/40 border border-gray-700 rounded-lg text-xs text-white placeholder-gray-500 focus:outline-none focus:border-amber-500/50"
+                                          />
+                                        </div>
+                                        <div className="space-y-1">
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              setValue("supervisor_id", "");
+                                              setIsSupervisorDropdownOpen(false);
+                                            }}
+                                            className="w-full text-left px-2.5 py-2 text-xs text-red-400 hover:bg-white/5 rounded-lg transition-colors font-medium flex items-center justify-between"
+                                          >
+                                            <span>Sin Supervisor</span>
+                                            {!selectedSupervisorId && <Check className="w-3.5 h-3.5" />}
+                                          </button>
+                                          {filteredSupervisors.map(s => (
+                                            <button
+                                              key={s.id}
+                                              type="button"
+                                              onClick={() => {
+                                                setValue("supervisor_id", s.id);
+                                                setIsSupervisorDropdownOpen(false);
+                                              }}
+                                              className="w-full text-left px-2.5 py-2 text-xs text-gray-200 hover:bg-white/5 rounded-lg transition-colors flex items-center justify-between gap-2"
+                                            >
+                                              <span className="flex items-center gap-2">
+                                                <img src={s.avatar || "https://ui-avatars.com/api/?name=" + s.name} alt="" className="w-5 h-5 rounded-full" />
+                                                <span className="truncate">{s.name} ({s.role})</span>
+                                              </span>
+                                              {selectedSupervisorId === s.id && <Check className="w-3.5 h-3.5 text-amber-400" />}
+                                            </button>
+                                          ))}
+                                        </div>
+                                      </motion.div>
+                                    )}
+                                  </AnimatePresence>
+                                </div>
                               </div>
-                            </motion.div>
-                          )}
-                        </AnimatePresence>
-                      </div>
-                    </div>
+                            ) : (
+                              <div className="hidden" />
+                            )}
 
-                    <div className="flex flex-col">
-                      <label className="text-gray-300 mb-1.5 text-xs font-semibold" htmlFor="status">Estado Operacional</label>
-                      <select 
-                        id="status" 
-                        {...register("status")} 
-                        className="bg-gray-800/50 border border-gray-700 rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-amber-500/50 transition-colors"
-                      >
-                        <option value="Planificado">Planificado</option>
-                        <option value="Confirmado">Confirmado</option>
-                        <option value="En progreso">En progreso</option>
-                        <option value="Finalizado">Finalizado</option>
-                        <option value="Cancelado">Cancelado</option>
-                      </select>
-                    </div>
+                            <div className="flex flex-col">
+                              <label className="text-gray-300 mb-1.5 text-xs font-semibold" htmlFor="status">Estado Operacional</label>
+                              <select 
+                                id="status" 
+                                {...register("status")} 
+                                className="bg-gray-800/50 border border-gray-700 rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-amber-500/50 transition-colors"
+                              >
+                                <option value="Planificado">Planificado</option>
+                                <option value="Confirmado">Confirmado</option>
+                                <option value="En progreso">En progreso</option>
+                                <option value="Finalizado">Finalizado</option>
+                                <option value="Cancelado">Cancelado</option>
+                              </select>
+                            </div>
 
-                    <div className="flex flex-col">
-                      <label className="text-gray-300 mb-1.5 text-xs font-semibold" htmlFor="priority">Prioridad</label>
-                      <select 
-                        id="priority" 
-                        {...register("priority")} 
-                        className="bg-gray-800/50 border border-gray-700 rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-amber-500/50 transition-colors"
-                      >
-                        <option value="Baja">Baja (Gris)</option>
-                        <option value="Media">Media (Azul)</option>
-                        <option value="Alta">Alta (Amarillo)</option>
-                        <option value="Crítica">Crítica (Rojo)</option>
-                      </select>
-                    </div>
-                  </div>
+                            <div className="flex flex-col">
+                              <label className="text-gray-300 mb-1.5 text-xs font-semibold" htmlFor="priority">Prioridad</label>
+                              <select 
+                                id="priority" 
+                                {...register("priority")} 
+                                className="bg-gray-800/50 border border-gray-700 rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-amber-500/50 transition-colors"
+                              >
+                                <option value="Baja">Baja (Gris)</option>
+                                <option value="Media">Media (Azul)</option>
+                                <option value="Alta">Alta (Amarillo)</option>
+                                <option value="Crítica">Crítica (Rojo)</option>
+                              </select>
+                            </div>
+                          </div>
+
+                          {/* Notas operativas avanzadas */}
+                          <div className="flex flex-col">
+                            <label className="text-gray-300 mb-1.5 text-xs font-semibold" htmlFor="operational_notes">Notas de Logística & Acceso Técnico (Instrucciones Especiales)</label>
+                            <textarea 
+                              id="operational_notes" 
+                              placeholder="Ej: Acceso de carga por calle norte. Contacto cliente: +569... Exigir credenciales..." 
+                              {...register("operational_notes")} 
+                              className="w-full h-20 bg-gray-800/50 border border-gray-700 rounded-xl p-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-amber-500/50" 
+                            />
+                          </div>
+
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
 
-                {/* 4️⃣ SECCIÓN: NOTAS OPERATIVAS & DESCRIPCIÓN */}
-                <div className="border-b border-white/5 pb-5">
-                  <h3 className="text-xs font-extrabold text-amber-400 uppercase tracking-widest mb-4 flex items-center gap-2">
-                    <FileText className="w-4 h-4" /> Notas de Campo & Descripción
-                  </h3>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="flex flex-col">
-                      <label className="text-gray-300 mb-1.5 text-xs font-semibold" htmlFor="description">Detalles de la Producción</label>
-                      <textarea 
-                        id="description" 
-                        placeholder="Descripción general, requerimientos logísticos..." 
-                        {...register("description")} 
-                        className="w-full h-24 bg-gray-800/50 border border-gray-700 rounded-xl p-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-amber-500/50" 
-                      />
-                    </div>
-                    
-                    <div className="flex flex-col">
-                      <label className="text-gray-300 mb-1.5 text-xs font-semibold" htmlFor="operational_notes">Notas Operativas (Acceso, Contactos, Instrucciones)</label>
-                      <textarea 
-                        id="operational_notes" 
-                        placeholder="Ej: Acceso de carga por calle norte. Contacto cliente: 912345678. Exigir credenciales..." 
-                        {...register("operational_notes")} 
-                        className="w-full h-24 bg-gray-800/50 border border-gray-700 rounded-xl p-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-amber-500/50" 
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* 5️⃣ SECCIÓN: ASIGNACIÓN DE STAFF CON VALIDACIÓN DE DISPONIBILIDAD */}
+                {/* 3️⃣ SECCIÓN: ASIGNACIÓN DE STAFF CON VALIDACIÓN DE DISPONIBILIDAD (SIEMPRE VISIBLE) */}
                 <div>
                   <h3 className="text-xs font-extrabold text-amber-400 uppercase tracking-widest mb-4 flex items-center gap-2">
                     <Users className="w-4 h-4" /> Asignación de Staff
@@ -616,7 +708,7 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
                           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                         </svg>
-                        Consultando estado de disponibilidad real...
+                        Consultando disponibilidad real...
                       </p>
                     ) : filteredStaff.length === 0 ? (
                       <p className="text-gray-400 text-xs col-span-2 text-center py-4">
