@@ -1,21 +1,109 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Bell, User as UserIcon, Menu } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { supabase } from "../lib/supabase.js";
 
 export default function TopBar({ user, onToggleMenu }) {
   const [showNotifications, setShowNotifications] = useState(false);
   const dropdownRef = useRef(null);
 
-  const [notifications, setNotifications] = useState([
-    { id: 1, message: user?.systemRole === 'admin' ? "Un nuevo trabajador ha sido registrado en el sistema." : "¡Has sido asignado al evento 'Arauco Talento'!", time: "Hace 5 min", read: false },
-    { id: 2, message: user?.systemRole === 'admin' ? "Leonardo ha sido marcado como inactivo." : "Recuerda subir tu fotografía biométrica en Mi Perfil.", time: "Hace 2 horas", read: false },
-    { id: 3, message: "Reporte semanal generado con éxito.", time: "Hace 1 día", read: true },
-  ]);
+  const [notifications, setNotifications] = useState([]);
+
+  const getTimeAgo = (dateString) => {
+    if (!dateString) return "Hace poco";
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffInSeconds = Math.floor((now - date) / 1000);
+    
+    if (diffInSeconds < 60) return `Hace unos segundos`;
+    if (diffInSeconds < 3600) return `Hace ${Math.floor(diffInSeconds / 60)} min`;
+    if (diffInSeconds < 86400) return `Hace ${Math.floor(diffInSeconds / 3600)} horas`;
+    return `Hace ${Math.floor(diffInSeconds / 86400)} días`;
+  };
+
+  useEffect(() => {
+    fetchNotifications();
+  }, [user]);
+
+  const fetchNotifications = async () => {
+    if (!user) return;
+    
+    const readIds = JSON.parse(localStorage.getItem('readNotifs') || '[]');
+    let combinedNotifs = [];
+
+    if (user.systemRole === 'admin') {
+      const { data: recentEventsData } = await supabase.from('events').select('id, name, created_at').order('created_at', { ascending: false }).limit(3);
+      const { data: recentStaffData } = await supabase.from('profiles').select('id, name, role, created_at').order('created_at', { ascending: false }).limit(3);
+      
+      if (recentEventsData) {
+        recentEventsData.forEach(e => {
+          combinedNotifs.push({
+            id: `e-${e.id}`,
+            message: `Nuevo evento: ${e.name}`,
+            time: getTimeAgo(e.created_at),
+            date: new Date(e.created_at),
+            read: readIds.includes(`e-${e.id}`)
+          });
+        });
+      }
+      if (recentStaffData) {
+        recentStaffData.forEach(s => {
+          combinedNotifs.push({
+            id: `s-${s.id}`,
+            message: `Nuevo staff: ${s.name} (${s.role})`,
+            time: getTimeAgo(s.created_at),
+            date: new Date(s.created_at),
+            read: readIds.includes(`s-${s.id}`)
+          });
+        });
+      }
+    } else {
+      // Worker
+      const { data: assignments } = await supabase
+        .from('event_assignments')
+        .select('id, created_at, events(name)')
+        .eq('staff_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(5);
+        
+      if (assignments) {
+        assignments.forEach(a => {
+          combinedNotifs.push({
+            id: `a-${a.id}`,
+            message: `Has sido asignado a: ${a.events?.name || 'Un evento'}`,
+            time: getTimeAgo(a.created_at),
+            date: new Date(a.created_at),
+            read: readIds.includes(`a-${a.id}`)
+          });
+        });
+      }
+
+      if (!user.avatar || !user.cuenta_destino) {
+        combinedNotifs.push({
+          id: 'sys-profile',
+          message: "⚠️ Recuerda completar tu perfil (Foto y Datos Bancarios).",
+          time: "Sistema",
+          date: new Date(),
+          read: readIds.includes('sys-profile')
+        });
+      }
+    }
+
+    combinedNotifs.sort((a, b) => b.date - a.date);
+    setNotifications(combinedNotifs.slice(0, 5));
+  };
 
   const unreadCount = notifications.filter(n => !n.read).length;
 
   const markAllAsRead = () => {
-    setNotifications(notifications.map(n => ({ ...n, read: true })));
+    const updatedNotifs = notifications.map(n => ({ ...n, read: true }));
+    setNotifications(updatedNotifs);
+    
+    const readIds = JSON.parse(localStorage.getItem('readNotifs') || '[]');
+    updatedNotifs.forEach(n => {
+      if (!readIds.includes(n.id)) readIds.push(n.id);
+    });
+    localStorage.setItem('readNotifs', JSON.stringify(readIds));
   };
 
   // Cerrar al hacer clic afuera

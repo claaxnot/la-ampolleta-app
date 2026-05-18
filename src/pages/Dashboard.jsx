@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { mockActivities } from "../data.js";
 import { supabase } from "../lib/supabase.js";
 import { CalendarDays, Users, Zap, Bell, ArrowRight, Download, Activity, Clock } from "lucide-react";
 import StatCard from "../components/StatCard.jsx";
@@ -29,7 +28,20 @@ export default function Dashboard() {
 
   const [events, setEvents] = useState([]);
   const [staffCount, setStaffCount] = useState(0);
+  const [activities, setActivities] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  const getTimeAgo = (dateString) => {
+    if (!dateString) return "Hace poco";
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffInSeconds = Math.floor((now - date) / 1000);
+    
+    if (diffInSeconds < 60) return `Hace unos segundos`;
+    if (diffInSeconds < 3600) return `Hace ${Math.floor(diffInSeconds / 60)} min`;
+    if (diffInSeconds < 86400) return `Hace ${Math.floor(diffInSeconds / 3600)} horas`;
+    return `Hace ${Math.floor(diffInSeconds / 86400)} días`;
+  };
 
   React.useEffect(() => {
     fetchDashboardData();
@@ -43,6 +55,35 @@ export default function Dashboard() {
 
     const { count: sCount } = await supabase.from('profiles').select('*', { count: 'exact', head: true });
     setStaffCount(sCount || 0);
+
+    // Fetch Recent Activities
+    const { data: recentEventsData } = await supabase.from('events').select('id, name, client, created_at').order('created_at', { ascending: false }).limit(5);
+    const { data: recentStaffData } = await supabase.from('profiles').select('id, name, role, created_at').order('created_at', { ascending: false }).limit(5);
+    
+    const combinedActivities = [];
+    if (recentEventsData) {
+      recentEventsData.forEach(e => {
+        combinedActivities.push({
+          id: `e-${e.id}`,
+          text: `Nuevo evento creado: ${e.name} para ${e.client}`,
+          time: getTimeAgo(e.created_at),
+          date: new Date(e.created_at)
+        });
+      });
+    }
+    if (recentStaffData) {
+      recentStaffData.forEach(s => {
+        combinedActivities.push({
+          id: `s-${s.id}`,
+          text: `Nuevo trabajador registrado: ${s.name} (${s.role})`,
+          time: getTimeAgo(s.created_at),
+          date: new Date(s.created_at)
+        });
+      });
+    }
+    
+    combinedActivities.sort((a, b) => b.date - a.date);
+    setActivities(combinedActivities.slice(0, 5));
 
     setIsLoading(false);
   };
@@ -181,24 +222,28 @@ export default function Dashboard() {
             </div>
             
             <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-6">
-              {mockActivities.map((activity, idx) => (
-                <div key={activity.id} className="relative pl-6">
-                  {/* Timeline vertical line */}
-                  {idx !== mockActivities.length - 1 && (
-                    <div className="absolute left-2.5 top-5 bottom-[-24px] w-[1px] bg-gray-700/50"></div>
-                  )}
-                  {/* Timeline dot */}
-                  <div className="absolute left-1 top-1.5 w-3 h-3 rounded-full bg-purple-500/50 border-2 border-purple-400 shadow-[0_0_8px_rgba(168,85,247,0.5)]"></div>
-                  
-                  <div className="bg-white/5 border border-white/5 rounded-xl p-3 hover:bg-white/10 transition-colors">
-                    <p className="text-sm text-gray-200 leading-snug">{activity.text}</p>
-                    <span className="text-xs text-gray-500 mt-1 block flex items-center gap-1">
-                      <Clock className="w-3 h-3" />
-                      {activity.time}
-                    </span>
+              {activities.length === 0 ? (
+                <div className="text-gray-400 text-sm text-center mt-4">No hay actividad reciente.</div>
+              ) : (
+                activities.map((activity, idx) => (
+                  <div key={activity.id} className="relative pl-6">
+                    {/* Timeline vertical line */}
+                    {idx !== activities.length - 1 && (
+                      <div className="absolute left-2.5 top-5 bottom-[-24px] w-[1px] bg-gray-700/50"></div>
+                    )}
+                    {/* Timeline dot */}
+                    <div className="absolute left-1 top-1.5 w-3 h-3 rounded-full bg-purple-500/50 border-2 border-purple-400 shadow-[0_0_8px_rgba(168,85,247,0.5)]"></div>
+                    
+                    <div className="bg-white/5 border border-white/5 rounded-xl p-3 hover:bg-white/10 transition-colors">
+                      <p className="text-sm text-gray-200 leading-snug">{activity.text}</p>
+                      <span className="text-xs text-gray-500 mt-1 block flex items-center gap-1">
+                        <Clock className="w-3 h-3" />
+                        {activity.time}
+                      </span>
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
             
             <button 
