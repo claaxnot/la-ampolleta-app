@@ -1,5 +1,4 @@
 import React, { useState } from "react";
-import { mockStaff } from "../data.js";
 import { supabase } from "../lib/supabase.js";
 import EventToolbar from "../components/EventToolbar.jsx";
 import EventModal from "../components/EventModal.jsx";
