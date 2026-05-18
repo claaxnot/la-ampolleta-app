@@ -12,3 +12,28 @@
     background-attachment: fixed;
   }
 }
+
+/* Estilo premium de Calendarios y Relojes para la estética de La Ampolleta */
+input[type="date"],
+input[type="time"] {
+  color-scheme: dark; /* Fuerza al navegador a renderizar el calendario y el reloj flotante en modo oscuro */
+  font-family: inherit;
+  letter-spacing: 0.02em;
+}
+
+/* Cambiar el color gris genérico del icono nativo a un dorado/ámbar brillante */
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="time"]::-webkit-calendar-picker-indicator {
+  filter: invert(0.85) sepia(1) saturate(5) hue-rotate(15deg) brightness(1.2);
+  cursor: pointer;
+  border-radius: 8px;
+  padding: 4px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator:hover,
+input[type="time"]::-webkit-calendar-picker-indicator:hover {
+  background: rgba(245, 158, 11, 0.15);
+  box-shadow: 0 0 10px rgba(245, 158, 11, 0.2);
+  transform: scale(1.15);
+}
