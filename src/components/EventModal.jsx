@@ -45,10 +45,14 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
   });
 
   const selectedStaffIds = watch("staffIds");
+  const eventDate = watch("date");
 
   const [staffSearch, setStaffSearch] = useState("");
   const [staffRole, setStaffRole] = useState("");
   const [dbStaff, setDbStaff] = useState([]);
+  const [availabilityMap, setAvailabilityMap] = useState({});
+  const [assignedStaffMap, setAssignedStaffMap] = useState({});
+  const [isLoadingAvailability, setIsLoadingAvailability] = useState(false);
 
   useEffect(() => {
     const fetchStaff = async () => {
@@ -58,14 +62,90 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
     fetchStaff();
   }, []);
 
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const fetchAvailabilityAndAssignments = async () => {
+      if (!eventDate) {
+        setAvailabilityMap({});
+        setAssignedStaffMap({});
+        return;
+      }
+      setIsLoadingAvailability(true);
+      try {
+        // 1. Fetch availability for this date
+        const { data: availData } = await supabase
+          .from('staff_availability')
+          .select('staff_id, status')
+          .eq('date', eventDate);
+
+        const newAvailMap = {};
+        if (availData) {
+          availData.forEach(item => {
+            newAvailMap[item.staff_id] = item.status;
+          });
+        }
+        setAvailabilityMap(newAvailMap);
+
+        // 2. Fetch events on this date to check assignments
+        const { data: eventsOnDate } = await supabase
+          .from('events')
+          .select('id')
+          .eq('date', eventDate);
+
+        const eventIds = eventsOnDate ? eventsOnDate.map(e => e.id) : [];
+
+        const newAssignedMap = {};
+        if (eventIds.length > 0) {
+          const { data: assignmentsOnDate } = await supabase
+            .from('event_assignments')
+            .select('staff_id, event_id')
+            .in('event_id', eventIds);
+
+          if (assignmentsOnDate) {
+            assignmentsOnDate.forEach(a => {
+              // Exclude current event being edited
+              if (!initialData?.id || a.event_id !== initialData.id) {
+                newAssignedMap[a.staff_id] = true;
+              }
+            });
+          }
+        }
+        setAssignedStaffMap(newAssignedMap);
+      } catch (err) {
+        console.error("Error fetching availability:", err);
+      } finally {
+        setIsLoadingAvailability(false);
+      }
+    };
+
+    fetchAvailabilityAndAssignments();
+  }, [eventDate, isOpen, initialData?.id]);
+
   const activeStaff = dbStaff;
   const uniqueRoles = [...new Set(activeStaff.map(s => s.role?.toLowerCase() || ''))].filter(Boolean);
-  
+
+  const getStaffStatus = (staffId) => {
+    if (assignedStaffMap[staffId]) return "En evento";
+    const avail = availabilityMap[staffId];
+    if (avail === "busy") return "No disponible";
+    return "Disponible";
+  };
+
   const filteredStaff = activeStaff.filter(s => {
     const matchesSearch = s.name?.toLowerCase().includes(staffSearch.toLowerCase());
     const matchesRole = staffRole === "" ? true : s.role?.toLowerCase() === staffRole;
-    return matchesSearch && matchesRole;
+
+    // Show selected ones ALWAYS so the admin can manage them,
+    // otherwise show ONLY available workers if date is set
+    const isChecked = selectedStaffIds.includes(s.id);
+    const status = getStaffStatus(s.id);
+    const isStaffAvailable = !eventDate || isChecked || status === "Disponible";
+
+    return matchesSearch && matchesRole && isStaffAvailable;
   });
+
+  const availableCount = activeStaff.filter(s => !eventDate || getStaffStatus(s.id) === "Disponible").length;
 
   // Sync initial data for edit mode or reset when opening
   useEffect(() => {
@@ -236,11 +316,17 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
                     <option value="Completado">Completado</option>
                   </select>
                 </div>
-                
-                {/* Staff assignment */}
+                          {/* Staff assignment */}
                 <div>
                   <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-2 gap-2">
-                    <label className="text-gray-300">Asignar Staff:</label>
+                    <div className="flex items-center gap-2">
+                      <label className="text-gray-300">Asignar Staff:</label>
+                      {eventDate && (
+                        <span className="text-xs bg-amber-500/10 text-amber-300 border border-amber-500/20 px-2 py-0.5 rounded-full font-medium">
+                          {availableCount} {availableCount === 1 ? 'trabajador disponible' : 'trabajadores disponibles'}
+                        </span>
+                      )}
+                    </div>
                     <div className="flex flex-wrap gap-2 w-full md:w-auto">
                       <div className="relative flex-1 md:flex-initial">
                         <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
@@ -269,24 +355,38 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2 bg-black/20 p-3 rounded-xl border border-white/5 max-h-48 overflow-y-auto">
-                    {filteredStaff.length === 0 ? (
-                      <p className="text-gray-400 text-sm col-span-2 text-center py-4">No hay staff que coincida con la búsqueda.</p>
+                    {isLoadingAvailability ? (
+                      <p className="text-gray-400 text-sm col-span-2 text-center py-4">Consultando disponibilidad...</p>
+                    ) : filteredStaff.length === 0 ? (
+                      <p className="text-gray-400 text-sm col-span-2 text-center py-4">No hay staff disponible que coincida con los filtros.</p>
                     ) : (
                       filteredStaff.map((staff) => {
                         const isChecked = selectedStaffIds.includes(staff.id);
+                        const status = getStaffStatus(staff.id);
+                        let badgeColor = "bg-emerald-500/20 text-emerald-300 border-emerald-500/30";
+                        if (status === "En evento") badgeColor = "bg-amber-500/20 text-amber-300 border-amber-500/30";
+                        if (status === "No disponible") badgeColor = "bg-red-500/20 text-red-300 border-red-500/30";
+
                         return (
-                          <label key={staff.id} className="flex items-center space-x-3 text-gray-200 cursor-pointer hover:bg-white/5 p-2 rounded-lg transition-colors">
-                            <input 
-                              type="checkbox" 
-                              checked={isChecked}
-                              onChange={() => toggleStaff(staff.id)}
-                              className="form-checkbox h-4 w-4 text-primary bg-gray-700 border-gray-600 rounded" 
-                            />
-                            <span className="flex items-center gap-2">
-                              <img src={staff.avatar || "https://ui-avatars.com/api/?name=" + staff.name} alt="" className="w-6 h-6 rounded-full" />
-                              <span className="truncate max-w-[120px]">{staff.name}</span>
-                              <span className="text-xs text-gray-400 capitalize">({staff.role})</span>
-                            </span>
+                          <label key={staff.id} className="flex items-center justify-between text-gray-200 cursor-pointer hover:bg-white/5 p-2 rounded-lg transition-colors border border-transparent hover:border-white/5">
+                            <div className="flex items-center space-x-3">
+                              <input 
+                                type="checkbox" 
+                                checked={isChecked}
+                                onChange={() => toggleStaff(staff.id)}
+                                className="form-checkbox h-4 w-4 text-primary bg-gray-700 border-gray-600 rounded" 
+                              />
+                              <span className="flex items-center gap-2">
+                                <img src={staff.avatar || "https://ui-avatars.com/api/?name=" + staff.name} alt="" className="w-6 h-6 rounded-full" />
+                                <span className="truncate max-w-[125px]">{staff.name}</span>
+                                <span className="text-xs text-gray-400 capitalize">({staff.role})</span>
+                              </span>
+                            </div>
+                            {eventDate && (
+                              <span className={`px-2 py-0.5 text-[10px] rounded-full border font-semibold ${badgeColor}`}>
+                                {status}
+                              </span>
+                            )}
                           </label>
                         );
                       })
