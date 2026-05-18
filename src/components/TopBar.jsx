@@ -22,7 +22,59 @@ export default function TopBar({ user, onToggleMenu }) {
   };
 
   useEffect(() => {
+    if (!user) return;
+    
     fetchNotifications();
+
+    console.log("🔌 [REALTIME] - Subscribiendo TopBar a notificaciones en vivo para:", user.systemRole);
+    
+    let channel;
+    
+    if (user.systemRole === 'admin') {
+      channel = supabase
+        .channel('topbar-realtime-admin')
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'event_assignments' },
+          () => {
+            console.log("🔔 [REALTIME] - Cambio detectado en asignaciones. Recargando...");
+            fetchNotifications();
+          }
+        )
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'events' },
+          () => {
+            console.log("🔔 [REALTIME] - Cambio detectado en eventos. Recargando...");
+            fetchNotifications();
+          }
+        )
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'profiles' },
+          () => {
+            console.log("🔔 [REALTIME] - Cambio detectado en perfiles. Recargando...");
+            fetchNotifications();
+          }
+        )
+        .subscribe();
+    } else {
+      channel = supabase
+        .channel('topbar-realtime-worker')
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'event_assignments', filter: `staff_id=eq.${user.id}` },
+          () => {
+            console.log("🔔 [REALTIME] - Cambio detectado en asignaciones del trabajador. Recargando...");
+            fetchNotifications();
+          }
+        )
+        .subscribe();
+    }
+
+    return () => {
+      if (channel) supabase.removeChannel(channel);
+    };
   }, [user]);
 
   const fetchNotifications = async () => {
@@ -34,6 +86,47 @@ export default function TopBar({ user, onToggleMenu }) {
     if (user.systemRole === 'admin') {
       const { data: recentEventsData } = await supabase.from('events').select('id, name, created_at').order('created_at', { ascending: false }).limit(3);
       const { data: recentStaffData } = await supabase.from('profiles').select('id, name, role, created_at').order('created_at', { ascending: false }).limit(3);
+      
+      // Consultar asignaciones recientes confirmadas o rechazadas de forma segura y retrocompatible
+      let recentAssignments = [];
+      const { data: dataWithUpdate, error: updateErr } = await supabase
+        .from('event_assignments')
+        .select(`
+          id,
+          status,
+          updated_at,
+          profiles:staff_id (name),
+          events:event_id (name)
+        `)
+        .neq('status', 'Pendiente')
+        .order('updated_at', { ascending: false })
+        .limit(5);
+
+      if (!updateErr && dataWithUpdate) {
+        recentAssignments = dataWithUpdate.map(a => ({
+          ...a,
+          notification_date: a.updated_at
+        }));
+      } else {
+        const { data: dataWithCreate } = await supabase
+          .from('event_assignments')
+          .select(`
+            id,
+            status,
+            created_at,
+            profiles:staff_id (name),
+            events:event_id (name)
+          `)
+          .neq('status', 'Pendiente')
+          .order('created_at', { ascending: false })
+          .limit(5);
+        if (dataWithCreate) {
+          recentAssignments = dataWithCreate.map(a => ({
+            ...a,
+            notification_date: a.created_at
+          }));
+        }
+      }
       
       if (recentEventsData) {
         recentEventsData.forEach(e => {
@@ -57,23 +150,42 @@ export default function TopBar({ user, onToggleMenu }) {
           });
         });
       }
+      if (recentAssignments) {
+        recentAssignments.forEach(a => {
+          const staffName = a.profiles?.name || 'Un trabajador';
+          const eventName = a.events?.name || 'un evento';
+          const statusText = a.status === 'Confirmado' ? '✅ ACEPTÓ' : '❌ RECHAZÓ';
+          
+          combinedNotifs.push({
+            id: `a-status-${a.id}-${a.status}`,
+            message: `${staffName} ${statusText} la asignación para "${eventName}"`,
+            time: getTimeAgo(a.notification_date),
+            date: new Date(a.notification_date),
+            read: readIds.includes(`a-status-${a.id}-${a.status}`)
+          });
+        });
+      }
     } else {
       // Worker
       const { data: assignments } = await supabase
         .from('event_assignments')
-        .select('id, created_at, events(name)')
+        .select('id, status, created_at, events(name)')
         .eq('staff_id', user.id)
         .order('created_at', { ascending: false })
         .limit(5);
         
       if (assignments) {
         assignments.forEach(a => {
+          let statusPrefix = "🔔 Has sido asignado a";
+          if (a.status === 'Confirmado') statusPrefix = "✅ Confirmaste tu asistencia a";
+          if (a.status === 'Rechazado') statusPrefix = "❌ Rechazaste la asignación a";
+
           combinedNotifs.push({
-            id: `a-${a.id}`,
-            message: `Has sido asignado a: ${a.events?.name || 'Un evento'}`,
+            id: `a-${a.id}-${a.status}`,
+            message: `${statusPrefix}: ${a.events?.name || 'Un evento'}`,
             time: getTimeAgo(a.created_at),
             date: new Date(a.created_at),
-            read: readIds.includes(`a-${a.id}`)
+            read: readIds.includes(`a-${a.id}-${a.status}`)
           });
         });
       }

@@ -98,6 +98,7 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
 
   const [staffSearch, setStaffSearch] = useState("");
   const [staffRole, setStaffRole] = useState("");
+  const [showOnlyAvailable, setShowOnlyAvailable] = useState(false);
   const [dbStaff, setDbStaff] = useState([]);
   const [availabilityMap, setAvailabilityMap] = useState({});
   const [assignedStaffMap, setAssignedStaffMap] = useState({});
@@ -226,9 +227,9 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
 
     const isChecked = selectedStaffIds.includes(s.id);
     const status = getStaffStatus(s.id);
-    const isStaffAvailable = !eventDate || isChecked || status === "Disponible";
+    const passesAvailability = !showOnlyAvailable || !eventDate || isChecked || status === "Disponible";
 
-    return matchesSearch && matchesRole && isStaffAvailable;
+    return matchesSearch && matchesRole && passesAvailability;
   });
 
   const availableCount = activeStaff.filter(s => !eventDate || getStaffStatus(s.id) === "Disponible").length;
@@ -358,6 +359,21 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
     if (current.includes(id)) {
       setValue("staffIds", current.filter(sId => sId !== id), { shouldDirty: true });
     } else {
+      const staff = dbStaff.find(s => s.id === id);
+      const status = getStaffStatus(id);
+
+      if (status === "En evento") {
+        const confirmAssign = window.confirm(
+          `⚠️ ADVERTENCIA OPERACIONAL:\n\n¿Estás seguro de que quieres asignar a "${staff?.name || 'este trabajador'}"?\nYa cuenta con otro evento asignado para este mismo día.`
+        );
+        if (!confirmAssign) return;
+      } else if (status === "No disponible") {
+        const confirmAssign = window.confirm(
+          `⚠️ ADVERTENCIA DE DISPONIBILIDAD:\n\n¿Estás seguro de que quieres asignar a "${staff?.name || 'este trabajador'}"?\nHa marcado este día como NO disponible en su calendario.`
+        );
+        if (!confirmAssign) return;
+      }
+
       setValue("staffIds", [...current, id], { shouldDirty: true });
     }
   };
@@ -732,7 +748,17 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
                       )}
                     </div>
                     
-                    <div className="flex flex-wrap gap-2 w-full md:w-auto">
+                    <div className="flex flex-wrap gap-2 w-full md:w-auto items-center">
+                      <label className="flex items-center gap-1.5 cursor-pointer bg-white/5 hover:bg-white/10 px-2.5 py-1.5 rounded-lg border border-white/5 text-[11px] font-bold text-gray-300 transition-all select-none">
+                        <input
+                          type="checkbox"
+                          checked={showOnlyAvailable}
+                          onChange={(e) => setShowOnlyAvailable(e.target.checked)}
+                          className="form-checkbox h-3.5 w-3.5 text-amber-500 bg-gray-700 border-gray-600 rounded focus:ring-amber-500/30"
+                        />
+                        <span>Solo disponibles</span>
+                      </label>
+
                       <div className="relative flex-1 md:flex-initial">
                         <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
                         <input 

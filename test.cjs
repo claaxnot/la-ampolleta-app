@@ -6,34 +6,19 @@ const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYm
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 async function run() {
-  const dummyId = "00000000-0000-0000-0000-000000000000";
-  // Attempt to insert a dummy profile
-  const { data: insertData, error: insertError } = await supabase
-    .from('profiles')
-    .insert({
-      id: dummyId,
-      name: "Temporary Test User",
-      email: "temp_test_user@laampolleta.tv",
-      rut: "1-9"
-    })
-    .select('*');
+  const { data, error } = await supabase
+    .from('event_assignments')
+    .select('id, created_at')
+    .limit(1);
 
-  if (insertError) {
-    console.error("Error inserting dummy:", insertError);
-  } else {
-    console.log("Successfully inserted! Column keys are:", Object.keys(insertData[0]));
-    
-    // Clean up
-    const { error: deleteError } = await supabase
-      .from('profiles')
-      .delete()
-      .eq('id', dummyId);
-    if (deleteError) {
-      console.error("Error deleting dummy:", deleteError);
-    } else {
-      console.log("Successfully cleaned up!");
-    }
-  }
+  console.log("Select created_at error:", error);
+
+  const { data: data2, error: error2 } = await supabase
+    .from('event_assignments')
+    .select('id, updated_at')
+    .limit(1);
+
+  console.log("Select updated_at error:", error2);
 }
 
 run();
