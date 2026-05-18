@@ -67,12 +67,47 @@ export default function Events({ user }) {
     delete eventData.staffIds;
     delete eventData.assignedStaff;
 
+    // Extraer y borrar bandera del panel avanzado
+    const isAdvancedActive = eventData.isAdvancedActive;
+    delete eventData.isAdvancedActive;
+
     // Map camelCase to snake_case for Supabase
     eventData.required_staff = eventData.requiredStaff;
     delete eventData.requiredStaff;
 
+    // 1. Normalizar campos operacionales avanzados
+    const advancedFields = ['supervisor_id', 'call_time', 'setup_time', 'end_time', 'priority', 'operational_notes'];
+    
+    if (isAdvancedActive === false) {
+      console.log("ℹ️ Panel avanzado desactivado. Forzando campos avanzados a NULL.");
+      advancedFields.forEach(field => {
+        eventData[field] = null;
+      });
+    } else {
+      console.log("ℹ️ Panel avanzado activo. Normalizando campos avanzados.");
+      advancedFields.forEach(field => {
+        const val = eventData[field];
+        if (val === "" || val === undefined || val === null || (typeof val === 'number' && Number.isNaN(val))) {
+          eventData[field] = null;
+        }
+      });
+    }
+
+    // 2. Normalizar campos generales de texto y número
+    const generalTextFields = ['description', 'client', 'location', 'name'];
+    generalTextFields.forEach(field => {
+      const val = eventData[field];
+      if (val === "" || val === undefined || val === null) {
+        eventData[field] = null;
+      }
+    });
+
+    if (eventData.required_staff === undefined || eventData.required_staff === null || Number.isNaN(eventData.required_staff)) {
+      eventData.required_staff = 1;
+    }
+
     let eventId = eventData.id;
-    console.log("4️⃣ [INSERTING EVENT] - Iniciando transacción en Supabase con payload:", eventData);
+    console.log("4️⃣ [INSERTING EVENT] - Iniciando transacción en Supabase con payload normalizado:", eventData);
 
     try {
       if (eventId) {

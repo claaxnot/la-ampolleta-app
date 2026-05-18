@@ -290,8 +290,8 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
     
     const eventData = { ...data };
     if (initialData.id) eventData.id = initialData.id;
-    if (!eventData.supervisor_id) eventData.supervisor_id = null;
     eventData.staffIds = data.staffIds || [];
+    eventData.isAdvancedActive = showAdvanced;
     
     setIsSubmittingForm(true);
     try {
