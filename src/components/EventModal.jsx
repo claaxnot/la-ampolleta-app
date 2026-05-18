@@ -619,83 +619,26 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
                           {/* Subsección: Estado, Prioridad y Supervisor */}
                           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
 
-                            {/* Supervisor del Evento (Searchable Dropdown) */}
-                            {showSupervisorField ? (
-                              <div className="flex flex-col relative">
-                                <label className="text-gray-300 mb-1.5 text-xs font-semibold" htmlFor="supervisor_id">Supervisor Operativo</label>
-                                <div className="relative">
-                                  <button
-                                    type="button"
-                                    onClick={() => setIsSupervisorDropdownOpen(!isSupervisorDropdownOpen)}
-                                    className="w-full bg-gray-800/50 border border-gray-700 rounded-xl p-2.5 text-sm text-white flex items-center justify-between text-left focus:outline-none focus:border-amber-500/50 transition-colors"
-                                  >
-                                    {selectedSupervisor ? (
-                                      <span className="flex items-center gap-2">
-                                        <img src={selectedSupervisor.avatar || "https://ui-avatars.com/api/?name=" + selectedSupervisor.name} alt="" className="w-5 h-5 rounded-full" />
-                                        <span className="truncate max-w-[130px] font-medium">{selectedSupervisor.name}</span>
-                                      </span>
-                                    ) : (
-                                      <span className="text-gray-500 font-medium">Asignar supervisor...</span>
-                                    )}
-                                    <ChevronDown className="w-4 h-4 text-gray-400 shrink-0" />
-                                  </button>
-
-                                  <AnimatePresence>
-                                    {isSupervisorDropdownOpen && (
-                                      <motion.div
-                                        initial={{ opacity: 0, y: -8 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                        exit={{ opacity: 0, y: -8 }}
-                                        className="absolute z-50 w-full mt-2 bg-gray-900 border border-white/10 rounded-2xl p-3 shadow-2xl backdrop-blur-md max-h-48 overflow-y-auto"
-                                      >
-                                        <div className="relative mb-2">
-                                          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-500" />
-                                          <input
-                                            type="text"
-                                            placeholder="Buscar supervisor..."
-                                            value={supervisorSearch}
-                                            onChange={(e) => setSupervisorSearch(e.target.value)}
-                                            className="w-full pl-8 pr-3 py-1.5 bg-black/40 border border-gray-700 rounded-lg text-xs text-white placeholder-gray-500 focus:outline-none focus:border-amber-500/50"
-                                          />
-                                        </div>
-                                        <div className="space-y-1">
-                                          <button
-                                            type="button"
-                                            onClick={() => {
-                                              setValue("supervisor_id", "");
-                                              setIsSupervisorDropdownOpen(false);
-                                            }}
-                                            className="w-full text-left px-2.5 py-2 text-xs text-red-400 hover:bg-white/5 rounded-lg transition-colors font-medium flex items-center justify-between"
-                                          >
-                                            <span>Sin Supervisor</span>
-                                            {!selectedSupervisorId && <Check className="w-3.5 h-3.5" />}
-                                          </button>
-                                          {filteredSupervisors.map(s => (
-                                            <button
-                                              key={s.id}
-                                              type="button"
-                                              onClick={() => {
-                                                setValue("supervisor_id", s.id);
-                                                setIsSupervisorDropdownOpen(false);
-                                              }}
-                                              className="w-full text-left px-2.5 py-2 text-xs text-gray-200 hover:bg-white/5 rounded-lg transition-colors flex items-center justify-between gap-2"
-                                            >
-                                              <span className="flex items-center gap-2">
-                                                <img src={s.avatar || "https://ui-avatars.com/api/?name=" + s.name} alt="" className="w-5 h-5 rounded-full" />
-                                                <span className="truncate">{s.name} ({s.role})</span>
-                                              </span>
-                                              {selectedSupervisorId === s.id && <Check className="w-3.5 h-3.5 text-amber-400" />}
-                                            </button>
-                                          ))}
-                                        </div>
-                                      </motion.div>
-                                    )}
-                                  </AnimatePresence>
-                                </div>
-                              </div>
-                            ) : (
-                              <div className="hidden" />
-                            )}
+                             {/* Supervisor del Evento (Native Select) */}
+                             {showSupervisorField ? (
+                               <div className="flex flex-col">
+                                 <label className="text-gray-300 mb-1.5 text-xs font-semibold" htmlFor="supervisor_id">Supervisor Operativo</label>
+                                 <select
+                                   id="supervisor_id"
+                                   {...register("supervisor_id")}
+                                   className="bg-gray-800/50 border border-gray-700 rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-amber-500/50 transition-colors font-medium"
+                                 >
+                                   <option value="">Sin Supervisor</option>
+                                   {dbStaff.map(s => (
+                                     <option key={s.id} value={s.id}>
+                                       {s.name} ({s.role})
+                                     </option>
+                                   ))}
+                                 </select>
+                               </div>
+                             ) : (
+                               <div className="hidden" />
+                             )}
 
                             <div className="flex flex-col">
                               <label className="text-gray-300 mb-1.5 text-xs font-semibold" htmlFor="status">Estado Operacional</label>
