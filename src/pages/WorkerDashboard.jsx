@@ -11,7 +11,11 @@ import {
   Sparkles, 
   Sun, 
   Info, 
-  AlertTriangle 
+  AlertTriangle,
+  Check,
+  BellOff,
+  Sliders,
+  User
 } from "lucide-react";
 import GlassCard from "../components/GlassCard.jsx";
 import { supabase } from "../lib/supabase.js";
@@ -44,6 +48,16 @@ export default function WorkerDashboard({ user }) {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [selectedDetailedEvent, setSelectedDetailedEvent] = useState(null);
   
+  // Perfil del trabajador para consultar su rol real
+  const [workerProfile, setWorkerProfile] = useState(null);
+
+  // Real-time Notifications state (Con estado de lectura y animaciones)
+  const [notifications, setNotifications] = useState([
+    { id: 1, title: "Actualización de Montaje", desc: "El montaje del concierto principal iniciará 30 min antes por pruebas técnicas.", type: "warning", time: "Hace 1 hora", read: false },
+    { id: 2, title: "Protocolo de Bodega", desc: "Recordar el uso obligatorio de calzado de seguridad en la carga de equipos.", type: "info", time: "Hace 2 horas", read: false },
+    { id: 3, title: "Documentación Pendiente", desc: "Sube tu boleta de honorarios de la producción anterior.", type: "danger", time: "Hace 1 día", read: true }
+  ]);
+  
   // Real-time Activity Feed state
   const [activities, setActivities] = useState([
     { id: 1, text: "Sistema operativo inicializado correctamente.", type: "system", time: "Hace unos minutos" },
@@ -57,6 +71,16 @@ export default function WorkerDashboard({ user }) {
     ]);
   };
 
+  const markAsRead = (id) => {
+    setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+    toast.success("Notificación marcada como leída", { duration: 1500 });
+  };
+
+  const markAllAsRead = () => {
+    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+    toast.success("Todas las notificaciones leídas", { duration: 1500 });
+  };
+
   // Clock updates every second
   useEffect(() => {
     const timer = setInterval(() => {
@@ -65,12 +89,110 @@ export default function WorkerDashboard({ user }) {
     return () => clearInterval(timer);
   }, []);
 
+  // Fetch inicial de datos
   useEffect(() => {
     if (user?.id) {
       fetchMyEvents(user.id);
       fetchMyAvailability(user.id);
+      
+      // Cargar perfil real del trabajador
+      supabase.from('profiles').select('*').eq('id', user.id).single().then(({ data }) => {
+        if (data) {
+          setWorkerProfile(data);
+        }
+      });
     }
   }, [user]);
+
+  // Suscripción Realtime en Supabase para actualizaciones en vivo
+  useEffect(() => {
+    if (!user?.id || assignedEvents.length === 0) return;
+
+    console.log("🔌 [REALTIME] - Subscribiendo a eventos en vivo para trabajador:", user.id);
+    const channel = supabase
+      .channel('events-updates-worker')
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'events' },
+        async (payload) => {
+          const updatedEvent = payload.new;
+          
+          // Verificar si el trabajador está asignado a este evento actualizado
+          const isAssigned = assignedEvents.some(e => e.id === updatedEvent.id);
+          if (isAssigned) {
+            console.log("🔔 [REALTIME] - Evento asignado actualizado en BD:", updatedEvent);
+            const oldEvent = assignedEvents.find(e => e.id === updatedEvent.id);
+            
+            const newNotifs = [];
+            let changesText = [];
+
+            // Detectar cambios en tiempos técnicos
+            if (oldEvent.call_time !== updatedEvent.call_time && updatedEvent.call_time) {
+              newNotifs.push({
+                id: Date.now() + 1,
+                title: "⏱️ Hora de Citación Definida",
+                desc: `Tu hora de presentación para "${updatedEvent.name}" se fijó a las ${updatedEvent.call_time.slice(0, 5)} hrs.`,
+                type: "info",
+                time: "Ahora mismo",
+                read: false
+              });
+              changesText.push("citación");
+            }
+
+            if (oldEvent.setup_time !== updatedEvent.setup_time && updatedEvent.setup_time) {
+              newNotifs.push({
+                id: Date.now() + 2,
+                title: "🏗️ Hora de Montaje Cargada",
+                desc: `Se estableció el montaje técnico para "${updatedEvent.name}" a las ${updatedEvent.setup_time.slice(0, 5)} hrs.`,
+                type: "warning",
+                time: "Ahora mismo",
+                read: false
+              });
+              changesText.push("montaje");
+            }
+
+            if (oldEvent.operational_info_pending && !updatedEvent.operational_info_pending) {
+              newNotifs.push({
+                id: Date.now() + 3,
+                title: "✅ Planificación Completada",
+                desc: `La planificación técnica de "${updatedEvent.name}" ya se encuentra definida por el Administrador.`,
+                type: "info",
+                time: "Ahora mismo",
+                read: false
+              });
+              changesText.push("planificación");
+            }
+
+            if (newNotifs.length > 0) {
+              setNotifications(prev => [...newNotifs, ...prev]);
+              addActivity(`Se actualizó la información de tu evento: "${updatedEvent.name}" (${changesText.join(", ")}).`, "event");
+              
+              toast.success(`¡Tu evento "${updatedEvent.name}" fue actualizado!`, {
+                icon: "🔔",
+                duration: 5000,
+                style: {
+                  background: 'rgba(31, 41, 55, 0.95)',
+                  color: '#fff',
+                  border: '1px solid rgba(245, 158, 11, 0.3)',
+                  boxShadow: '0 0 20px rgba(245, 158, 11, 0.2)'
+                }
+              });
+            } else {
+              toast.success(`Evento actualizado: "${updatedEvent.name}"`, { icon: "📝" });
+              addActivity(`Tu evento "${updatedEvent.name}" fue modificado.`, "event");
+            }
+
+            // Recargar eventos para actualizar transiciones en UI en tiempo real
+            fetchMyEvents(user.id);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id, assignedEvents]);
 
   const fetchMyAvailability = async (workerId) => {
     const { data } = await supabase
@@ -98,7 +220,7 @@ export default function WorkerDashboard({ user }) {
         events (
           id, name, date, time, location, client, status, description,
           call_time, setup_time, end_time, priority, operational_notes,
-          supervisor_id,
+          supervisor_id, type, operational_info_pending,
           profiles:supervisor_id (
             name
           )
@@ -138,7 +260,6 @@ export default function WorkerDashboard({ user }) {
     const d = String(day).padStart(2, '0');
     const dateStr = `${y}-${m}-${d}`;
 
-    // Block changes if day has an assigned event
     const hasAssignedEvent = assignedEvents.some(event => event.date === dateStr);
     if (hasAssignedEvent) {
       toast.error("No puedes cambiar la disponibilidad de un día con evento asignado.");
@@ -236,12 +357,9 @@ export default function WorkerDashboard({ user }) {
     return `${diffHrs}h ${diffMins}m ${diffSecs}s`;
   };
 
-  // Modern Enterprise Notifications
-  const notifications = [
-    { id: 1, title: "Actualización de Montaje", desc: "El montaje del concierto principal iniciará 30 min antes por pruebas técnicas.", type: "warning", time: "Hace 1 hora" },
-    { id: 2, title: "Protocolo de Bodega", desc: "Recordar el uso obligatorio de calzado de seguridad en la carga de equipos.", type: "info", time: "Hace 2 horas" },
-    { id: 3, title: "Documentación Pendiente", desc: "Sube tu boleta de honorarios de la producción anterior.", type: "danger", time: "Hace 1 día" }
-  ];
+  // Detectar roles simples (Anfitriona, Modelo, Promotora)
+  const workerRoleName = (workerProfile?.role || user?.role || "Staff").toLowerCase();
+  const isWorkerSimpleRole = workerRoleName.includes("anfitriona") || workerRoleName.includes("promotora") || workerRoleName.includes("modelo");
 
   return (
     <motion.div 
@@ -254,7 +372,7 @@ export default function WorkerDashboard({ user }) {
       <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-amber-500/5 rounded-full blur-[120px] pointer-events-none" />
       <div className="absolute bottom-10 left-10 w-[400px] h-[400px] bg-emerald-500/5 rounded-full blur-[100px] pointer-events-none" />
 
-      {/* 3️⃣ Hero Section más Viva */}
+      {/* Hero Section */}
       <motion.div 
         variants={itemVariants}
         className="relative overflow-hidden rounded-3xl p-6 lg:p-8 bg-gradient-to-br from-gray-900/90 via-gray-900 to-amber-950/20 border border-white/5 mb-8 shadow-2xl backdrop-blur-md"
@@ -279,7 +397,7 @@ export default function WorkerDashboard({ user }) {
               Hola, {user?.name || "Trabajador"}
             </h1>
             <p className="text-gray-400 mt-1.5 text-sm lg:text-base">
-              Bienvenido de vuelta. Tu rol operativo es <span className="text-amber-300 font-semibold capitalize">{user?.role || "Staff"}</span>.
+              Bienvenido de vuelta. Tu rol operativo es <span className="text-amber-300 font-semibold capitalize">{workerProfile?.role || user?.role || "Staff"}</span>.
             </p>
           </div>
 
@@ -326,6 +444,21 @@ export default function WorkerDashboard({ user }) {
               const isConfirmed = event.assignment_status === 'Confirmado';
               const isRejected = event.assignment_status === 'Rechazado';
 
+              const isEventSimpleType = event.type === "Anfitrionas" || event.type === "Promotoría";
+              
+              // Planificación Técnica / Operacional Pendiente
+              const isPlanPending = event.operational_info_pending ?? false;
+
+              // Decidir si mostrar el bloque operacional o el timeline técnico en el dashboard
+              const shouldShowOperationalSection = 
+                !isWorkerSimpleRole && 
+                !isEventSimpleType && 
+                (isPlanPending || event.setup_time || event.call_time || event.end_time);
+
+              // Decidir si mostrar supervisor y citación
+              const shouldShowSupervisor = !isEventSimpleType && (event.profiles?.name || isPlanPending);
+              const shouldShowCallTime = !isWorkerSimpleRole && !isEventSimpleType && (event.call_time || isPlanPending);
+
               // Dynamic styling based on assignment status
               let glowColor = "border-white/5 hover:border-amber-500/20";
               let statusBadge = "bg-amber-500/20 text-amber-300 border-amber-500/30";
@@ -339,8 +472,14 @@ export default function WorkerDashboard({ user }) {
               }
 
               // Real presentation time and supervisor name from DB
-              const presentationTime = event.call_time ? `${event.call_time.slice(0, 5)} hrs` : 'Por definir';
-              const supervisorName = event.profiles?.name || 'Por definir';
+              const presentationTime = event.call_time 
+                ? `${event.call_time.slice(0, 5)} hrs` 
+                : (isPlanPending ? 'Por definir' : null);
+
+              const supervisorName = event.profiles?.name 
+                ? event.profiles.name 
+                : (isPlanPending ? 'Por definir' : null);
+
               const priorityName = event.priority || 'Media';
 
               return (
@@ -348,14 +487,25 @@ export default function WorkerDashboard({ user }) {
                   key={event.id}
                   whileHover={{ y: -4, scale: 1.01 }}
                   transition={{ duration: 0.2 }}
+                  layout
                 >
-                  {/* 4️⃣ Event Card más Rica (Cinematic glass panel, dynamic glow) */}
-                  <GlassCard className={`p-6 border-l-4 ${isConfirmed ? 'border-l-emerald-500' : isRejected ? 'border-l-red-500' : 'border-l-amber-500'} ${glowColor} transition-all duration-300`}>
+                  <GlassCard className={`p-6 border-l-4 ${isConfirmed ? 'border-l-emerald-500' : isRejected ? 'border-l-red-500' : 'border-l-amber-500'} ${glowColor} transition-all duration-300 relative overflow-hidden`}>
+                    
+                    {/* Badge indicador de Planificación Pendiente */}
+                    {isPlanPending && (
+                      <div className="absolute top-0 right-0 bg-amber-500/20 border-l border-b border-amber-500/30 text-amber-300 px-3 py-1 rounded-bl-xl text-[9px] font-extrabold uppercase tracking-widest animate-pulse">
+                        Planificación Pendiente
+                      </div>
+                    )}
+
                     <div className="flex flex-col lg:flex-row justify-between gap-6">
                       <div className="flex-1 space-y-4">
                         <div className="flex items-center justify-between flex-wrap gap-2">
                           <div className="flex items-center gap-2 flex-wrap">
                             <h3 className="text-xl font-bold text-white tracking-wide">{event.name}</h3>
+                            <span className="text-[10px] px-2 py-0.5 rounded border border-white/10 bg-white/5 text-gray-400 font-semibold uppercase tracking-wider">
+                              {event.type || "Producción técnica"}
+                            </span>
                             <span className={`text-[10px] px-2 py-0.5 rounded border font-semibold ${
                               priorityName === "Crítica" ? "bg-red-500/20 text-red-300 border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.1)]" :
                               priorityName === "Alta" ? "bg-amber-500/20 text-amber-300 border-amber-500/30" :
@@ -370,6 +520,7 @@ export default function WorkerDashboard({ user }) {
                           </span>
                         </div>
 
+                        {/* Grid de Datos Adaptativo */}
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm text-gray-300 bg-black/40 p-4 rounded-2xl border border-white/5 shadow-inner">
                           <div className="flex flex-col gap-0.5">
                             <span className="text-[10px] text-gray-500 uppercase tracking-wider font-extrabold">Fecha</span>
@@ -388,36 +539,40 @@ export default function WorkerDashboard({ user }) {
                           </div>
 
                           <div className="flex flex-col gap-0.5">
-                            <span className="text-[10px] text-gray-500 uppercase tracking-wider font-extrabold">Presentación</span>
-                            <span className="flex items-center gap-1.5 font-semibold text-amber-300">
-                              <Clock className="w-4 h-4 text-amber-400" /> 
-                              {presentationTime}
-                            </span>
-                          </div>
-
-                          <div className="flex flex-col gap-0.5">
-                            <span className="text-[10px] text-gray-500 uppercase tracking-wider font-extrabold">Supervisor</span>
-                            <span className="flex items-center gap-1.5 font-semibold text-gray-100 truncate">
-                              👤 {supervisorName}
+                            <span className="text-[10px] text-gray-500 uppercase tracking-wider font-extrabold">Showtime</span>
+                            <span className="flex items-center gap-1.5 font-semibold text-gray-100">
+                              🎬 {event.time ? event.time.slice(0, 5) : 'Por definir'}
                             </span>
                           </div>
 
                           <div className="flex flex-col gap-0.5">
                             <span className="text-[10px] text-gray-500 uppercase tracking-wider font-extrabold">Tu Rol</span>
                             <span className="flex items-center gap-1.5 font-semibold text-gray-100 capitalize">
-                              🛠️ {user?.role || "Staff"}
+                              🛠️ {workerProfile?.role || user?.role || "Staff"}
                             </span>
                           </div>
 
-                          <div className="flex flex-col gap-0.5">
-                            <span className="text-[10px] text-gray-500 uppercase tracking-wider font-extrabold">Showtime</span>
-                            <span className="flex items-center gap-1.5 font-semibold text-gray-100">
-                              🎬 {event.time ? event.time.slice(0, 5) : 'Por definir'}
-                            </span>
-                          </div>
+                          {shouldShowCallTime && presentationTime && (
+                            <div className="flex flex-col gap-0.5">
+                              <span className="text-[10px] text-gray-500 uppercase tracking-wider font-extrabold">Presentación</span>
+                              <span className={`flex items-center gap-1.5 font-semibold ${presentationTime === "Por definir" ? "text-amber-500/50 italic animate-pulse" : "text-amber-300"}`}>
+                                <Clock className="w-4 h-4 text-amber-400" /> 
+                                {presentationTime}
+                              </span>
+                            </div>
+                          )}
+
+                          {shouldShowSupervisor && supervisorName && (
+                            <div className="flex flex-col gap-0.5">
+                              <span className="text-[10px] text-gray-500 uppercase tracking-wider font-extrabold">Supervisor</span>
+                              <span className={`flex items-center gap-1.5 font-semibold ${supervisorName === "Por definir" ? "text-gray-500 italic animate-pulse" : "text-gray-100 truncate"}`}>
+                                👤 {supervisorName}
+                              </span>
+                            </div>
+                          )}
                         </div>
 
-                        {/* Notas operativas rápidas si existen */}
+                        {/* Notas operativas si existen */}
                         {event.operational_notes && (
                           <div className="text-xs bg-amber-500/5 text-amber-300 border border-amber-500/10 p-3 rounded-xl leading-relaxed">
                             <strong>⚠️ Notas de Operación:</strong> {event.operational_notes}
@@ -450,7 +605,7 @@ export default function WorkerDashboard({ user }) {
                         {isConfirmed && (
                           <div className="flex flex-col gap-2 w-full lg:w-44">
                             <span className="flex items-center justify-center gap-1.5 px-4 py-2.5 bg-emerald-500/10 text-emerald-400 rounded-xl border border-emerald-500/30 font-bold text-sm shadow-inner text-center">
-                              ✓ Asistencia Confirmada
+                              ✓ Confirmada
                             </span>
                             <motion.button
                               whileTap={{ scale: 0.95 }}
@@ -488,48 +643,76 @@ export default function WorkerDashboard({ user }) {
                       </div>
                     </div>
 
-                    {/* 5️⃣ Timeline Operativo (Enterprise style, vertical illuminated line) */}
-                    {isConfirmed && (
+                    {/* Timeline Operativo Adaptativo e Inteligente */}
+                    {isConfirmed && shouldShowOperationalSection && (
                       <div className="mt-6 border-t border-white/5 pt-6">
                         <h4 className="text-xs font-extrabold uppercase tracking-wider text-amber-400 mb-4 flex items-center gap-1.5">
-                          📋 Cronograma Operativo del Evento
+                          📋 Cronograma Operativo Técnico
                         </h4>
                         <div className="relative pl-6 border-l border-white/10 space-y-4">
-                          <div className="relative group">
-                            <div className="absolute -left-[30px] top-1.5 w-4 h-4 rounded-full bg-emerald-500 border-4 border-gray-950 shadow-[0_0_10px_rgba(16,185,129,0.5)] group-hover:scale-125 transition-transform duration-300" />
-                            <div className="flex items-center justify-between text-xs md:text-sm">
-                              <span className="font-bold text-emerald-300 font-mono">{event.setup_time ? event.setup_time.slice(0, 5) : 'Por definir'}</span>
-                              <span className="text-gray-200">Inicio de montaje técnico y descarga</span>
-                              <span className="text-[10px] bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded border border-emerald-500/20 font-medium">Montaje</span>
+                          
+                          {/* 1. Montaje */}
+                          {(!isEventSimpleType || isPlanPending) && (
+                            <div className="relative group">
+                              <div className={`absolute -left-[30px] top-1.5 w-4 h-4 rounded-full border-4 border-gray-950 group-hover:scale-125 transition-transform duration-300 ${
+                                event.setup_time ? 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]' : 'bg-gray-700'
+                              }`} />
+                              <div className="flex items-center justify-between text-xs md:text-sm">
+                                <span className={`font-bold font-mono ${event.setup_time ? 'text-emerald-300' : 'text-gray-500 italic animate-pulse'}`}>
+                                  {event.setup_time ? event.setup_time.slice(0, 5) : 'Por definir'}
+                                </span>
+                                <span className={event.setup_time ? 'text-gray-200' : 'text-gray-500 italic'}>
+                                  {event.setup_time ? 'Inicio de montaje técnico y descarga' : 'Horario de montaje técnico por definir'}
+                                </span>
+                                <span className="text-[10px] bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded border border-emerald-500/20 font-medium">Montaje</span>
+                              </div>
                             </div>
-                          </div>
+                          )}
 
+                          {/* 2. Presentación (Llegada) */}
                           <div className="relative group">
-                            <div className="absolute -left-[30px] top-1.5 w-4 h-4 rounded-full bg-amber-500 border-4 border-gray-950 shadow-[0_0_10px_rgba(245,158,11,0.5)] group-hover:scale-125 transition-transform duration-300" />
+                            <div className={`absolute -left-[30px] top-1.5 w-4 h-4 rounded-full border-4 border-gray-950 group-hover:scale-125 transition-transform duration-300 ${
+                              event.call_time ? 'bg-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.5)]' : 'bg-gray-700'
+                            }`} />
                             <div className="flex items-center justify-between text-xs md:text-sm">
-                              <span className="font-bold text-amber-300 font-mono">{event.call_time ? event.call_time.slice(0, 5) : 'Por definir'}</span>
-                              <span className="text-gray-200">Hora de presentación (Call Time)</span>
+                              <span className={`font-bold font-mono ${event.call_time ? 'text-amber-300' : 'text-gray-500 italic animate-pulse'}`}>
+                                {event.call_time ? event.call_time.slice(0, 5) : 'Por definir'}
+                              </span>
+                              <span className={event.call_time ? 'text-gray-200' : 'text-gray-500 italic'}>
+                                {event.call_time ? 'Hora de presentación en recinto (Call Time)' : 'Hora de citación por definir'}
+                              </span>
                               <span className="text-[10px] bg-amber-500/10 text-amber-400 px-2 py-0.5 rounded border border-amber-500/20 font-medium">Llegada</span>
                             </div>
                           </div>
 
+                          {/* 3. Showtime (Siempre visible) */}
                           <div className="relative group">
                             <div className="absolute -left-[30px] top-1.5 w-4 h-4 rounded-full bg-blue-500 border-4 border-gray-950 shadow-[0_0_10px_rgba(59,130,246,0.5)] group-hover:scale-125 transition-transform duration-300" />
                             <div className="flex items-center justify-between text-xs md:text-sm">
                               <span className="font-bold text-blue-300 font-mono">{event.time ? event.time.slice(0, 5) : 'Por definir'}</span>
-                              <span className="text-gray-200">Inicio de show / Transmisión principal</span>
+                              <span className="text-gray-200">Inicio de show / Activación principal</span>
                               <span className="text-[10px] bg-blue-500/10 text-blue-400 px-2 py-0.5 rounded border border-blue-500/20 font-medium">Showtime</span>
                             </div>
                           </div>
 
-                          <div className="relative group">
-                            <div className="absolute -left-[30px] top-1.5 w-4 h-4 rounded-full bg-red-500 border-4 border-gray-950 shadow-[0_0_10px_rgba(239,68,68,0.5)] group-hover:scale-125 transition-transform duration-300" />
-                            <div className="flex items-center justify-between text-xs md:text-sm">
-                              <span className="font-bold text-red-300 font-mono">{event.end_time ? event.end_time.slice(0, 5) : 'Por definir'}</span>
-                              <span className="text-gray-200">Finalización del evento y desmontaje</span>
-                              <span className="text-[10px] bg-red-500/10 text-red-400 px-2 py-0.5 rounded border border-red-500/20 font-medium">Término</span>
+                          {/* 4. Término */}
+                          {(!isEventSimpleType || isPlanPending) && (
+                            <div className="relative group">
+                              <div className={`absolute -left-[30px] top-1.5 w-4 h-4 rounded-full border-4 border-gray-950 group-hover:scale-125 transition-transform duration-300 ${
+                                event.end_time ? 'bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.5)]' : 'bg-gray-700'
+                              }`} />
+                              <div className="flex items-center justify-between text-xs md:text-sm">
+                                <span className={`font-bold font-mono ${event.end_time ? 'text-red-300' : 'text-gray-500 italic animate-pulse'}`}>
+                                  {event.end_time ? event.end_time.slice(0, 5) : 'Por definir'}
+                                </span>
+                                <span className={event.end_time ? 'text-gray-200' : 'text-gray-500 italic'}>
+                                  {event.end_time ? 'Finalización del evento y desmontaje' : 'Hora de desmontaje y término por definir'}
+                                </span>
+                                <span className="text-[10px] bg-red-500/10 text-red-400 px-2 py-0.5 rounded border border-red-500/20 font-medium">Término</span>
+                              </div>
                             </div>
-                          </div>
+                          )}
+
                         </div>
                       </div>
                     )}
@@ -557,7 +740,7 @@ export default function WorkerDashboard({ user }) {
               />
               <div className="overflow-hidden">
                 <p className="font-bold text-white truncate">{user?.name || "Trabajador"}</p>
-                <p className="text-xs text-amber-400 capitalize font-semibold tracking-wider mt-0.5">{user?.role || "Staff"}</p>
+                <p className="text-xs text-amber-400 capitalize font-semibold tracking-wider mt-0.5">{workerProfile?.role || user?.role || "Staff"}</p>
               </div>
             </div>
 
@@ -603,7 +786,6 @@ export default function WorkerDashboard({ user }) {
                     }
 
                     return (
-                      // 1️⃣ Mejorar Calendario (Click cycling, transitions, custom tooltips, loading state)
                       <div key={day} className="relative group flex items-center justify-center">
                         <button
                           onClick={() => toggleAvailability(day)}
@@ -640,41 +822,92 @@ export default function WorkerDashboard({ user }) {
             </div>
           </GlassCard>
 
-          {/* 7️⃣ Notificaciones Panel */}
+          {/* Notificaciones Panel */}
           <GlassCard className="p-6 border border-white/5">
-            <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-              <Bell className="w-5 h-5 text-amber-400" />
-              Notificaciones Operativas
-            </h2>
-            <div className="space-y-3.5">
-              {notifications.map(n => {
-                let cardStyle = "border-amber-500/20 bg-amber-500/5";
-                let icon = <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />;
-                if (n.type === "info") {
-                  cardStyle = "border-blue-500/20 bg-blue-500/5";
-                  icon = <Info className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />;
-                } else if (n.type === "danger") {
-                  cardStyle = "border-red-500/20 bg-red-500/5";
-                  icon = <XCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />;
-                }
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+                <Bell className="w-5 h-5 text-amber-400 animate-bounce" />
+                Notificaciones
+              </h2>
+              {notifications.some(n => !n.read) && (
+                <button 
+                  onClick={markAllAsRead}
+                  className="text-[10px] text-amber-400 hover:text-amber-300 transition-colors hover:underline font-bold"
+                >
+                  Marcar todas
+                </button>
+              )}
+            </div>
 
-                return (
-                  <div key={n.id} className={`p-3.5 rounded-2xl border text-xs flex gap-3 shadow-inner ${cardStyle}`}>
-                    {icon}
-                    <div className="space-y-1">
-                      <div className="flex justify-between items-center gap-2">
-                        <strong className="text-gray-100 font-bold leading-none">{n.title}</strong>
-                        <span className="text-[9px] text-gray-500 font-medium whitespace-nowrap">{n.time}</span>
-                      </div>
-                      <p className="text-gray-300 leading-normal">{n.desc}</p>
-                    </div>
+            <div className="space-y-3">
+              <AnimatePresence initial={false}>
+                {notifications.length === 0 ? (
+                  <div className="text-center py-6 text-gray-500 text-xs flex flex-col items-center gap-2">
+                    <BellOff className="w-8 h-8 text-gray-700" />
+                    <span>Sin notificaciones pendientes</span>
                   </div>
-                );
-              })}
+                ) : (
+                  notifications.map(n => {
+                    let cardStyle = "border-amber-500/10 bg-amber-500/5 hover:bg-amber-500/10";
+                    let icon = <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />;
+                    if (n.type === "info") {
+                      cardStyle = "border-blue-500/10 bg-blue-500/5 hover:bg-blue-500/10";
+                      icon = <Info className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />;
+                    } else if (n.type === "danger") {
+                      cardStyle = "border-red-500/10 bg-red-500/5 hover:bg-red-500/10";
+                      icon = <XCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />;
+                    }
+
+                    return (
+                      <motion.div
+                        key={n.id}
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0 }}
+                        layout
+                        className={`p-3 rounded-2xl border text-xs flex gap-2.5 transition-all duration-300 relative group overflow-hidden ${cardStyle} ${
+                          !n.read ? 'shadow-[0_0_12px_rgba(245,158,11,0.06)] border-amber-500/30' : 'opacity-55 hover:opacity-80'
+                        }`}
+                      >
+                        {/* Glow decorativo sutil si no está leída */}
+                        {!n.read && (
+                          <div className="absolute inset-0 bg-gradient-to-r from-amber-500/0 via-amber-500/5 to-amber-500/0 animate-pulse pointer-events-none" />
+                        )}
+
+                        {icon}
+                        <div className="space-y-1 flex-1 min-w-0 relative z-10">
+                          <div className="flex justify-between items-start gap-1">
+                            <strong className="text-gray-100 font-bold leading-tight truncate pr-8">{n.title}</strong>
+                            <span className="text-[8px] text-gray-500 font-medium whitespace-nowrap">{n.time}</span>
+                          </div>
+                          <p className="text-gray-300 leading-normal text-[11px]">{n.desc}</p>
+                          
+                          {/* Acciones de la notificación */}
+                          {!n.read && (
+                            <button
+                              onClick={() => markAsRead(n.id)}
+                              className="text-[9px] text-amber-400 hover:text-amber-300 font-bold mt-1 block hover:underline"
+                            >
+                              Marcar como leído
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Badge de Nuevo */}
+                        {!n.read && (
+                          <span className="absolute top-2 right-2 bg-amber-500 text-gray-900 text-[8px] font-extrabold px-1.5 py-0.5 rounded-full uppercase tracking-wider scale-90">
+                            Nuevo
+                          </span>
+                        )}
+                      </motion.div>
+                    );
+                  })
+                )}
+              </AnimatePresence>
             </div>
           </GlassCard>
 
-          {/* 6️⃣ Feed de Actividad Panel */}
+          {/* Feed de Actividad Panel */}
           <GlassCard className="p-6 border border-white/5">
             <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
               <Activity className="w-5 h-5 text-amber-400" />
@@ -690,7 +923,7 @@ export default function WorkerDashboard({ user }) {
                     exit={{ opacity: 0 }}
                     className="flex gap-2.5 items-start text-xs border-b border-white/5 pb-3 last:border-b-0 last:pb-0"
                   >
-                    <div className="w-2 h-2 rounded-full bg-amber-500 mt-1.5 shrink-0" />
+                    <div className="w-2 h-2 rounded-full bg-amber-500 mt-1.5 shrink-0 animate-pulse" />
                     <div className="space-y-0.5">
                       <p className="text-gray-200 font-medium leading-normal">{act.text}</p>
                       <span className="text-[9px] text-gray-500 block font-semibold">{act.time}</span>
@@ -705,71 +938,116 @@ export default function WorkerDashboard({ user }) {
 
       </div>
 
-      {/* Details Modal */}
+      {/* Details Modal Adaptativo */}
       <AnimatePresence>
-        {selectedDetailedEvent && (
-          <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/85 backdrop-blur-md p-4">
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="relative w-full max-w-lg bg-gray-900 border border-white/10 rounded-3xl p-6 shadow-2xl overflow-hidden"
-            >
-              <div className="absolute top-0 right-0 w-48 h-48 bg-amber-500/10 rounded-full blur-[60px] pointer-events-none" />
-              
-              <button 
-                onClick={() => setSelectedDetailedEvent(null)}
-                className="absolute top-4 right-4 text-gray-400 hover:text-white transition-colors"
+        {selectedDetailedEvent && (() => {
+          const isEventSimpleType = selectedDetailedEvent.type === "Anfitrionas" || selectedDetailedEvent.type === "Promotoría";
+          const isPlanPending = selectedDetailedEvent.operational_info_pending ?? false;
+
+          // Decidir qué tiempos técnicos renderizar en el modal
+          const shouldShowSetup = !isWorkerSimpleRole && !isEventSimpleType && (selectedDetailedEvent.setup_time || isPlanPending);
+          const shouldShowCall = !isWorkerSimpleRole && !isEventSimpleType && (selectedDetailedEvent.call_time || isPlanPending);
+          const shouldShowEnd = !isWorkerSimpleRole && !isEventSimpleType && (selectedDetailedEvent.end_time || isPlanPending);
+
+          return (
+            <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/85 backdrop-blur-md p-4">
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                className="relative w-full max-w-lg bg-gray-900 border border-white/10 rounded-3xl p-6 shadow-2xl overflow-hidden"
               >
-                <XCircle className="w-6 h-6" />
-              </button>
+                <div className="absolute top-0 right-0 w-48 h-48 bg-amber-500/10 rounded-full blur-[60px] pointer-events-none" />
+                
+                <button 
+                  onClick={() => setSelectedDetailedEvent(null)}
+                  className="absolute top-4 right-4 text-gray-400 hover:text-white transition-colors"
+                >
+                  <XCircle className="w-6 h-6" />
+                </button>
 
-              <h3 className="text-2xl font-bold text-white mb-4 pr-8">{selectedDetailedEvent.name}</h3>
-              
-              <div className="space-y-4 text-sm text-gray-300">
-                <div className="bg-white/5 p-4 rounded-xl space-y-2 border border-white/5 shadow-inner">
-                  <p><strong className="text-amber-400">Cliente:</strong> {selectedDetailedEvent.client || 'Por definir'}</p>
-                  <p><strong className="text-amber-400">Ubicación:</strong> {selectedDetailedEvent.location}</p>
-                  <p><strong className="text-amber-400">Prioridad:</strong> {selectedDetailedEvent.priority || 'Media'}</p>
-                  <p><strong className="text-amber-400">Estado Operacional:</strong> {selectedDetailedEvent.status}</p>
+                <div className="mb-4 pr-8">
+                  <h3 className="text-2xl font-bold text-white leading-tight">{selectedDetailedEvent.name}</h3>
+                  <span className="inline-block mt-1.5 text-xs px-2.5 py-0.5 rounded border border-white/10 bg-white/5 text-gray-400 font-semibold uppercase tracking-wider">
+                    {selectedDetailedEvent.type || "Producción técnica"}
+                  </span>
                 </div>
+                
+                <div className="space-y-4 text-sm text-gray-300">
+                  <div className="bg-white/5 p-4 rounded-xl space-y-2 border border-white/5 shadow-inner">
+                    <p><strong className="text-amber-400">Cliente:</strong> {selectedDetailedEvent.client || 'Por definir'}</p>
+                    <p><strong className="text-amber-400">Ubicación:</strong> {selectedDetailedEvent.location}</p>
+                    <p><strong className="text-amber-400">Prioridad:</strong> {selectedDetailedEvent.priority || 'Media'}</p>
+                    <p><strong className="text-amber-400">Estado Operacional:</strong> {selectedDetailedEvent.status}</p>
+                  </div>
 
-                <div className="bg-black/30 p-4 rounded-xl space-y-1.5 border border-white/5 text-xs">
-                  <h4 className="font-bold text-white uppercase tracking-wider text-amber-400 mb-1.5">⏱ Horarios de Producción</h4>
-                  <p><strong className="text-gray-400">Montaje:</strong> {selectedDetailedEvent.setup_time ? selectedDetailedEvent.setup_time.slice(0, 5) : 'Por definir'} hrs</p>
-                  <p><strong className="text-gray-400">Presentación:</strong> {selectedDetailedEvent.call_time ? selectedDetailedEvent.call_time.slice(0, 5) : 'Por definir'} hrs</p>
-                  <p><strong className="text-gray-400">Inicio Show:</strong> {selectedDetailedEvent.time ? selectedDetailedEvent.time.slice(0, 5) : 'Por definir'} hrs</p>
-                  <p><strong className="text-gray-400">Término Show:</strong> {selectedDetailedEvent.end_time ? selectedDetailedEvent.end_time.slice(0, 5) : 'Por definir'} hrs</p>
-                </div>
+                  <div className="bg-black/30 p-4 rounded-xl space-y-1.5 border border-white/5 text-xs">
+                    <h4 className="font-bold text-white uppercase tracking-wider text-amber-400 mb-1.5">⏱ Horarios de Producción</h4>
+                    
+                    {shouldShowSetup && (
+                      <p>
+                        <strong className="text-gray-400">Montaje:</strong>{' '}
+                        <span className={selectedDetailedEvent.setup_time ? '' : 'text-amber-500/60 italic animate-pulse'}>
+                          {selectedDetailedEvent.setup_time ? `${selectedDetailedEvent.setup_time.slice(0, 5)} hrs` : 'Por definir'}
+                        </span>
+                      </p>
+                    )}
+                    
+                    {shouldShowCall && (
+                      <p>
+                        <strong className="text-gray-400">Presentación:</strong>{' '}
+                        <span className={selectedDetailedEvent.call_time ? '' : 'text-amber-500/60 italic animate-pulse'}>
+                          {selectedDetailedEvent.call_time ? `${selectedDetailedEvent.call_time.slice(0, 5)} hrs` : 'Por definir'}
+                        </span>
+                      </p>
+                    )}
+                    
+                    <p>
+                      <strong className="text-gray-400">Inicio Show:</strong>{' '}
+                      <span>
+                        {selectedDetailedEvent.time ? `${selectedDetailedEvent.time.slice(0, 5)} hrs` : 'Por definir'}
+                      </span>
+                    </p>
+                    
+                    {shouldShowEnd && (
+                      <p>
+                        <strong className="text-gray-400">Término Show:</strong>{' '}
+                        <span className={selectedDetailedEvent.end_time ? '' : 'text-amber-500/60 italic animate-pulse'}>
+                          {selectedDetailedEvent.end_time ? `${selectedDetailedEvent.end_time.slice(0, 5)} hrs` : 'Por definir'}
+                        </span>
+                      </p>
+                    )}
+                  </div>
 
-                {selectedDetailedEvent.operational_notes && (
+                  {selectedDetailedEvent.operational_notes && (
+                    <div className="space-y-1">
+                      <h4 className="font-bold text-white text-xs uppercase tracking-wider text-amber-400">⚠️ Notas Operativas:</h4>
+                      <p className="text-amber-200 bg-amber-950/20 p-3 rounded-xl border border-amber-500/10 leading-relaxed text-xs">
+                        {selectedDetailedEvent.operational_notes}
+                      </p>
+                    </div>
+                  )}
+
                   <div className="space-y-1">
-                    <h4 className="font-bold text-white text-xs uppercase tracking-wider text-amber-400">⚠️ Notas Operativas:</h4>
-                    <p className="text-amber-200 bg-amber-950/20 p-3 rounded-xl border border-amber-500/10 leading-relaxed text-xs">
-                      {selectedDetailedEvent.operational_notes}
+                    <h4 className="font-bold text-white text-xs uppercase tracking-wider text-amber-400">Descripción del Evento:</h4>
+                    <p className="text-gray-400 italic bg-black/20 p-3 rounded-xl border border-white/5 leading-relaxed text-xs">
+                      {selectedDetailedEvent.description || "Sin descripción adicional proporcionada para esta fecha de producción."}
                     </p>
                   </div>
-                )}
-
-                <div className="space-y-1">
-                  <h4 className="font-bold text-white text-xs uppercase tracking-wider text-amber-400">Descripción del Evento:</h4>
-                  <p className="text-gray-400 italic bg-black/20 p-3 rounded-xl border border-white/5 leading-relaxed text-xs">
-                    {selectedDetailedEvent.description || "Sin descripción adicional proporcionada para esta fecha de producción."}
-                  </p>
                 </div>
-              </div>
 
-              <div className="mt-6 flex justify-end">
-                <button
-                  onClick={() => setSelectedDetailedEvent(null)}
-                  className="px-5 py-2.5 bg-amber-500 text-gray-900 font-bold rounded-xl hover:bg-amber-400 transition-colors shadow-lg shadow-amber-500/20 active:scale-95 transition-all duration-300"
-                >
-                  Cerrar
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
+                <div className="mt-6 flex justify-end">
+                  <button
+                    onClick={() => setSelectedDetailedEvent(null)}
+                    className="px-5 py-2.5 bg-amber-500 text-gray-900 font-bold rounded-xl hover:bg-amber-400 transition-colors shadow-lg shadow-amber-500/20 active:scale-95 transition-all duration-300"
+                  >
+                    Cerrar
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+          );
+        })()}
       </AnimatePresence>
     </motion.div>
   );

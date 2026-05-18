@@ -106,6 +106,8 @@ export default function Events({ user }) {
       eventData.required_staff = 1;
     }
 
+    eventData.operational_info_pending = !!eventData.operational_info_pending;
+
     let eventId = eventData.id;
     console.log("4️⃣ [INSERTING EVENT] - Iniciando transacción en Supabase con payload normalizado:", eventData);
 

@@ -35,6 +35,7 @@ const eventSchema = z.object({
   end_time: z.string().optional().or(z.literal("")),
   priority: z.string().default("Media"),
   operational_notes: z.string().optional(),
+  operational_info_pending: z.boolean().default(false),
 }).refine((data) => {
   // Validar: hora presentación < hora inicio
   if (!data.call_time || !data.time || !data.call_time.includes(":") || !data.time.includes(":")) return true;
@@ -84,7 +85,8 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
       setup_time: "",
       end_time: "",
       priority: "Media",
-      operational_notes: ""
+      operational_notes: "",
+      operational_info_pending: false
     }
   });
 
@@ -264,7 +266,8 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
           setup_time: initialData.setup_time || "",
           end_time: initialData.end_time || "",
           priority: initialData.priority || "Media",
-          operational_notes: initialData.operational_notes || ""
+          operational_notes: initialData.operational_notes || "",
+          operational_info_pending: initialData.operational_info_pending || false
         });
         
         if (initialData.id) {
@@ -279,7 +282,8 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
           name: "", client: "", date: "", time: "", location: "",
           requiredStaff: 1, description: "", status: "Planificado", staffIds: [],
           type: "Producción técnica", supervisor_id: "", call_time: "", 
-          setup_time: "", end_time: "", priority: "Media", operational_notes: ""
+          setup_time: "", end_time: "", priority: "Media", operational_notes: "",
+          operational_info_pending: false
         });
       }
     }
@@ -500,16 +504,27 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
 
                 {/* 2️⃣ SECCIÓN DE CONFIGURACIÓN OPERACIONAL AVANZADA (COLAPSABLE CON FRAMER MOTION) */}
                 <div className="border-b border-white/5 pb-4">
-                  <button
-                    type="button"
-                    onClick={() => setShowAdvanced(!showAdvanced)}
-                    className="flex items-center gap-2 px-3 py-2 bg-white/5 hover:bg-white/10 rounded-xl border border-white/10 text-xs font-bold uppercase tracking-wider text-amber-400 transition-colors focus:outline-none shadow-md"
-                  >
-                    <span>{showAdvanced ? "▼ Ocultar Configuración Avanzada" : "▶ Mostrar Configuración Avanzada"}</span>
-                    <span className="text-[10px] text-gray-400 normal-case font-medium">
-                      ({showAdvanced ? "Haga clic para cerrar" : "Supervisor, horarios detallados, notas"})
-                    </span>
-                  </button>
+                  <div className="flex flex-wrap items-center gap-4 mb-1">
+                    <button
+                      type="button"
+                      onClick={() => setShowAdvanced(!showAdvanced)}
+                      className="flex items-center gap-2 px-3 py-2 bg-white/5 hover:bg-white/10 rounded-xl border border-white/10 text-xs font-bold uppercase tracking-wider text-amber-400 transition-colors focus:outline-none shadow-md"
+                    >
+                      <span>{showAdvanced ? "▼ Ocultar Configuración Avanzada" : "▶ Mostrar Configuración Avanzada"}</span>
+                      <span className="text-[10px] text-gray-400 normal-case font-medium">
+                        ({showAdvanced ? "Haga clic para cerrar" : "Supervisor, horarios detallados, notas"})
+                      </span>
+                    </button>
+
+                    <label className="flex items-center gap-2.5 cursor-pointer bg-white/5 hover:bg-white/10 px-3 py-2 rounded-xl border border-white/10 text-xs font-bold text-amber-300 transition-colors shadow-md select-none">
+                      <input 
+                        type="checkbox"
+                        {...register("operational_info_pending")}
+                        className="form-checkbox h-4 w-4 text-amber-500 bg-gray-700 border-gray-600 rounded focus:ring-amber-500/50" 
+                      />
+                      <span>Información operacional pendiente</span>
+                    </label>
+                  </div>
                   
                   <AnimatePresence initial={false}>
                     {showAdvanced && (
