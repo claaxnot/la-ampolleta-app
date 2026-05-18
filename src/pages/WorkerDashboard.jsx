@@ -51,17 +51,53 @@ export default function WorkerDashboard({ user }) {
   // Perfil del trabajador para consultar su rol real
   const [workerProfile, setWorkerProfile] = useState(null);
 
+  const getTimeAgo = (dateString) => {
+    if (!dateString) return "Hace poco";
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffInSeconds = Math.floor((now - date) / 1000);
+    
+    if (diffInSeconds < 60) return `Hace unos segundos`;
+    if (diffInSeconds < 3600) return `Hace ${Math.floor(diffInSeconds / 60)} min`;
+    if (diffInSeconds < 86400) return `Hace ${Math.floor(diffInSeconds / 3600)} horas`;
+    return `Hace ${Math.floor(diffInSeconds / 86400)} días`;
+  };
+
   // Real-time Notifications state (Con estado de lectura y animaciones)
   const [notifications, setNotifications] = useState([
     { id: 1, title: "Actualización de Montaje", desc: "El montaje del concierto principal iniciará 30 min antes por pruebas técnicas.", type: "warning", time: "Hace 1 hora", read: false },
     { id: 2, title: "Protocolo de Bodega", desc: "Recordar el uso obligatorio de calzado de seguridad en la carga de equipos.", type: "info", time: "Hace 2 horas", read: false },
     { id: 3, title: "Documentación Pendiente", desc: "Sube tu boleta de honorarios de la producción anterior.", type: "danger", time: "Hace 1 día", read: true }
   ]);
+
+  const fetchMyDbNotifications = async (workerId) => {
+    try {
+      const { data, error } = await supabase
+        .from('notifications')
+        .select('*')
+        .eq('user_id', workerId)
+        .order('created_at', { ascending: false });
+      
+      if (!error && data && data.length > 0) {
+        const formatted = data.map(n => ({
+          id: n.id,
+          title: n.title,
+          desc: n.description,
+          type: n.type || "info",
+          time: getTimeAgo(n.created_at),
+          read: n.read
+        }));
+        setNotifications(formatted);
+      }
+    } catch (err) {
+      console.warn("⚠️ [NOTIFICATIONS TABLE]: No se pudo cargar notificaciones de BD, usando datos temporales:", err);
+    }
+  };
   
   // Real-time Activity Feed state
   const [activities, setActivities] = useState([
     { id: 1, text: "Sistema operativo inicializado correctamente.", type: "system", time: "Hace unos minutos" },
-    { id: 2, text: "Sesión iniciada con éxito.", type: "auth", time: "Hace 5 minutos" }
+    { id: 2, text: "Sesión iniciada con éxito.", type: "auth", time: "Hace 5 minutes" }
   ]);
 
   const addActivity = (text, type) => {
@@ -71,14 +107,36 @@ export default function WorkerDashboard({ user }) {
     ]);
   };
 
-  const markAsRead = (id) => {
+  const markAsRead = async (id) => {
     setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
     toast.success("Notificación marcada como leída", { duration: 1500 });
+    
+    if (typeof id === 'string') {
+      try {
+        await supabase
+          .from('notifications')
+          .update({ read: true })
+          .eq('id', id);
+      } catch (err) {
+        console.error("Error updating notification in database:", err);
+      }
+    }
   };
 
-  const markAllAsRead = () => {
+  const markAllAsRead = async () => {
     setNotifications(prev => prev.map(n => ({ ...n, read: true })));
     toast.success("Todas las notificaciones leídas", { duration: 1500 });
+    
+    if (user?.id) {
+      try {
+        await supabase
+          .from('notifications')
+          .update({ read: true })
+          .eq('user_id', user.id);
+      } catch (err) {
+        console.error("Error marking all notifications as read in database:", err);
+      }
+    }
   };
 
   // Clock updates every second
@@ -89,11 +147,12 @@ export default function WorkerDashboard({ user }) {
     return () => clearInterval(timer);
   }, []);
 
-  // Fetch inicial de datos
+  // Fetch inicial de datos y Subscripción Realtime para notificaciones físicas de base de datos
   useEffect(() => {
     if (user?.id) {
       fetchMyEvents(user.id);
       fetchMyAvailability(user.id);
+      fetchMyDbNotifications(user.id);
       
       // Cargar perfil real del trabajador
       supabase.from('profiles').select('*').eq('id', user.id).single().then(({ data }) => {
@@ -101,6 +160,56 @@ export default function WorkerDashboard({ user }) {
           setWorkerProfile(data);
         }
       });
+
+      console.log("🔌 [REALTIME] - Subscribiendo WorkerDashboard a tabla 'notifications'...");
+      const channel = supabase
+        .channel('db-notifications-updates')
+        .on(
+          'postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'notifications' },
+          (payload) => {
+            if (payload.new && payload.new.user_id === user.id) {
+              console.log("🔔 [REALTIME] - Nueva notificación física recibida:", payload.new);
+              const newNotif = {
+                id: payload.new.id,
+                title: payload.new.title,
+                desc: payload.new.description,
+                type: payload.new.type || "info",
+                time: "Ahora mismo",
+                read: payload.new.read
+              };
+              setNotifications(prev => [newNotif, ...prev]);
+              toast.success(`Nueva notificación: ${payload.new.title}`, {
+                icon: "🔔",
+                duration: 4000,
+                style: {
+                  background: 'rgba(31, 41, 55, 0.95)',
+                  color: '#fff',
+                  border: '1px solid rgba(245, 158, 11, 0.3)',
+                  boxShadow: '0 0 20px rgba(245, 158, 11, 0.2)'
+                }
+              });
+            }
+          }
+        )
+        .on(
+          'postgres_changes',
+          { event: 'UPDATE', schema: 'public', table: 'notifications' },
+          (payload) => {
+            if (payload.new && payload.new.user_id === user.id) {
+              console.log("🔔 [REALTIME] - Notificación física modificada:", payload.new);
+              setNotifications(prev => prev.map(n => n.id === payload.new.id ? {
+                ...n,
+                read: payload.new.read
+              } : n));
+            }
+          }
+        )
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
     }
   }, [user]);
 
@@ -318,6 +427,19 @@ export default function WorkerDashboard({ user }) {
       const eventInfo = assignedEvents.find(e => e.assignment_id === assignmentId);
       addActivity(`Cambiaste tu estado en "${eventInfo?.name || 'Evento'}" a ${newStatus}`, newStatus === "Confirmado" ? "success" : "danger");
       toast.success(`Asistencia marcada como: ${newStatus}`);
+      
+      // Crear notificación física de confirmación/rechazo para el trabajador
+      try {
+        await supabase.from('notifications').insert({
+          user_id: user.id,
+          title: newStatus === "Confirmado" ? "✅ Asistencia Confirmada" : "❌ Asistencia Rechazada",
+          description: `Has ${newStatus === "Confirmado" ? "confirmado tu asistencia al" : "rechazado el"} evento "${eventInfo?.name || 'Evento'}" programado para el ${eventInfo?.date || ''}.`,
+          type: newStatus === "Confirmado" ? "info" : "danger"
+        });
+      } catch (err) {
+        console.warn("⚠️ [NOTIFICATIONS TABLE]: La tabla notifications no existe aún.");
+      }
+      
       fetchMyEvents(user.id);
     } else {
       toast.error("Error al actualizar la asistencia.");

@@ -136,6 +136,19 @@ export default function Events({ user }) {
         const assignments = staffIds.map(id => ({ event_id: eventId, staff_id: id }));
         const { error: assignError } = await supabase.from('event_assignments').insert(assignments);
         if (assignError) throw assignError;
+        
+        // Crear notificaciones físicas para los trabajadores asignados
+        try {
+          const notificationsPayload = staffIds.map(id => ({
+            user_id: id,
+            title: "📅 Nueva Asignación de Evento",
+            description: `Has sido asignado para el evento "${eventData.name || 'Producción'}" el ${eventData.date || ''}.`,
+            type: "info"
+          }));
+          await supabase.from('notifications').insert(notificationsPayload);
+        } catch (err) {
+          console.warn("⚠️ [NOTIFICATIONS TABLE]: La tabla notifications no existe aún en BD.");
+        }
       }
 
       toast.success(eventData.id ? "¡Evento actualizado con éxito!" : "¡Evento creado con éxito!");

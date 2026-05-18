@@ -7,18 +7,15 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 async function run() {
   const { data, error } = await supabase
-    .from('event_assignments')
-    .select('id, created_at')
+    .from('notifications')
+    .select('*')
     .limit(1);
 
-  console.log("Select created_at error:", error);
-
-  const { data: data2, error: error2 } = await supabase
-    .from('event_assignments')
-    .select('id, updated_at')
-    .limit(1);
-
-  console.log("Select updated_at error:", error2);
+  if (error) {
+    console.log("notifications table does not exist or error:", error.message);
+  } else {
+    console.log("notifications table exists!");
+  }
 }
 
 run();
