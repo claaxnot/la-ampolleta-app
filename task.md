@@ -41,7 +41,15 @@
 - [x] **Filtrado Inteligente de Staff:** Mostrar quién está disponible (según su calendario) al momento de asignarlo a un evento en el EventModal, con alertas operacionales preventivas ante doble asignación o no disponibilidad.
 - [x] **Persistencia de Notificaciones:** Tabla física `notifications` en Supabase para conservar el historial de mensajes de los trabajadores (completamente funcional con tiempo real y tolerancia a fallos).
 
+- [x] **Módulo de Finanzas y Pagos (Admin/Worker):** Visualización de transferencias y estados por mes, generación de nóminas masivas de pagos en Excel agrupadas por persona para bancos, y registro obligatorio de datos de cuenta del trabajador.
+- [x] **Seguridad y Auditoría del Sistema:**
+  - [x] Verificación de sesión dinámica y revocación en tiempo real si una cuenta es desactivada (`Activo` / `Inactivo`).
+  - [x] Exención blindada (failsafe) para el SuperAdmin (`admin@laampolleta.tv`).
+  - [x] Actualización de contraseña real integrada directamente con Supabase Auth en Mi Perfil.
+  - [x] Control estricto de token activo y protección de interfaz en la pantalla de Restablecer Contraseña.
+
 ## 6. Pendientes y Tareas Futuras
-- [ ] **Módulo de Finanzas y Pagos (Admin/Worker):** Visualización de transferencias, generación de nóminas bancarias chilenas y carga de datos de cuenta del trabajador.
-- [ ] **Subida de Boletas de Honorarios (Worker):** Módulo para subir boletas en formato PDF cuando el evento finalice.
+- [ ] **Módulo de Subida de Boletas de Honorarios (Worker):** Subida de PDFs de boletas para eventos finalizados, con flujo de revisión y aprobación del administrador antes de liberar el pago.
+- [ ] **Reportes Visuales y Gráficos de Finanzas (Admin):** Gráficos interactivos de barra/línea sobre egresos mensuales y exportación de informes analíticos en PDF.
+- [ ] **Bitácora de Auditoría Operacional (Logs):** Registro e historial detallado de acciones administrativas críticas (ej: creación de eventos, cambios de estados de pago).
 - [ ] Escribir archivo README.md completo con instrucciones de configuración local y variables de entorno.
