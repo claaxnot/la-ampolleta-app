@@ -6,6 +6,7 @@ import EventModal from "../components/EventModal.jsx";
 import EventDetails from "../components/EventDetails.jsx";
 import GlassCard from "../components/GlassCard.jsx";
 import { permissions } from "../lib/permissions.js";
+import { toast } from "react-hot-toast";
 
 export default function Events({ user }) {
   const [events, setEvents] = useState([]);
@@ -23,27 +24,47 @@ export default function Events({ user }) {
   const rolePermissions = permissions[user?.systemRole] || permissions.viewer;
 
   const openModal = (event = null) => {
-    if (!rolePermissions.canEdit && event) return;
-    if (!rolePermissions.canCreate && !event) return;
-    setEditingEvent(event);
+    if (event) {
+      if (!rolePermissions.canEdit) return;
+      setEditingEvent(event);
+    } else {
+      if (!rolePermissions.canCreate) return;
+      setEditingEvent(null);
+    }
     setModalOpen(true);
   };
-  const closeModal = () => setModalOpen(false);
+
+  const closeModal = () => {
+    setModalOpen(false);
+    setEditingEvent(null);
+  };
+
+  const fetchEvents = async () => {
+    setIsLoading(true);
+    const { data, error } = await supabase.from('events').select(`
+      *,
+      assignedStaff:event_assignments(
+        staff_id,
+        profiles(name, avatar, role)
+      )
+    `);
+    if (data) setEvents(data);
+    setIsLoading(false);
+  };
 
   React.useEffect(() => {
     fetchEvents();
   }, []);
 
-  const fetchEvents = async () => {
-    setIsLoading(true);
-    const { data, error } = await supabase.from('events').select('*').order('date', { ascending: true });
-    if (data) setEvents(data);
-    setIsLoading(false);
-  };
-
   const handleSubmit = async (eventData) => {
-    if (eventData.id && !rolePermissions.canEdit) return;
-    if (!eventData.id && !rolePermissions.canCreate) return;
+    if (eventData.id && !rolePermissions.canEdit) {
+      toast.error("No tienes permisos para editar eventos");
+      throw new Error("No edit permissions");
+    }
+    if (!eventData.id && !rolePermissions.canCreate) {
+      toast.error("No tienes permisos para crear eventos");
+      throw new Error("No create permissions");
+    }
 
     const staffIds = eventData.staffIds || [];
     delete eventData.staffIds;
@@ -54,30 +75,43 @@ export default function Events({ user }) {
     delete eventData.requiredStaff;
 
     let eventId = eventData.id;
+    console.log("4️⃣ [INSERTING EVENT] - Iniciando transacción en Supabase con payload:", eventData);
 
-    if (eventId) {
-      // Update Event
-      const { error } = await supabase.from('events').update(eventData).eq('id', eventId);
-      if (!error) {
+    try {
+      if (eventId) {
+        // Update Event
+        const { error } = await supabase.from('events').update(eventData).eq('id', eventId);
+        console.log("5️⃣ [UPDATE RESPONSE] - Error de actualización:", error);
+        if (error) throw error;
+        
         // Clear old assignments
-        await supabase.from('event_assignments').delete().eq('event_id', eventId);
+        const { error: deleteError } = await supabase.from('event_assignments').delete().eq('event_id', eventId);
+        if (deleteError) throw deleteError;
+      } else {
+        // Insert new Event
+        const { data, error } = await supabase.from('events').insert([eventData]).select();
+        console.log("5️⃣ [INSERT RESPONSE] - Datos recibidos:", data, "Error:", error);
+        if (error) throw error;
+        if (data && data.length > 0) {
+          eventId = data[0].id;
+        }
       }
-    } else {
-      // Insert new Event
-      const { data, error } = await supabase.from('events').insert([eventData]).select();
-      if (!error && data && data.length > 0) {
-        eventId = data[0].id;
+
+      // Insert new assignments
+      if (eventId && staffIds.length > 0) {
+        const assignments = staffIds.map(id => ({ event_id: eventId, staff_id: id }));
+        const { error: assignError } = await supabase.from('event_assignments').insert(assignments);
+        if (assignError) throw assignError;
       }
-    }
 
-    // Insert new assignments
-    if (eventId && staffIds.length > 0) {
-      const assignments = staffIds.map(id => ({ event_id: eventId, staff_id: id }));
-      await supabase.from('event_assignments').insert(assignments);
+      toast.success(eventData.id ? "¡Evento actualizado con éxito!" : "¡Evento creado con éxito!");
+      fetchEvents();
+      closeModal();
+    } catch (dbError) {
+      console.error("❌ SUPABASE TRANSACTION FAILED:", dbError);
+      toast.error(`Error en base de datos: ${dbError.message || "Operación fallida"}`);
+      throw dbError;
     }
-
-    fetchEvents();
-    closeModal();
   };
 
   const openDetails = (event) => {

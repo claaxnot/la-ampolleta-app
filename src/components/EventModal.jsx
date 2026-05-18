@@ -11,8 +11,9 @@ import {
   AlertCircle, FileText, Activity, AlertTriangle, Settings, Sliders
 } from "lucide-react";
 import { supabase } from "../lib/supabase.js";
+import { toast } from "react-hot-toast";
 
-// Zod Schema con validaciones operacionales estrictas y seguras
+// Zod Schema tolerante y flexible para evitar bloqueos silenciosos
 const eventSchema = z.object({
   name: z.string().min(3, "El nombre debe tener al menos 3 caracteres"),
   client: z.string().min(2, "El nombre del cliente es obligatorio"),
@@ -21,44 +22,36 @@ const eventSchema = z.object({
   location: z.string().min(3, "La ubicación es obligatoria"),
   requiredStaff: z.coerce.number().min(1, "Debe requerir al menos 1 persona"),
   description: z.string().optional(),
-  status: z.enum(["Planificado", "Confirmado", "En progreso", "Finalizado", "Cancelado"]),
-  staffIds: z.array(z.string()),
+  status: z.string().min(1, "El estado es obligatorio"),
+  staffIds: z.array(z.string()).default([]),
   
   // Tipo de Evento
-  type: z.enum([
-    "Producción técnica", 
-    "Evento corporativo", 
-    "Activación", 
-    "Anfitrionas", 
-    "Promotoría", 
-    "Streaming", 
-    "Otro"
-  ]),
+  type: z.string().default("Producción técnica"),
 
-  // Campos operacionales avanzados (opcionales para eventos simples)
+  // Campos avanzados flexibles
   supervisor_id: z.string().nullable().optional(),
   call_time: z.string().optional().or(z.literal("")),
   setup_time: z.string().optional().or(z.literal("")),
   end_time: z.string().optional().or(z.literal("")),
-  priority: z.enum(["Baja", "Media", "Alta", "Crítica"]),
+  priority: z.string().default("Media"),
   operational_notes: z.string().optional(),
 }).refine((data) => {
   // Validar: hora presentación < hora inicio
-  if (!data.call_time || !data.time) return true;
+  if (!data.call_time || !data.time || !data.call_time.includes(":") || !data.time.includes(":")) return true;
   return data.call_time < data.time;
 }, {
   message: "La hora de presentación debe ser anterior a la hora de inicio",
   path: ["call_time"]
 }).refine((data) => {
   // Validar: hora montaje <= presentación
-  if (!data.setup_time || !data.call_time) return true;
+  if (!data.setup_time || !data.call_time || !data.setup_time.includes(":") || !data.call_time.includes(":")) return true;
   return data.setup_time <= data.call_time;
 }, {
   message: "La hora de montaje debe ser anterior o igual a la de presentación",
   path: ["setup_time"]
 }).refine((data) => {
   // Validar: hora finalización > inicio
-  if (!data.end_time || !data.time) return true;
+  if (!data.end_time || !data.time || !data.end_time.includes(":") || !data.time.includes(":")) return true;
   return data.end_time > data.time;
 }, {
   message: "La hora de finalización debe ser posterior a la de inicio del evento",
@@ -107,6 +100,7 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
   const [availabilityMap, setAvailabilityMap] = useState({});
   const [assignedStaffMap, setAssignedStaffMap] = useState({});
   const [isLoadingAvailability, setIsLoadingAvailability] = useState(false);
+  const [isSubmittingForm, setIsSubmittingForm] = useState(false);
   
   // Drawer colapsable para configuración avanzada
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -168,7 +162,6 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
       }
       setIsLoadingAvailability(true);
       try {
-        // 1. Fetch availability for this date
         const { data: availData } = await supabase
           .from('staff_availability')
           .select('staff_id, status')
@@ -182,7 +175,6 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
         }
         setAvailabilityMap(newAvailMap);
 
-        // 2. Fetch events on this date to check assignments
         const { data: eventsOnDate } = await supabase
           .from('events')
           .select('id')
@@ -199,7 +191,6 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
 
           if (assignmentsOnDate) {
             assignmentsOnDate.forEach(a => {
-              // Exclude current event being edited
               if (!initialData?.id || a.event_id !== initialData.id) {
                 newAssignedMap[a.staff_id] = true;
               }
@@ -208,7 +199,7 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
         }
         setAssignedStaffMap(newAssignedMap);
       } catch (err) {
-        console.error("Error fetching availability:", err);
+        console.error("Error al obtener la disponibilidad:", err);
       } finally {
         setIsLoadingAvailability(false);
       }
@@ -240,7 +231,7 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
 
   const availableCount = activeStaff.filter(s => !eventDate || getStaffStatus(s.id) === "Disponible").length;
 
-  const filteredSupervisors = dbStaff.filter(s => 
+  const filteredSupervisors = dbStaff.filter(s =>
     s.name?.toLowerCase().includes(supervisorSearch.toLowerCase())
   );
 
@@ -251,8 +242,8 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
     if (isOpen) {
       setSupervisorSearch("");
       setIsSupervisorDropdownOpen(false);
+      setIsSubmittingForm(false);
       
-      // Auto expandir si el evento ya tenía campos avanzados configurados
       const hasAdvancedFields = initialData.supervisor_id || initialData.call_time || initialData.setup_time || initialData.operational_notes;
       setShowAdvanced(!!hasAdvancedFields);
 
@@ -276,7 +267,6 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
           operational_notes: initialData.operational_notes || ""
         });
         
-        // Fetch assigned staff for this event
         if (initialData.id) {
           supabase.from('event_assignments').select('staff_id').eq('event_id', initialData.id).then(({ data }) => {
             if (data) {
@@ -295,14 +285,68 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
     }
   }, [initialData, isOpen, reset, setValue]);
 
-  const onSubmitForm = (data) => {
+  const onSubmitForm = async (data) => {
+    console.log("3️⃣ [VALIDATIONS PASSED] - Formulario válido. Preparando datos para el controlador padre:", data);
+    
     const eventData = { ...data };
     if (initialData.id) eventData.id = initialData.id;
     if (!eventData.supervisor_id) eventData.supervisor_id = null;
     eventData.staffIds = data.staffIds || [];
     
-    onSubmit(eventData);
-    onClose();
+    setIsSubmittingForm(true);
+    try {
+      // Llamar al submit asíncrono de la página padre
+      await onSubmit(eventData);
+      console.log("🟢 [SUBMIT SUCCESS] - Evento guardado con éxito.");
+      onClose();
+    } catch (err) {
+      console.error("❌ [SUBMIT TRANSACTION ERROR] - Error al guardar evento:", err);
+      // Mantener modal abierto en caso de error
+    } finally {
+      setIsSubmittingForm(false);
+    }
+  };
+
+  const handleFormSubmit = (e) => {
+    e.preventDefault();
+    console.log("1️⃣ [SUBMIT START] - Iniciando envío del formulario");
+    
+    // Obtener los datos actuales del formulario antes de validar
+    const currentValues = {
+      name: watch("name"),
+      client: watch("client"),
+      date: watch("date"),
+      time: watch("time"),
+      location: watch("location"),
+      requiredStaff: watch("requiredStaff"),
+      type: watch("type"),
+      status: watch("status"),
+      priority: watch("priority")
+    };
+    console.log("2️⃣ [FORM DATA] - Datos antes de validar:", currentValues);
+
+    handleSubmit(
+      (data) => {
+        onSubmitForm(data);
+      },
+      (formErrors) => {
+        console.error("❌ [VALIDATION FAILED] - Errores de Zod detectados:", formErrors);
+        
+        // Desplegar un toast visual indicando qué campo está fallando
+        const firstErrorKey = Object.keys(formErrors)[0];
+        const firstErrorMessage = formErrors[firstErrorKey]?.message || "Verifica los campos obligatorios";
+        
+        toast.error(`Error de validación: ${firstErrorMessage}`, {
+          duration: 4000,
+          position: "top-center",
+          style: {
+            background: "#1f2937",
+            color: "#f87171",
+            border: "1px solid rgba(248, 113, 113, 0.2)"
+          }
+        });
+      }
+    )(e);
   };
 
   const toggleStaff = (id) => {
@@ -347,7 +391,7 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
                 {initialData.id ? "Editar Evento" : "Crear Nuevo Evento"}
               </h2>
               
-              <form onSubmit={handleSubmit(onSubmitForm)} className="space-y-6">
+              <form onSubmit={handleFormSubmit} className="space-y-6">
                 
                 {/* 1️⃣ SECCIÓN BASE: INFORMACIÓN GENERAL (SIEMPRE VISIBLE) */}
                 <div className="border-b border-white/5 pb-5">
@@ -377,7 +421,7 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
                       <label className="text-gray-300 mb-1.5 text-xs font-semibold" htmlFor="name">Nombre del Evento</label>
                       <input 
                         id="name" 
-                        placeholder="Ej: Producción Live Lollapalooza..." 
+                        placeholder="Ej: Arauco Talentos..." 
                         {...register("name")} 
                         className={`w-full bg-gray-800/50 border rounded-xl p-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-amber-500/50 transition-colors ${errors.name ? 'border-red-500 focus:ring-red-500' : 'border-gray-700'}`} 
                       />
@@ -388,7 +432,7 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
                       <label className="text-gray-300 mb-1.5 text-xs font-semibold" htmlFor="client">Cliente</label>
                       <input 
                         id="client" 
-                        placeholder="Ej: TVN Chile" 
+                        placeholder="Ej: Mall Arauco" 
                         {...register("client")} 
                         className={`w-full bg-gray-800/50 border rounded-xl p-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-amber-500/50 transition-colors ${errors.client ? 'border-red-500 focus:ring-red-500' : 'border-gray-700'}`} 
                       />
@@ -750,8 +794,20 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
                 </div>
 
                 <div className="flex justify-end space-x-3 mt-6 pt-4 border-t border-gray-800">
-                  <Button type="button" variant="secondary" onClick={onClose}>Cancelar</Button>
-                  <Button type="submit" variant="primary">{initialData.id ? "Actualizar Evento" : "Crear Evento"}</Button>
+                  <Button type="button" variant="secondary" onClick={onClose} disabled={isSubmittingForm}>Cancelar</Button>
+                  <Button type="submit" variant="primary" disabled={isSubmittingForm}>
+                    {isSubmittingForm ? (
+                      <span className="flex items-center gap-2">
+                        <svg className="animate-spin h-4 w-4 text-gray-900" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Guardando...
+                      </span>
+                    ) : (
+                      initialData.id ? "Actualizar Evento" : "Crear Evento"
+                    )}
+                  </Button>
                 </div>
 
               </form>
