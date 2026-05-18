@@ -3,7 +3,7 @@ import { motion } from "framer-motion";
 import GlassCard from "../components/GlassCard.jsx";
 import Button from "../components/Button.jsx";
 import { supabase } from "../lib/supabase.js";
-import { User, Settings, Plus, Trash2, Power, Search, Filter, X, Download } from "lucide-react";
+import { User, Settings, Plus, Trash2, Power, Search, Filter, X, Download, Mail } from "lucide-react";
 import * as XLSX from "xlsx";
 import StaffModal from "../components/StaffModal.jsx";
 import { useAuth } from "../hooks/useAuth.js";
@@ -17,6 +17,25 @@ export default function Staff() {
   const [isSaving, setIsSaving] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingStaff, setEditingStaff] = useState(null);
+  const [resendingEmails, setResendingEmails] = useState({});
+
+  const handleResendEmail = async (email) => {
+    setResendingEmails(prev => ({ ...prev, [email]: true }));
+    const loadingToast = toast.loading("Reenviando correo de activación...");
+    try {
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email: email,
+      });
+      if (error) throw error;
+      toast.success("Correo de activación reenviado correctamente.", { id: loadingToast });
+    } catch (err) {
+      console.error("Resend error:", err);
+      toast.error(err.message || "Error al reenviar el correo de activación.", { id: loadingToast });
+    } finally {
+      setResendingEmails(prev => ({ ...prev, [email]: false }));
+    }
+  };
 
   const [searchTerm, setSearchTerm] = useState("");
   const [roleFilter, setRoleFilter] = useState("");
@@ -300,8 +319,10 @@ export default function Staff() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-700">
-                  {filteredStaff.map((member) => (
-                    <tr key={member.id} className="hover:bg-gray-800/30 transition-colors">
+                  {filteredStaff.map((member) => {
+                    const isConfirmed = !!(member.avatar_url || member.cuenta_destino);
+                    return (
+                      <tr key={member.id} className="hover:bg-gray-800/30 transition-colors">
                       <td className="px-4 py-2 flex items-center space-x-3 text-gray-100">
                         <div
                           className="w-10 h-10 rounded-full overflow-hidden border border-gray-600 cursor-pointer relative group"
@@ -323,7 +344,38 @@ export default function Staff() {
                         </span>
                       </td>
                       <td className="px-4 py-2">
-                        <div className="flex space-x-2">
+                        <div className="flex items-center space-x-2">
+                          <motion.div layout className="flex items-center">
+                            {isConfirmed ? (
+                              <motion.span 
+                                initial={{ opacity: 0, scale: 0.9 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shadow-[0_0_10px_rgba(16,185,129,0.1)]"
+                              >
+                                Cuenta activa
+                              </motion.span>
+                            ) : (
+                              <motion.button
+                                initial={{ opacity: 0, scale: 0.9 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                onClick={() => handleResendEmail(member.email)}
+                                disabled={resendingEmails[member.email] || !rolePermissions.canEdit}
+                                className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/20 hover:bg-amber-500/20 hover:border-amber-500/40 hover:shadow-[0_0_10px_rgba(245,158,11,0.2)] active:scale-95 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed`}
+                                title={!rolePermissions.canEdit ? "Disponible solo para administradores" : "Reenviar correo de activación"}
+                              >
+                                {resendingEmails[member.email] ? (
+                                  <svg className="animate-spin h-3.5 w-3.5 text-amber-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                  </svg>
+                                ) : (
+                                  <Mail className="w-3.5 h-3.5" />
+                                )}
+                                <span>Reenviar</span>
+                              </motion.button>
+                            )}
+                          </motion.div>
+
                           <Button 
                             variant="secondary" 
                             size="sm" 
@@ -352,7 +404,8 @@ export default function Staff() {
                         </div>
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
