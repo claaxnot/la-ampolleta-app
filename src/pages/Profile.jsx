@@ -133,16 +133,27 @@ export default function Profile({ user, onUpdateUser }) {
     setTimeout(() => setMessage(""), 3000);
   };
 
-  const handleUpdatePassword = (e) => {
+  const handleUpdatePassword = async (e) => {
     e.preventDefault();
     if (passwords.newPass !== passwords.confirmPass) {
       setMessage("❌ Las nuevas contraseñas no coinciden.");
       setTimeout(() => setMessage(""), 3000);
       return;
     }
-    setMessage("✅ Contraseña actualizada correctamente.");
-    setPasswords({ current: "", newPass: "", confirmPass: "" });
-    setTimeout(() => setMessage(""), 3000);
+    
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: passwords.newPass
+      });
+      if (error) throw error;
+      
+      setMessage("✅ Contraseña actualizada correctamente.");
+      setPasswords({ current: "", newPass: "", confirmPass: "" });
+    } catch (err) {
+      console.error("Error updating password:", err);
+      setMessage(`❌ Error: ${err.message}`);
+    }
+    setTimeout(() => setMessage(""), 4000);
   };
 
 
