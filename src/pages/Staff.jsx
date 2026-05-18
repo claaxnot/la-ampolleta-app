@@ -3,7 +3,8 @@ import { motion } from "framer-motion";
 import GlassCard from "../components/GlassCard.jsx";
 import Button from "../components/Button.jsx";
 import { supabase } from "../lib/supabase.js";
-import { User, Settings, Plus, Trash2, Power, Search, Filter, X } from "lucide-react";
+import { User, Settings, Plus, Trash2, Power, Search, Filter, X, Download } from "lucide-react";
+import * as XLSX from "xlsx";
 import StaffModal from "../components/StaffModal.jsx";
 import { useAuth } from "../hooks/useAuth.js";
 import { permissions } from "../lib/permissions.js";
@@ -59,7 +60,17 @@ export default function Staff() {
     if (staffData.id) {
       const { data, error } = await supabase
         .from('profiles')
-        .update({ name: staffData.name, rut: staffData.rut, role: staffData.role })
+        .update({
+          name: staffData.name,
+          rut: staffData.rut,
+          role: staffData.role,
+          cuenta_origen: staffData.cuenta_origen,
+          cuenta_destino: staffData.cuenta_destino,
+          codigo_banco_destino: staffData.codigo_banco_destino,
+          monto_transferencia: staffData.monto_transferencia,
+          glosa_transferencia: staffData.glosa_transferencia,
+          mensaje_beneficiario: staffData.mensaje_beneficiario
+        })
         .eq('id', staffData.id);
 
       if (!error) {
@@ -95,7 +106,13 @@ export default function Staff() {
         await supabase.from('profiles').update({
           name: staffData.name,
           rut: staffData.rut,
-          role: staffData.role
+          role: staffData.role,
+          cuenta_origen: staffData.cuenta_origen,
+          cuenta_destino: staffData.cuenta_destino,
+          codigo_banco_destino: staffData.codigo_banco_destino,
+          monto_transferencia: staffData.monto_transferencia,
+          glosa_transferencia: staffData.glosa_transferencia,
+          mensaje_beneficiario: staffData.mensaje_beneficiario
         }).eq('email', staffData.email);
         fetchStaff();
       }, 1500);
@@ -132,6 +149,28 @@ export default function Staff() {
 
     return matchesSearch && matchesRole;
   });
+
+  const exportToExcel = () => {
+    const dataToExport = filteredStaff.map(member => ({
+      "Nombre": member.name,
+      "RUT": member.rut,
+      "Correo": member.email,
+      "Rol": member.role,
+      "Cuenta Origen": member.cuenta_origen || "",
+      "Moneda Origen": "CLP",
+      "Cuenta destino": member.cuenta_destino || "",
+      "Moneda Destino": "CLP",
+      "Codigo banco destino": member.codigo_banco_destino || "",
+      "Monto Transferencia": member.monto_transferencia || "",
+      "Glosa personalizada transferencia": member.glosa_transferencia || "",
+      "Mensaje corre beneficiario": member.mensaje_beneficiario || "",
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Pagos Staff");
+    XLSX.writeFile(workbook, "Pagos_Staff.xlsx");
+  };
 
   return (
     <>
@@ -178,6 +217,13 @@ export default function Staff() {
                 title={!rolePermissions.canCreate ? "Disponible solo para administradores" : ""}
               >
                 <Plus className="w-4 h-4" /> Añadir Staff
+              </Button>
+              <Button 
+                variant="secondary" 
+                className="flex items-center gap-2 justify-center border-amber-500/50 text-amber-500 hover:bg-amber-500/10"
+                onClick={exportToExcel}
+              >
+                <Download className="w-4 h-4" /> Exportar Excel
               </Button>
             </div>
           </div>
