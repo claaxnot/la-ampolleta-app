@@ -37,7 +37,7 @@ export default function Dashboard() {
     const date = new Date(dateString);
     const now = new Date();
     const diffInSeconds = Math.floor((now - date) / 1000);
-    
+
     if (diffInSeconds < 60) return `Hace unos segundos`;
     if (diffInSeconds < 3600) return `Hace ${Math.floor(diffInSeconds / 60)} min`;
     if (diffInSeconds < 86400) return `Hace ${Math.floor(diffInSeconds / 3600)} horas`;
@@ -50,7 +50,7 @@ export default function Dashboard() {
 
   const fetchDashboardData = async () => {
     setIsLoading(true);
-    
+
     const { data: eventsData } = await supabase.from('events').select('*').order('date', { ascending: true });
     if (eventsData) setEvents(eventsData);
 
@@ -60,7 +60,7 @@ export default function Dashboard() {
     // Fetch Recent Activities
     const { data: recentEventsData } = await supabase.from('events').select('id, name, client, created_at').order('created_at', { ascending: false }).limit(5);
     const { data: recentStaffData } = await supabase.from('profiles').select('id, name, role, created_at').order('created_at', { ascending: false }).limit(5);
-    
+
     const combinedActivities = [];
     if (recentEventsData) {
       recentEventsData.forEach(e => {
@@ -82,7 +82,7 @@ export default function Dashboard() {
         });
       });
     }
-    
+
     combinedActivities.sort((a, b) => b.date - a.date);
     setActivities(combinedActivities.slice(0, 5));
 
@@ -91,7 +91,7 @@ export default function Dashboard() {
 
   const totalEvents = events.length;
   const totalStaff = staffCount;
-  
+
   const upcomingEvents = events.filter(e => {
     const [eYear, eMonth, eDay] = e.date.split('-').map(Number);
     const eventDate = new Date(eYear, eMonth - 1, eDay);
@@ -109,7 +109,7 @@ export default function Dashboard() {
   const recentEvents = events.slice(0, 5);
 
   return (
-    <motion.div 
+    <motion.div
       className="p-6 lg:p-8 min-h-[calc(100vh-64px)]"
       variants={containerVariants}
       initial="hidden"
@@ -123,7 +123,7 @@ export default function Dashboard() {
           </h1>
           <p className="text-gray-400 mt-1">Resumen general de La Ampolleta Producciones</p>
         </div>
-        <button 
+        <button
           onClick={() => window.print()}
           className="flex items-center gap-2 px-5 py-2.5 bg-amber-500/20 text-amber-300 border border-amber-500/50 hover:bg-amber-500 hover:text-gray-900 rounded-xl font-medium transition-all shadow-[0_0_15px_rgba(245,158,11,0.15)] group"
         >
@@ -148,7 +148,7 @@ export default function Dashboard() {
 
       {/* Main Grid: Events Table & Activities */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        
+
         {/* Recent events table (takes 2/3 space on large screens) */}
         <motion.section variants={itemVariants} className="xl:col-span-2">
           <GlassCard className="p-6 h-full flex flex-col">
@@ -157,14 +157,14 @@ export default function Dashboard() {
                 <CalendarDays className="w-5 h-5 text-amber-400" />
                 Eventos Próximos
               </h2>
-              <button 
+              <button
                 onClick={() => navigate("/events")}
                 className="text-sm text-amber-400 hover:text-amber-300 flex items-center gap-1 transition-colors"
               >
                 Ver todos <ArrowRight className="w-4 h-4" />
               </button>
             </div>
-            
+
             <div className="overflow-x-auto flex-1">
               <table className="min-w-full text-left">
                 <thead>
@@ -185,8 +185,8 @@ export default function Dashboard() {
                     }
 
                     return (
-                      <tr 
-                        key={idx} 
+                      <tr
+                        key={idx}
                         onClick={() => {
                           setSelectedEvent(e);
                           setIsDetailsOpen(true);
@@ -221,7 +221,7 @@ export default function Dashboard() {
                 Actividad Reciente
               </h2>
             </div>
-            
+
             <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-6">
               {activities.length === 0 ? (
                 <div className="text-gray-400 text-sm text-center mt-4">No hay actividad reciente.</div>
@@ -234,10 +234,10 @@ export default function Dashboard() {
                     )}
                     {/* Timeline dot */}
                     <div className="absolute left-1 top-1.5 w-3 h-3 rounded-full bg-purple-500/50 border-2 border-purple-400 shadow-[0_0_8px_rgba(168,85,247,0.5)]"></div>
-                    
+
                     <div className="bg-white/5 border border-white/5 rounded-xl p-3 hover:bg-white/10 transition-colors">
                       <p className="text-sm text-gray-200 leading-snug">{activity.text}</p>
-                      <span className="text-xs text-gray-500 mt-1 block flex items-center gap-1">
+                      <span className="text-xs text-gray-500 mt-1 flex items-center gap-1">
                         <Clock className="w-3 h-3" />
                         {activity.time}
                       </span>
@@ -246,8 +246,8 @@ export default function Dashboard() {
                 ))
               )}
             </div>
-            
-            <button 
+
+            <button
               onClick={() => toast.success("El historial completo estará disponible próximamente.")}
               className="mt-6 w-full py-2.5 rounded-xl bg-gray-800/50 hover:bg-gray-700/50 text-gray-300 border border-gray-700 transition-colors text-sm font-medium"
             >
@@ -259,7 +259,7 @@ export default function Dashboard() {
       </div>
 
       {/* Modal de Detalles del Evento */}
-      <EventDetails 
+      <EventDetails
         event={selectedEvent}
         isOpen={isDetailsOpen}
         onClose={() => setIsDetailsOpen(false)}
