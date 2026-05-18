@@ -41,13 +41,10 @@ export default function Events({ user }) {
 
   const fetchEvents = async () => {
     setIsLoading(true);
-    const { data, error } = await supabase.from('events').select(`
-      *,
-      assignedStaff:event_assignments(
-        staff_id,
-        profiles(name, avatar, role)
-      )
-    `);
+    const { data, error } = await supabase
+      .from('events')
+      .select('*')
+      .order('date', { ascending: true });
     if (data) setEvents(data);
     setIsLoading(false);
   };
