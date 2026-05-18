@@ -94,8 +94,12 @@ export default function Login({ onLogin }) {
 
     setIsLoading(true);
     try {
+      const redirectToUrl = window.location.origin.includes("localhost")
+        ? window.location.origin + "/reset-password"
+        : "https://la-ampolleta-app.vercel.app/reset-password";
+
       const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: window.location.origin + "/profile",
+        redirectTo: redirectToUrl,
       });
       if (resetError) throw resetError;
       setMessage("Se ha enviado un enlace de recuperación a tu correo. Por favor, revisa tu bandeja de entrada o spam.");
