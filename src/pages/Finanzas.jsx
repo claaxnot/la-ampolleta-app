@@ -102,7 +102,7 @@ export default function Finanzas() {
       if (assignments) {
         // Formatear y calcular montos
         const formatted = assignments.map(a => {
-          const defaultRate = a.profiles?.monto_transferencia ? parseFloat(a.profiles.monto_transferencia) : 35000;
+          const defaultRate = a.profiles?.monto_transferencia ? parseFloat(a.profiles.monto_transferencia) : 25000;
           const rate = a.custom_rate ? parseFloat(a.custom_rate) : defaultRate;
           const isFinished = a.events?.date ? new Date(a.events.date) < new Date() : false;
           
@@ -151,7 +151,7 @@ export default function Finanzas() {
 
       if (assignments) {
         const formatted = assignments.map(a => {
-          const defaultRate = a.profiles?.monto_transferencia ? parseFloat(a.profiles.monto_transferencia) : 35000;
+          const defaultRate = a.profiles?.monto_transferencia ? parseFloat(a.profiles.monto_transferencia) : 25000;
           const isFinished = a.events?.date ? new Date(a.events.date) < new Date() : false;
           
           return {

@@ -1201,7 +1201,7 @@ export default function WorkerDashboard({ user }) {
           return event.assignment_status === "Confirmado" && isFinished;
         });
 
-        const baselineRate = workerProfile?.monto_transferencia ? parseFloat(workerProfile.monto_transferencia) : 35000;
+        const baselineRate = workerProfile?.monto_transferencia ? parseFloat(workerProfile.monto_transferencia) : 25000;
 
         const totalEarnedPaid = completedEvents
           .filter(e => e.payment_status === "Pagado")
