@@ -13,6 +13,7 @@ import {
 import { supabase } from "../lib/supabase.js";
 import { toast } from "react-hot-toast";
 import ClockPicker from "./ClockPicker.jsx";
+import DatePicker from "./DatePicker.jsx";
 
 // Zod Schema tolerante y flexible para evitar bloqueos silenciosos
 const eventSchema = z.object({
@@ -489,17 +490,13 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
 
                     <div className="grid grid-cols-2 gap-3">
                       <div className="flex flex-col">
-                        <label className="text-gray-300 mb-1.5 text-xs font-semibold" htmlFor="date">Fecha</label>
-                        <div className="relative flex items-center">
-                          <input
-                            id="date"
-                            type="date"
-                            {...register("date")}
-                            className={`w-full bg-gray-800/50 border rounded-xl p-2.5 pr-10 text-sm text-white focus:outline-none focus:border-amber-500/50 transition-colors ${errors.date ? 'border-red-500 focus:ring-red-500' : 'border-gray-700'}`}
-                          />
-                          <Calendar className="absolute right-3.5 w-4 h-4 text-amber-400/80 pointer-events-none" />
-                        </div>
-                        {errors.date && <span className="text-red-400 text-xs mt-1">{errors.date.message}</span>}
+                        <DatePicker
+                          value={watch("date")}
+                          onChange={(val) => setValue("date", val, { shouldDirty: true })}
+                          label="Fecha"
+                          id="date"
+                          error={errors.date}
+                        />
                       </div>
 
                       <div className="flex flex-col">

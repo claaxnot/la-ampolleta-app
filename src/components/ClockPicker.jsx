@@ -36,12 +36,12 @@ export default function ClockPicker({ value, onChange, label, id, error }) {
   const hoursList = [12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
   const minutesList = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55];
 
-  // Get coordinates for placement on clock face (diameter 210px, radius 105px, center 105, 105)
-  const getCoords = (index, total, radius = 76) => {
+  // Get coordinates for placement on clock face (diameter 180px, radius 90px, center 90, 90)
+  const getCoords = (index, total, radius = 64) => {
     const angle = (index * 360 / total) * (Math.PI / 180);
     const x = Math.sin(angle) * radius;
     const y = -Math.cos(angle) * radius;
-    return { x: 105 + x, y: 105 + y };
+    return { x: 90 + x, y: 90 + y };
   };
 
   // Close when clicking outside
@@ -106,41 +106,41 @@ export default function ClockPicker({ value, onChange, label, id, error }) {
       {isOpen && (
         <div 
           ref={popoverRef}
-          className="absolute z-50 mt-2 top-full left-0 bg-gray-950/95 border border-white/10 rounded-3xl p-5 shadow-[0_20px_50px_rgba(0,0,0,0.8)] backdrop-blur-2xl w-[260px] flex flex-col items-center select-none"
+          className="absolute z-50 mt-2 top-full left-0 bg-gray-950/95 border border-white/10 rounded-3xl p-4 shadow-[0_20px_50px_rgba(0,0,0,0.8)] backdrop-blur-2xl w-[220px] flex flex-col items-center select-none"
         >
           {/* Header Display */}
-          <div className="flex items-center justify-between w-full mb-4 px-2">
-            <div className="flex items-center gap-1.5">
+          <div className="flex items-center justify-between w-full mb-3.5 px-1.5">
+            <div className="flex items-center gap-1">
               <button
                 type="button"
                 onClick={() => setMode("hours")}
-                className={`text-3xl font-black transition-colors ${mode === "hours" ? "text-amber-400" : "text-gray-500 hover:text-gray-300"}`}
+                className={`text-2xl font-black transition-colors ${mode === "hours" ? "text-amber-400" : "text-gray-500 hover:text-gray-300"}`}
               >
                 {String(currentHour).padStart(2, "0")}
               </button>
-              <span className="text-3xl font-black text-gray-600">:</span>
+              <span className="text-2xl font-black text-gray-600">:</span>
               <button
                 type="button"
                 onClick={() => setMode("minutes")}
-                className={`text-3xl font-black transition-colors ${mode === "minutes" ? "text-amber-400" : "text-gray-500 hover:text-gray-300"}`}
+                className={`text-2xl font-black transition-colors ${mode === "minutes" ? "text-amber-400" : "text-gray-500 hover:text-gray-300"}`}
               >
                 {String(currentMinute).padStart(2, "0")}
               </button>
             </div>
             
             {/* AM/PM Toggle */}
-            <div className="flex flex-col gap-1 text-[10px] font-bold">
+            <div className="flex flex-col gap-0.5 text-[9px] font-bold">
               <button
                 type="button"
                 onClick={() => togglePeriod("AM")}
-                className={`px-2 py-0.5 rounded-md transition-colors ${currentPeriod === "AM" ? "bg-amber-500/20 text-amber-400 border border-amber-500/30" : "text-gray-500 hover:text-gray-300"}`}
+                className={`px-1.5 py-0.5 rounded-md transition-colors ${currentPeriod === "AM" ? "bg-amber-500/20 text-amber-400 border border-amber-500/30" : "text-gray-500 hover:text-gray-300"}`}
               >
                 AM
               </button>
               <button
                 type="button"
                 onClick={() => togglePeriod("PM")}
-                className={`px-2 py-0.5 rounded-md transition-colors ${currentPeriod === "PM" ? "bg-amber-500/20 text-amber-400 border border-amber-500/30" : "text-gray-500 hover:text-gray-300"}`}
+                className={`px-1.5 py-0.5 rounded-md transition-colors ${currentPeriod === "PM" ? "bg-amber-500/20 text-amber-400 border border-amber-500/30" : "text-gray-500 hover:text-gray-300"}`}
               >
                 PM
               </button>
@@ -148,20 +148,20 @@ export default function ClockPicker({ value, onChange, label, id, error }) {
           </div>
 
           {/* Clock Face Container */}
-          <div className="relative w-[210px] h-[210px] bg-gray-900/60 border border-white/5 rounded-full flex items-center justify-center shadow-inner">
+          <div className="relative w-[180px] h-[180px] bg-gray-900/60 border border-white/5 rounded-full flex items-center justify-center shadow-inner">
             
             {/* Clock Hand */}
             <div 
               className="absolute w-1 bg-amber-500 origin-bottom rounded-full transition-transform duration-300 ease-out"
               style={{
-                height: "76px",
-                bottom: "105px",
+                height: "64px",
+                bottom: "90px",
                 transform: `rotate(${getHandRotation()}deg)`,
                 transformOrigin: "bottom center"
               }}
             >
               {/* Circular selector on target value */}
-              <div className="absolute -top-3 -left-3.5 w-8 h-8 rounded-full bg-amber-500 shadow-[0_0_15px_rgba(245,158,11,0.5)] border border-amber-300/30 flex items-center justify-center text-xs font-black text-black">
+              <div className="absolute -top-2.5 -left-3 w-7 h-7 rounded-full bg-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.5)] border border-amber-300/30 flex items-center justify-center text-[10px] font-black text-black">
                 {mode === "hours" ? currentHour : String(currentMinute).padStart(2, "0")}
               </div>
             </div>
@@ -179,8 +179,8 @@ export default function ClockPicker({ value, onChange, label, id, error }) {
                     key={`h-${h}`}
                     type="button"
                     onClick={() => handleHourSelect(h)}
-                    style={{ left: `${x - 14}px`, top: `${y - 14}px` }}
-                    className={`absolute w-7 h-7 rounded-full flex items-center justify-center text-xs transition-all duration-200 z-10 ${isSelected ? "text-transparent pointer-events-none" : "text-gray-300 hover:bg-white/10 hover:text-white font-semibold"}`}
+                    style={{ left: `${x - 12}px`, top: `${y - 12}px` }}
+                    className={`absolute w-6 h-6 rounded-full flex items-center justify-center text-[10px] transition-all duration-200 z-10 ${isSelected ? "text-transparent pointer-events-none" : "text-gray-300 hover:bg-white/10 hover:text-white font-semibold"}`}
                   >
                     {h}
                   </button>
@@ -195,8 +195,8 @@ export default function ClockPicker({ value, onChange, label, id, error }) {
                     key={`m-${m}`}
                     type="button"
                     onClick={() => handleMinuteSelect(m)}
-                    style={{ left: `${x - 14}px`, top: `${y - 14}px` }}
-                    className={`absolute w-7 h-7 rounded-full flex items-center justify-center text-xs transition-all duration-200 z-10 ${isSelected ? "text-transparent pointer-events-none" : "text-gray-400 hover:bg-white/10 hover:text-white font-semibold"}`}
+                    style={{ left: `${x - 12}px`, top: `${y - 12}px` }}
+                    className={`absolute w-6 h-6 rounded-full flex items-center justify-center text-[10px] transition-all duration-200 z-10 ${isSelected ? "text-transparent pointer-events-none" : "text-gray-400 hover:bg-white/10 hover:text-white font-semibold"}`}
                   >
                     {String(m).padStart(2, "0")}
                   </button>
@@ -209,9 +209,9 @@ export default function ClockPicker({ value, onChange, label, id, error }) {
           <button
             type="button"
             onClick={() => setIsOpen(false)}
-            className="mt-4 w-full py-2 bg-amber-500 hover:bg-amber-400 text-black font-extrabold text-xs rounded-xl transition-all shadow-[0_4px_15px_rgba(245,158,11,0.3)] active:scale-95 flex items-center justify-center gap-1.5"
+            className="mt-3.5 w-full py-1.5 bg-amber-500 hover:bg-amber-400 text-black font-extrabold text-[11px] rounded-xl transition-all shadow-[0_4px_15px_rgba(245,158,11,0.3)] active:scale-95 flex items-center justify-center gap-1.5"
           >
-            <Check className="w-3.5 h-3.5 stroke-[3]" />
+            <Check className="w-3 h-3 stroke-[3]" />
             <span>Confirmar Hora</span>
           </button>
         </div>
