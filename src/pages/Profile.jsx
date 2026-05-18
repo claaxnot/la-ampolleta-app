@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Camera, Lock, Save, User as UserIcon, Upload, Eye, EyeOff } from "lucide-react";
+import { Camera, Lock, Save, User as UserIcon, Upload, Eye, EyeOff, Building } from "lucide-react";
 import { useLocation } from "react-router-dom";
 import GlassCard from "../components/GlassCard.jsx";
 import Button from "../components/Button.jsx";
@@ -20,6 +20,31 @@ export default function Profile({ user, onUpdateUser }) {
   const location = useLocation();
   const searchParams = new URLSearchParams(location.search);
   const requireAvatar = searchParams.get("requireAvatar") === "true";
+  const requireBank = searchParams.get("requireBank") === "true";
+
+  // Lista de bancos comunes en Chile (puedes actualizarla con la tabla oficial)
+  const BANCOS_CHILE = [
+    { code: "001", name: "Banco de Chile / Edwards" },
+    { code: "009", name: "Banco Internacional" },
+    { code: "012", name: "Banco Estado" },
+    { code: "014", name: "Scotiabank Chile" },
+    { code: "016", name: "Banco BCI/Mach" },
+    { code: "028", name: "Banco Bice" },
+    { code: "031", name: "HSBC Bank (Chile)" },
+    { code: "037", name: "Banco Santander" },
+    { code: "039", name: "Banco Itaú" },
+    { code: "049", name: "Banco Security" },
+    { code: "051", name: "Banco Falabella" },
+    { code: "053", name: "Banco Ripley" },
+    { code: "055", name: "Banco Consorcio" },
+    { code: "059", name: "Banco BTG Pactual Chile" },
+    { code: "672", name: "Coopeuch" },
+    { code: "729", name: "Prepago Los Héroes" },
+    { code: "730", name: "Tenpo" },
+    { code: "732", name: "Prepago Los Andes (Tapp)" },
+    { code: "738", name: "Global 66" },
+    { code: "875", name: "Mercado Pago" },
+  ];
 
   // Simulamos que obtenemos el usuario actual. En la vida real esto viene del contexto de Auth.
   const currentUser = user || {};
@@ -31,6 +56,11 @@ export default function Profile({ user, onUpdateUser }) {
     confirmPass: "",
   });
   const [showPasswords, setShowPasswords] = useState(false);
+
+  const [bankData, setBankData] = useState({
+    cuenta_destino: currentUser.cuenta_destino || "",
+    codigo_banco_destino: currentUser.codigo_banco_destino || "",
+  });
 
   const [message, setMessage] = useState("");
 
@@ -54,10 +84,10 @@ export default function Profile({ user, onUpdateUser }) {
     try {
       // Activa el modo cámara para que React renderice el elemento <video>
       setIsCameraActive(true);
-      
+
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
       streamRef.current = stream;
-      
+
       // Esperar un instante para que el elemento <video> termine de renderizarse
       setTimeout(() => {
         if (videoRef.current) {
@@ -100,7 +130,7 @@ export default function Profile({ user, onUpdateUser }) {
       canvas.width = width;
       canvas.height = height;
       const ctx = canvas.getContext("2d");
-      
+
       // Flip canvas to match mirrored video
       ctx.translate(width, 0);
       ctx.scale(-1, 1);
@@ -144,6 +174,39 @@ export default function Profile({ user, onUpdateUser }) {
     setTimeout(() => setMessage(""), 3000);
   };
 
+  const handleUpdateBankData = async (e) => {
+    e.preventDefault();
+    if (!bankData.cuenta_destino || !bankData.codigo_banco_destino) {
+      setMessage("❌ Debes completar tu número de cuenta y banco.");
+      setTimeout(() => setMessage(""), 3000);
+      return;
+    }
+
+    if (currentUser.id) {
+      const { error } = await supabase.from('profiles').update({
+        cuenta_destino: bankData.cuenta_destino,
+        codigo_banco_destino: bankData.codigo_banco_destino
+      }).eq('id', currentUser.id);
+
+      if (error) {
+        setMessage("❌ Error al guardar datos bancarios.");
+        setTimeout(() => setMessage(""), 3000);
+        return;
+      }
+    }
+
+    if (onUpdateUser) {
+      onUpdateUser({
+        ...currentUser,
+        cuenta_destino: bankData.cuenta_destino,
+        codigo_banco_destino: bankData.codigo_banco_destino
+      });
+    }
+
+    setMessage("✅ Datos bancarios guardados correctamente.");
+    setTimeout(() => setMessage(""), 3000);
+  };
+
   return (
     <motion.div
       className="p-6 lg:p-8 min-h-[calc(100vh-64px)]"
@@ -165,6 +228,16 @@ export default function Profile({ user, onUpdateUser }) {
           className="mb-6 p-4 rounded-xl text-sm font-medium border bg-amber-500/10 text-amber-400 border-amber-500/20"
         >
           ⚠️ Es obligatorio tomar tu fotografía de seguridad antes de poder acceder a tu panel de eventos.
+        </motion.div>
+      )}
+
+      {requireBank && (!currentUser.cuenta_destino || !currentUser.codigo_banco_destino) && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-6 p-4 rounded-xl text-sm font-medium border bg-amber-500/10 text-amber-400 border-amber-500/20"
+        >
+          ⚠️ Es obligatorio ingresar tus Datos Bancarios para recibir tus pagos.
         </motion.div>
       )}
 
@@ -338,6 +411,49 @@ export default function Profile({ user, onUpdateUser }) {
                 <Button type="submit" variant="primary" className="flex items-center gap-2">
                   <Save className="w-4 h-4" />
                   Actualizar Contraseña
+                </Button>
+              </div>
+            </form>
+          </GlassCard>
+
+          <GlassCard className="p-6 md:p-8 mt-6">
+            <h2 className="text-xl font-semibold text-white mb-6 flex items-center gap-2">
+              <Building className="w-5 h-5 text-amber-400" />
+              Datos Bancarios (Para Pagos)
+            </h2>
+
+            <form onSubmit={handleUpdateBankData} className="space-y-6 max-w-md">
+              <div className="flex flex-col">
+                <label className="text-gray-300 mb-1 text-sm font-medium">Banco</label>
+                <select
+                  value={bankData.codigo_banco_destino}
+                  onChange={(e) => setBankData({ ...bankData, codigo_banco_destino: e.target.value })}
+                  className="w-full bg-gray-800/50 border border-gray-700 rounded-xl p-2.5 text-white focus:outline-none focus:border-amber-500/50 transition-colors"
+                  required
+                >
+                  <option value="">Selecciona tu banco</option>
+                  {BANCOS_CHILE.map(banco => (
+                    <option key={banco.code} value={banco.code}>{banco.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex flex-col">
+                <label className="text-gray-300 mb-1 text-sm font-medium">Número de Cuenta</label>
+                <input
+                  type="text"
+                  value={bankData.cuenta_destino}
+                  onChange={(e) => setBankData({ ...bankData, cuenta_destino: e.target.value })}
+                  placeholder="Ej: 123456789"
+                  className="w-full bg-gray-800/50 border border-gray-700 rounded-xl p-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-amber-500/50 transition-colors"
+                  required
+                />
+              </div>
+
+              <div className="pt-2">
+                <Button type="submit" variant="primary" className="flex items-center gap-2">
+                  <Save className="w-4 h-4" />
+                  Guardar Datos Bancarios
                 </Button>
               </div>
             </form>

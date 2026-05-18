@@ -32,8 +32,12 @@ function App() {
 
   const WorkerRoute = ({ children }) => {
     if (!user) return <Navigate to="/login" replace />;
-    if (user.systemRole === 'worker' && !user.avatar) {
-      return <Navigate to="/profile?requireAvatar=true" replace />;
+    if (user.systemRole === 'worker') {
+      const missingAvatar = !user.avatar;
+      const missingBank = !user.cuenta_destino || !user.codigo_banco_destino;
+      if (missingAvatar || missingBank) {
+        return <Navigate to={`/profile?requireAvatar=${missingAvatar}&requireBank=${missingBank}`} replace />;
+      }
     }
     return children;
   };

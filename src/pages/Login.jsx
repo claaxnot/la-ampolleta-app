@@ -59,7 +59,9 @@ export default function Login({ onLogin }) {
         systemRole: profile?.system_role || (data.user.email === 'admin@laampolleta.tv' ? 'admin' : 'worker'),
         role: profile?.role || 'Staff',
         name: profile?.name || data.user.email.split('@')[0],
-        avatar: profile?.avatar_url || null
+        avatar: profile?.avatar_url || null,
+        cuenta_destino: profile?.cuenta_destino || null,
+        codigo_banco_destino: profile?.codigo_banco_destino || null
       };
 
       onLogin(userInfo);
