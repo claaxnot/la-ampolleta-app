@@ -1,15 +1,15 @@
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { 
-  DollarSign, 
-  Download, 
-  CheckCircle, 
-  Search, 
-  Filter, 
-  AlertTriangle, 
-  ArrowUpRight, 
-  TrendingUp, 
-  Users, 
+import {
+  DollarSign,
+  Download,
+  CheckCircle,
+  Search,
+  Filter,
+  AlertTriangle,
+  ArrowUpRight,
+  TrendingUp,
+  Users,
   Building,
   CheckSquare,
   Square,
@@ -106,7 +106,7 @@ export default function Finanzas() {
           const defaultRate = a.profiles?.monto_transferencia ? parseFloat(a.profiles.monto_transferencia) : 25000;
           const rate = a.custom_rate ? parseFloat(a.custom_rate) : defaultRate;
           const isFinished = a.events?.date ? new Date(a.events.date) < new Date() : false;
-          
+
           return {
             id: a.id,
             event_name: a.events?.name || "Sin Nombre",
@@ -169,7 +169,7 @@ export default function Finanzas() {
         const formatted = assignments.map(a => {
           const defaultRate = a.profiles?.monto_transferencia ? parseFloat(a.profiles.monto_transferencia) : 25000;
           const isFinished = a.events?.date ? new Date(a.events.date) < new Date() : false;
-          
+
           return {
             id: a.id,
             event_name: a.events?.name || "Sin Nombre",
@@ -212,7 +212,7 @@ export default function Finanzas() {
   };
 
   const handleSelectOne = (id) => {
-    setSelectedIds(prev => 
+    setSelectedIds(prev =>
       prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
     );
   };
@@ -220,7 +220,7 @@ export default function Finanzas() {
   // Marcar como pagados masivamente
   const handleMarkAsPaid = async () => {
     if (selectedIds.length === 0) return;
-    
+
     const loadingToast = toast.loading("Actualizando estados de pago...");
     try {
       // Intentamos actualizar la columna payment_status en Supabase
@@ -252,7 +252,7 @@ export default function Finanzas() {
     }
 
     const selectedPayments = payments.filter(p => selectedIds.includes(p.id));
-    
+
     // Agrupar por RUT/ID para sumar los montos por persona
     const grouped = {};
     selectedPayments.forEach(p => {
@@ -282,9 +282,9 @@ export default function Finanzas() {
       "Rol": item.role,
       "Cuenta Origen": item.cuenta_origen || "",
       "Moneda Origen": "CLP",
-      "Cuenta destino": item.cuenta_destino || "",
       "Moneda Destino": "CLP",
       "Codigo banco destino": item.codigo_banco_destino || "",
+      "Cuenta destino": item.cuenta_destino || "",
       "Monto Transferencia": item.monto_total,
       "Glosa personalizada transferencia": item.glosa_transferencia || "",
       "Mensaje corre beneficiario": item.mensaje_beneficiario || "",
@@ -294,10 +294,10 @@ export default function Finanzas() {
     const worksheet = XLSX.utils.json_to_sheet(dataToExport);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Pagos Staff");
-    
+
     const fileName = `NOMINA_PAGOS_AMPOLLETA_${new Date().toISOString().slice(0, 10)}.xlsx`;
     XLSX.writeFile(workbook, fileName);
-    
+
     toast.success("¡Nómina de Excel de Pagos descargada con éxito!");
   };
 
@@ -327,18 +327,18 @@ export default function Finanzas() {
   };
 
   const filteredPayments = payments.filter(p => {
-    const matchesSearch = 
+    const matchesSearch =
       p.staff_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       p.event_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       p.staff_rut.includes(searchTerm);
 
-    const matchesStatus = 
-      statusFilter === "all" || 
+    const matchesStatus =
+      statusFilter === "all" ||
       (statusFilter === "pending" && p.status === "Pendiente") ||
       (statusFilter === "paid" && p.status === "Pagado");
 
-    const matchesMonth = 
-      monthFilter === "all" || 
+    const matchesMonth =
+      monthFilter === "all" ||
       (p.event_date && p.event_date.startsWith(monthFilter));
 
     return matchesSearch && matchesStatus && matchesMonth;
@@ -393,7 +393,7 @@ export default function Finanzas() {
           <div>
             <span className="font-bold">Aviso Técnico de Base de Datos:</span> La tabla de Supabase requiere las nuevas columnas operacionales de finanzas (`payment_status` y `custom_rate`). La aplicación está operando en modo **Fallback Inteligente** utilizando el monto predeterminado de los perfiles y simulando las transiciones localmente.
             <div className="mt-2 text-xs font-mono bg-black/40 p-2 rounded-lg border border-amber-500/20 overflow-x-auto text-amber-300/90">
-              ALTER TABLE public.event_assignments ADD COLUMN IF NOT EXISTS payment_status VARCHAR(50) DEFAULT 'Pendiente';<br/>
+              ALTER TABLE public.event_assignments ADD COLUMN IF NOT EXISTS payment_status VARCHAR(50) DEFAULT 'Pendiente';<br />
               ALTER TABLE public.event_assignments ADD COLUMN IF NOT EXISTS custom_rate NUMERIC DEFAULT NULL;
             </div>
           </div>
@@ -504,7 +504,7 @@ export default function Finanzas() {
 
         {/* Acciones masivas */}
         {selectedIds.length > 0 && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             className="flex items-center gap-2"
@@ -575,8 +575,8 @@ export default function Finanzas() {
                     const missingBank = !p.cuenta_destino || !p.codigo_banco_destino;
 
                     return (
-                      <tr 
-                        key={p.id} 
+                      <tr
+                        key={p.id}
                         className={`transition-colors duration-200 ${isSelected ? 'bg-amber-500/5' : 'hover:bg-gray-800/10'}`}
                       >
                         <td className="py-4 px-6">
@@ -623,11 +623,10 @@ export default function Finanzas() {
                           )}
                         </td>
                         <td className="py-4 px-6 text-center">
-                          <span className={`px-3 py-1.5 rounded-full text-xs font-extrabold shadow-sm border ${
-                            p.status === "Pagado" 
-                              ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' 
+                          <span className={`px-3 py-1.5 rounded-full text-xs font-extrabold shadow-sm border ${p.status === "Pagado"
+                              ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
                               : 'bg-red-500/10 border-red-500/30 text-red-400'
-                          }`}>
+                            }`}>
                             {p.status}
                           </span>
                         </td>
