@@ -12,7 +12,8 @@ import {
   Users, 
   Building,
   CheckSquare,
-  Square
+  Square,
+  Sliders
 } from "lucide-react";
 import GlassCard from "../components/GlassCard.jsx";
 import Button from "../components/Button.jsx";
@@ -61,13 +62,8 @@ export default function Finanzas() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [dbErrorWarning, setDbErrorWarning] = useState(false);
 
-  // Totales
-  const [stats, setStats] = useState({
-    totalPending: 0,
-    totalPaid: 0,
-    countPending: 0,
-    countPaid: 0
-  });
+  // Filtro de Período Mensual
+  const [monthFilter, setMonthFilter] = useState("all");
 
   const fetchPayments = async () => {
     setLoading(true);
@@ -125,7 +121,6 @@ export default function Finanzas() {
         }).filter(a => (a.assignment_status === "Confirmado" || a.assignment_status === "Aceptado") && a.is_finished); // Solo eventos terminados y aceptados o confirmados
 
         setPayments(formatted);
-        calculateStats(formatted);
       }
     } catch (err) {
       console.warn("⚠️ [FINANZAS]: Columnas nuevas ausentes, usando fallback seguro.", err);
@@ -173,35 +168,10 @@ export default function Finanzas() {
         }).filter(a => (a.assignment_status === "Confirmado" || a.assignment_status === "Aceptado") && a.is_finished);
 
         setPayments(formatted);
-        calculateStats(formatted);
       }
     } catch (err) {
       console.error("Error in fallback payments:", err);
     }
-  };
-
-  const calculateStats = (list) => {
-    let pendingSum = 0;
-    let paidSum = 0;
-    let pendingCount = 0;
-    let paidCount = 0;
-
-    list.forEach(p => {
-      if (p.status === "Pagado") {
-        paidSum += p.monto;
-        paidCount++;
-      } else {
-        pendingSum += p.monto;
-        pendingCount++;
-      }
-    });
-
-    setStats({
-      totalPending: pendingSum,
-      totalPaid: paidSum,
-      countPending: pendingCount,
-      countPaid: paidCount
-    });
   };
 
   useEffect(() => {
@@ -286,6 +256,31 @@ export default function Finanzas() {
     toast.success("¡Nómina de Pago Bancario descargada con éxito!");
   };
 
+  const uniqueMonths = React.useMemo(() => {
+    const periods = new Set();
+    payments.forEach(p => {
+      if (p.event_date) {
+        const [year, month] = p.event_date.split("-");
+        if (year && month) {
+          periods.add(`${year}-${month}`);
+        }
+      }
+    });
+    return Array.from(periods).sort().reverse();
+  }, [payments]);
+
+  const MONTH_NAMES = [
+    "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+    "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
+  ];
+
+  const formatPeriod = (period) => {
+    if (!period || period === "all") return "Todos los meses";
+    const [year, monthStr] = period.split("-");
+    const monthIndex = parseInt(monthStr, 10) - 1;
+    return `${MONTH_NAMES[monthIndex]} ${year}`;
+  };
+
   const filteredPayments = payments.filter(p => {
     const matchesSearch = 
       p.staff_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -297,8 +292,36 @@ export default function Finanzas() {
       (statusFilter === "pending" && p.status === "Pendiente") ||
       (statusFilter === "paid" && p.status === "Pagado");
 
-    return matchesSearch && matchesStatus;
+    const matchesMonth = 
+      monthFilter === "all" || 
+      (p.event_date && p.event_date.startsWith(monthFilter));
+
+    return matchesSearch && matchesStatus && matchesMonth;
   });
+
+  const stats = React.useMemo(() => {
+    let pendingSum = 0;
+    let paidSum = 0;
+    let pendingCount = 0;
+    let paidCount = 0;
+
+    filteredPayments.forEach(p => {
+      if (p.status === "Pagado") {
+        paidSum += p.monto;
+        paidCount++;
+      } else {
+        pendingSum += p.monto;
+        pendingCount++;
+      }
+    });
+
+    return {
+      totalPending: pendingSum,
+      totalPaid: paidSum,
+      countPending: pendingCount,
+      countPaid: paidCount
+    };
+  }, [filteredPayments]);
 
   return (
     <motion.div
@@ -394,6 +417,22 @@ export default function Finanzas() {
               onChange={(e) => setSearchTerm(e.target.value)}
               className="bg-gray-800/40 border border-gray-700/60 rounded-xl py-2 pl-9 pr-4 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-amber-500 w-64 transition-all duration-300"
             />
+          </div>
+
+          <div className="relative">
+            <select
+              value={monthFilter}
+              onChange={(e) => setMonthFilter(e.target.value)}
+              className="bg-gray-800/40 border border-gray-700/60 rounded-xl py-2 pl-4 pr-10 text-sm text-white focus:outline-none focus:border-amber-500 appearance-none transition-all duration-300 font-semibold cursor-pointer"
+            >
+              <option value="all">Todos los meses</option>
+              {uniqueMonths.map(p => (
+                <option key={p} value={p}>{formatPeriod(p)}</option>
+              ))}
+            </select>
+            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-gray-400">
+              <Sliders className="w-3.5 h-3.5" />
+            </div>
           </div>
 
           <div className="flex items-center bg-gray-800/40 border border-gray-700/60 rounded-xl p-1 gap-1">

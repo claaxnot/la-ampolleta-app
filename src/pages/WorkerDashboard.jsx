@@ -55,6 +55,7 @@ export default function WorkerDashboard({ user }) {
   
   // Perfil del trabajador para consultar su rol real
   const [workerProfile, setWorkerProfile] = useState(null);
+  const [financeMonthFilter, setFinanceMonthFilter] = useState("all");
 
   // Estados de Finanzas y Sub-pestañas sincronizados con la URL
   const [activeSubTab, setActiveSubTab] = useState(() => {
@@ -1201,13 +1202,39 @@ export default function WorkerDashboard({ user }) {
           return event.assignment_status === "Confirmado" && isFinished;
         });
 
+        // Obtener los periodos únicos de meses para rellenar el dropdown
+        const uniqueFinanceMonths = React.useMemo(() => {
+          const periods = new Set();
+          completedEvents.forEach(e => {
+            if (e.date) {
+              const [year, month] = e.date.split("-");
+              if (year && month) {
+                periods.add(`${year}-${month}`);
+              }
+            }
+          });
+          return Array.from(periods).sort().reverse();
+        }, [completedEvents]);
+
+        const formatPeriod = (period) => {
+          if (!period || period === "all") return "Todos los meses";
+          const [year, monthStr] = period.split("-");
+          const monthIndex = parseInt(monthStr, 10) - 1;
+          return `${MONTH_NAMES[monthIndex]} ${year}`;
+        };
+
+        const filteredCompletedEvents = React.useMemo(() => {
+          if (financeMonthFilter === "all") return completedEvents;
+          return completedEvents.filter(e => e.date && e.date.startsWith(financeMonthFilter));
+        }, [completedEvents, financeMonthFilter]);
+
         const baselineRate = workerProfile?.monto_transferencia ? parseFloat(workerProfile.monto_transferencia) : 25000;
 
-        const totalEarnedPaid = completedEvents
+        const totalEarnedPaid = filteredCompletedEvents
           .filter(e => e.payment_status === "Pagado")
           .reduce((sum, e) => sum + (e.custom_rate ? parseFloat(e.custom_rate) : baselineRate), 0);
 
-        const totalEarnedPending = completedEvents
+        const totalEarnedPending = filteredCompletedEvents
           .filter(e => e.payment_status !== "Pagado")
           .reduce((sum, e) => sum + (e.custom_rate ? parseFloat(e.custom_rate) : baselineRate), 0);
 
@@ -1247,6 +1274,29 @@ export default function WorkerDashboard({ user }) {
 
         return (
           <div className="space-y-6 relative z-10">
+            {/* Filtro Mensual de Finanzas */}
+            <motion.div variants={itemVariants} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white/5 p-4 rounded-2xl border border-white/5">
+              <div>
+                <h4 className="text-sm font-bold text-white">Filtro por Período Mensual</h4>
+                <p className="text-[11px] text-gray-400">Filtra tus cobros y honorarios según el mes de ejecución.</p>
+              </div>
+              <div className="relative">
+                <select
+                  value={financeMonthFilter}
+                  onChange={(e) => setFinanceMonthFilter(e.target.value)}
+                  className="bg-gray-800/80 border border-gray-700 rounded-xl px-4 py-2 text-xs font-bold text-white focus:outline-none focus:border-amber-500/50 appearance-none pr-10 cursor-pointer"
+                >
+                  <option value="all">Todos los meses</option>
+                  {uniqueFinanceMonths.map(p => (
+                    <option key={p} value={p}>{formatPeriod(p)}</option>
+                  ))}
+                </select>
+                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-gray-400">
+                  <Sliders className="w-3.5 h-3.5" />
+                </div>
+              </div>
+            </motion.div>
+
             {/* Stats Cards */}
             <motion.div variants={itemVariants} className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <GlassCard className="p-6 relative overflow-hidden">
@@ -1304,14 +1354,14 @@ export default function WorkerDashboard({ user }) {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-white/5">
-                        {completedEvents.length === 0 ? (
+                        {filteredCompletedEvents.length === 0 ? (
                           <tr>
                             <td colSpan="4" className="py-8 text-center text-gray-500 italic">
-                              No tienes eventos completados registrados aún.
+                              No tienes eventos completados registrados para este período.
                             </td>
                           </tr>
                         ) : (
-                          completedEvents.map(event => {
+                          filteredCompletedEvents.map(event => {
                             const rate = event.custom_rate ? parseFloat(event.custom_rate) : baselineRate;
                             const isPaid = event.payment_status === "Pagado";
 
