@@ -57,19 +57,23 @@ export default function TopBar({ user, onToggleMenu }) {
             fetchNotifications();
           }
         )
-        .subscribe();
+        .subscribe((status) => {
+          console.log(`🔌 [REALTIME STATUS ADMIN]: ${status}`);
+        });
     } else {
       channel = supabase
         .channel('topbar-realtime-worker')
         .on(
           'postgres_changes',
-          { event: '*', schema: 'public', table: 'event_assignments', filter: `staff_id=eq.${user.id}` },
+          { event: '*', schema: 'public', table: 'event_assignments' },
           () => {
             console.log("🔔 [REALTIME] - Cambio detectado en asignaciones del trabajador. Recargando...");
             fetchNotifications();
           }
         )
-        .subscribe();
+        .subscribe((status) => {
+          console.log(`🔌 [REALTIME STATUS WORKER]: ${status}`);
+        });
     }
 
     return () => {
