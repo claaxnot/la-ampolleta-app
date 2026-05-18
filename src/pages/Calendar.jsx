@@ -52,7 +52,7 @@ export default function Calendar() {
   const blanks = Array.from({ length: firstDay }, (_, i) => i);
   const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
 
-  // Filtrar eventos de mockEvents para el día específico
+  // Filtrar eventos de Supabase para el día específico
   const getEventsForDay = (day) => {
     return events.filter(event => {
       // Usamos split para evitar problemas de zona horaria con new Date()
