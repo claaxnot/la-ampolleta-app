@@ -1521,7 +1521,7 @@ export default function WorkerDashboard({ user }) {
                   </div>
 
                   <div className="bg-black/30 p-4 rounded-xl space-y-1.5 border border-white/5 text-xs">
-                    <h4 className="font-bold text-white uppercase tracking-wider text-amber-400 mb-1.5">⏱ Horarios de Producción</h4>
+                    <h4 className="font-bold uppercase tracking-wider text-amber-400 mb-1.5">⏱ Horarios de Producción</h4>
                     
                     {shouldShowSetup && (
                       <p>
@@ -1560,7 +1560,7 @@ export default function WorkerDashboard({ user }) {
 
                   {selectedDetailedEvent.operational_notes && (
                     <div className="space-y-1">
-                      <h4 className="font-bold text-white text-xs uppercase tracking-wider text-amber-400">⚠️ Notas Operativas:</h4>
+                      <h4 className="font-bold text-xs uppercase tracking-wider text-amber-400">⚠️ Notas Operativas:</h4>
                       <p className="text-amber-200 bg-amber-950/20 p-3 rounded-xl border border-amber-500/10 leading-relaxed text-xs">
                         {selectedDetailedEvent.operational_notes}
                       </p>
@@ -1568,7 +1568,7 @@ export default function WorkerDashboard({ user }) {
                   )}
 
                   <div className="space-y-1">
-                    <h4 className="font-bold text-white text-xs uppercase tracking-wider text-amber-400">Descripción del Evento:</h4>
+                    <h4 className="font-bold text-xs uppercase tracking-wider text-amber-400">Descripción del Evento:</h4>
                     <p className="text-gray-400 italic bg-black/20 p-3 rounded-xl border border-white/5 leading-relaxed text-xs">
                       {selectedDetailedEvent.description || "Sin descripción adicional proporcionada para esta fecha de producción."}
                     </p>
@@ -1578,7 +1578,7 @@ export default function WorkerDashboard({ user }) {
                 <div className="mt-6 flex justify-end">
                   <button
                     onClick={() => setSelectedDetailedEvent(null)}
-                    className="px-5 py-2.5 bg-amber-500 text-gray-900 font-bold rounded-xl hover:bg-amber-400 transition-colors shadow-lg shadow-amber-500/20 active:scale-95 transition-all duration-300"
+                    className="px-5 py-2.5 bg-amber-500 text-gray-900 font-bold rounded-xl hover:bg-amber-400 shadow-lg shadow-amber-500/20 active:scale-95 transition-all duration-300"
                   >
                     Cerrar
                   </button>
