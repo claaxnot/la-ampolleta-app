@@ -19,6 +19,7 @@ import GlassCard from "../components/GlassCard.jsx";
 import Button from "../components/Button.jsx";
 import { supabase } from "../lib/supabase.js";
 import toast from "react-hot-toast";
+import * as XLSX from "xlsx";
 
 // Lista de bancos chilenos
 const BANCOS_CHILE = {
@@ -87,9 +88,13 @@ export default function Finanzas() {
             name,
             rut,
             email,
+            role,
+            cuenta_origen,
             cuenta_destino,
             codigo_banco_destino,
-            monto_transferencia
+            monto_transferencia,
+            glosa_transferencia,
+            mensaje_beneficiario
           )
         `);
 
@@ -111,8 +116,12 @@ export default function Finanzas() {
             staff_name: a.profiles?.name || "Personal Desconocido",
             staff_rut: a.profiles?.rut || "",
             staff_email: a.profiles?.email || "",
+            staff_role: a.profiles?.role || "",
+            cuenta_origen: a.profiles?.cuenta_origen || "",
             cuenta_destino: a.profiles?.cuenta_destino || "",
             codigo_banco_destino: a.profiles?.codigo_banco_destino || "",
+            glosa_transferencia: a.profiles?.glosa_transferencia || "",
+            mensaje_beneficiario: a.profiles?.mensaje_beneficiario || "",
             banco_name: BANCOS_CHILE[a.profiles?.codigo_banco_destino] || "Banco No Registrado",
             monto: rate,
             status: a.payment_status || "Pendiente",
@@ -141,7 +150,19 @@ export default function Finanzas() {
           id,
           status,
           events:event_id ( id, name, date, time ),
-          profiles:staff_id ( id, name, rut, email, cuenta_destino, codigo_banco_destino, monto_transferencia )
+          profiles:staff_id (
+            id,
+            name,
+            rut,
+            email,
+            role,
+            cuenta_origen,
+            cuenta_destino,
+            codigo_banco_destino,
+            monto_transferencia,
+            glosa_transferencia,
+            mensaje_beneficiario
+          )
         `);
 
       if (assignments) {
@@ -158,8 +179,12 @@ export default function Finanzas() {
             staff_name: a.profiles?.name || "Personal Desconocido",
             staff_rut: a.profiles?.rut || "",
             staff_email: a.profiles?.email || "",
+            staff_role: a.profiles?.role || "",
+            cuenta_origen: a.profiles?.cuenta_origen || "",
             cuenta_destino: a.profiles?.cuenta_destino || "",
             codigo_banco_destino: a.profiles?.codigo_banco_destino || "",
+            glosa_transferencia: a.profiles?.glosa_transferencia || "",
+            mensaje_beneficiario: a.profiles?.mensaje_beneficiario || "",
             banco_name: BANCOS_CHILE[a.profiles?.codigo_banco_destino] || "Banco No Registrado",
             monto: defaultRate,
             status: "Pendiente", // Fallback por defecto
@@ -219,7 +244,7 @@ export default function Finanzas() {
     }
   };
 
-  // Generador de nómina bancaria chilena en formato estándar
+  // Generador de nómina bancaria chilena en formato Excel
   const handleDownloadNomina = () => {
     if (selectedIds.length === 0) {
       toast.error("Selecciona al menos un pago para generar la nómina.");
@@ -228,32 +253,52 @@ export default function Finanzas() {
 
     const selectedPayments = payments.filter(p => selectedIds.includes(p.id));
     
-    // Crear el string de la nómina (Formato universal semi-colon CSV / TXT para subida masiva)
-    let fileContent = "RUT Beneficiario;Nombre Beneficiario;Codigo Banco;Tipo Cuenta;Numero Cuenta;Monto;Email;Glosa\r\n";
-    
+    // Agrupar por RUT/ID para sumar los montos por persona
+    const grouped = {};
     selectedPayments.forEach(p => {
-      const cleanRut = p.staff_rut.replace(/\./g, "").trim();
-      const cleanName = p.staff_name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase(); // Sin tildes
-      const banco = p.codigo_banco_destino || "999";
-      const cuenta = p.cuenta_destino || "";
-      const email = p.staff_email || "";
-      const monto = p.monto;
-      const glosa = `PAGO ${p.event_name.toUpperCase().substring(0, 15)}`;
-
-      fileContent += `${cleanRut};${cleanName};${banco};Vista/Rut;${cuenta};${monto};${email};${glosa}\r\n`;
+      const key = p.staff_rut || p.staff_id;
+      if (!grouped[key]) {
+        grouped[key] = {
+          name: p.staff_name,
+          rut: p.staff_rut,
+          email: p.staff_email,
+          role: p.staff_role,
+          cuenta_origen: p.cuenta_origen,
+          cuenta_destino: p.cuenta_destino,
+          codigo_banco_destino: p.codigo_banco_destino,
+          glosa_transferencia: p.glosa_transferencia,
+          mensaje_beneficiario: p.mensaje_beneficiario,
+          monto_total: 0
+        };
+      }
+      grouped[key].monto_total += parseFloat(p.monto) || 0;
     });
 
-    // Crear el enlace de descarga
-    const blob = new Blob([fileContent], { type: "text/plain;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `NOMINA_PAGOS_AMPOLLETA_${new Date().toISOString().slice(0,10)}.txt`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    // Mapear con la estructura exacta de exportToExcel en Staff.jsx
+    const dataToExport = Object.values(grouped).map(item => ({
+      "Nombre": item.name,
+      "RUT": item.rut,
+      "Correo": item.email,
+      "Rol": item.role,
+      "Cuenta Origen": item.cuenta_origen || "",
+      "Moneda Origen": "CLP",
+      "Cuenta destino": item.cuenta_destino || "",
+      "Moneda Destino": "CLP",
+      "Codigo banco destino": item.codigo_banco_destino || "",
+      "Monto Transferencia": item.monto_total,
+      "Glosa personalizada transferencia": item.glosa_transferencia || "",
+      "Mensaje corre beneficiario": item.mensaje_beneficiario || "",
+    }));
+
+    // Generar el archivo Excel
+    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Pagos Staff");
     
-    toast.success("¡Nómina de Pago Bancario descargada con éxito!");
+    const fileName = `NOMINA_PAGOS_AMPOLLETA_${new Date().toISOString().slice(0, 10)}.xlsx`;
+    XLSX.writeFile(workbook, fileName);
+    
+    toast.success("¡Nómina de Excel de Pagos descargada con éxito!");
   };
 
   const uniqueMonths = React.useMemo(() => {
