@@ -65,6 +65,7 @@ export default function Finanzas() {
 
   // Filtro de Período Mensual
   const [monthFilter, setMonthFilter] = useState("all");
+  const [includeFuture, setIncludeFuture] = useState(false);
 
   const fetchPayments = async () => {
     setLoading(true);
@@ -127,7 +128,7 @@ export default function Finanzas() {
             status: a.payment_status || "Pendiente",
             assignment_status: a.status
           };
-        }).filter(a => (a.assignment_status === "Confirmado" || a.assignment_status === "Aceptado") && a.is_finished); // Solo eventos terminados y aceptados o confirmados
+        }).filter(a => a.assignment_status === "Confirmado" || a.assignment_status === "Aceptado"); // Todos los confirmados/aceptados (pasados y futuros)
 
         setPayments(formatted);
       }
@@ -190,7 +191,7 @@ export default function Finanzas() {
             status: "Pendiente", // Fallback por defecto
             assignment_status: a.status
           };
-        }).filter(a => (a.assignment_status === "Confirmado" || a.assignment_status === "Aceptado") && a.is_finished);
+        }).filter(a => a.assignment_status === "Confirmado" || a.assignment_status === "Aceptado");
 
         setPayments(formatted);
       }
@@ -529,7 +530,9 @@ export default function Finanzas() {
       monthFilter === "all" ||
       (p.event_date && p.event_date.startsWith(monthFilter));
 
-    return matchesSearch && matchesStatus && matchesMonth;
+    const matchesFinished = includeFuture || p.is_finished;
+
+    return matchesSearch && matchesStatus && matchesMonth && matchesFinished;
   });
 
   const stats = React.useMemo(() => {
@@ -688,6 +691,16 @@ export default function Finanzas() {
               Pagados
             </button>
           </div>
+
+          <label className="flex items-center gap-2 cursor-pointer bg-gray-800/40 border border-gray-700/60 rounded-xl px-3.5 py-1.5 text-xs font-semibold text-gray-300 hover:text-white hover:border-amber-500/30 transition-all select-none h-[38px]">
+            <input
+              type="checkbox"
+              checked={includeFuture}
+              onChange={(e) => setIncludeFuture(e.target.checked)}
+              className="accent-amber-500 rounded cursor-pointer w-3.5 h-3.5"
+            />
+            <span>Incluir Eventos Futuros</span>
+          </label>
         </div>
 
         {/* Acciones masivas o reporte filtrado */}
