@@ -13,7 +13,9 @@ import {
   Building,
   CheckSquare,
   Square,
-  Sliders
+  Sliders,
+  Eye,
+  EyeOff
 } from "lucide-react";
 import GlassCard from "../components/GlassCard.jsx";
 import Button from "../components/Button.jsx";
@@ -66,6 +68,20 @@ export default function Finanzas() {
   // Filtro de Período Mensual
   const [monthFilter, setMonthFilter] = useState("all");
   const [includeFuture, setIncludeFuture] = useState(false);
+
+  // Enmascaramiento de Cuentas Bancarias (Shoulder-Surfing prevention)
+  const [revealedAccounts, setRevealedAccounts] = useState({});
+
+  const toggleRevealAccount = (id) => {
+    setRevealedAccounts(prev => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const maskAccountNumber = (accountNumber) => {
+    if (!accountNumber) return "No registrada";
+    const str = String(accountNumber);
+    if (str.length <= 4) return "•••• " + str;
+    return "•••• " + str.slice(-4);
+  };
 
   const fetchPayments = async () => {
     setLoading(true);
@@ -834,7 +850,23 @@ export default function Finanzas() {
                               <span className="font-bold flex items-center gap-1">
                                 <Building className="w-3.5 h-3.5 text-gray-400" /> {p.banco_name}
                               </span>
-                              <span className="text-gray-400">Nº Cuenta: <span className="font-mono text-white font-semibold">{p.cuenta_destino}</span></span>
+                              <span className="text-gray-400 flex items-center gap-1.5">
+                                Nº Cuenta:{" "}
+                                <span className="font-mono text-white font-semibold">
+                                  {revealedAccounts[p.id] ? p.cuenta_destino : maskAccountNumber(p.cuenta_destino)}
+                                </span>
+                                <button
+                                  onClick={() => toggleRevealAccount(p.id)}
+                                  className="text-gray-400 hover:text-amber-400 transition-colors focus:outline-none"
+                                  title={revealedAccounts[p.id] ? "Ocultar número de cuenta" : "Mostrar número de cuenta"}
+                                >
+                                  {revealedAccounts[p.id] ? (
+                                    <EyeOff className="w-3.5 h-3.5 text-amber-500" />
+                                  ) : (
+                                    <Eye className="w-3.5 h-3.5" />
+                                  )}
+                                </button>
+                              </span>
                             </div>
                           )}
                         </td>
