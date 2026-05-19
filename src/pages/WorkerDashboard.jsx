@@ -20,7 +20,9 @@ import {
   Building,
   Wallet,
   Landmark,
-  Coins
+  Coins,
+  ChevronDown,
+  ChevronUp
 } from "lucide-react";
 import GlassCard from "../components/GlassCard.jsx";
 import { supabase } from "../lib/supabase.js";
@@ -119,6 +121,7 @@ export default function WorkerDashboard({ user }) {
 
   // Real-time Notifications state (Con estado de lectura y animaciones)
   const [notifications, setNotifications] = useState([]);
+  const [showAllNotifications, setShowAllNotifications] = useState(false);
 
   const generateDynamicNotifications = (eventsList) => {
     if (!eventsList || eventsList.length === 0) return [];
@@ -1051,7 +1054,7 @@ export default function WorkerDashboard({ user }) {
               )}
             </div>
 
-            <div className="space-y-3">
+            <div className={`space-y-3 pr-0.5 ${showAllNotifications ? "max-h-[360px] overflow-y-auto scrollbar-thin scrollbar-thumb-white/10" : ""}`}>
               <AnimatePresence initial={false}>
                 {notifications.length === 0 ? (
                   <div className="text-center py-6 text-gray-500 text-xs flex flex-col items-center gap-2">
@@ -1059,7 +1062,7 @@ export default function WorkerDashboard({ user }) {
                     <span>Sin notificaciones pendientes</span>
                   </div>
                 ) : (
-                  notifications.map(n => {
+                  (showAllNotifications ? notifications : notifications.slice(0, 5)).map(n => {
                     let cardStyle = "border-amber-500/10 bg-amber-500/5 hover:bg-amber-500/10";
                     let icon = <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />;
                     if (n.type === "info") {
@@ -1117,6 +1120,25 @@ export default function WorkerDashboard({ user }) {
                 )}
               </AnimatePresence>
             </div>
+
+            {notifications.length > 5 && (
+              <button
+                onClick={() => setShowAllNotifications(!showAllNotifications)}
+                className="w-full text-center py-2 text-xs font-bold text-amber-400 hover:text-amber-300 transition-colors mt-2 border-t border-white/5 pt-3 hover:underline flex items-center justify-center gap-1.5"
+              >
+                {showAllNotifications ? (
+                  <>
+                    <span>Ver menos</span>
+                    <ChevronUp className="w-3.5 h-3.5" />
+                  </>
+                ) : (
+                  <>
+                    <span>Ver todas ({notifications.length})</span>
+                    <ChevronDown className="w-3.5 h-3.5" />
+                  </>
+                )}
+              </button>
+            )}
           </GlassCard>
           
           {/* Mi Estado & Disponibilidad */}
