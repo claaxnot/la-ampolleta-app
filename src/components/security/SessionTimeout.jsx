@@ -63,8 +63,19 @@ export default function SessionTimeout() {
   useEffect(() => {
     if (!user) return; // do nothing when not logged in
     const events = ["mousemove", "click", "keydown", "scroll", "touchstart"];
-    const handler = () => resetTimer();
+    
+    let lastReset = Date.now();
+    const handler = () => {
+      const now = Date.now();
+      // Throttling: solo re-inicializamos el timer si pasaron más de 5 segundos de inactividad
+      if (now - lastReset > 5000) {
+        lastReset = now;
+        resetTimer();
+      }
+    };
+
     events.forEach((ev) => window.addEventListener(ev, handler));
+    
     // beforeunload store timestamp
     const beforeUnload = () => {
       localStorage.setItem("lastActivity", Date.now().toString());
@@ -79,19 +90,15 @@ export default function SessionTimeout() {
         // session already expired while tab was closed
         performLogout(false);
         return; // no need to set timers
-      } else if (elapsed >= INACTIVITY_LIMIT - WARNING_TIME) {
-        // show warning immediately and adjust remaining timers
-        setShowWarning(true);
-        const remainingWarning = INACTIVITY_LIMIT - elapsed - WARNING_TIME;
-        const remainingLogout = INACTIVITY_LIMIT - elapsed;
-        warningTimer.current = setTimeout(() => setShowWarning(true), remainingWarning);
-        logoutTimer.current = setTimeout(() => performLogout(true), remainingLogout);
       } else {
-        // normal start
-        resetTimer();
-        // adjust timers based on elapsed time
-        const remainingWarning = INACTIVITY_LIMIT - WARNING_TIME - elapsed;
-        const remainingLogout = INACTIVITY_LIMIT - elapsed;
+        // start clean and adjust remaining timers based on elapsed time without overlaps
+        clearTimers();
+        const hasReachedWarning = elapsed >= (INACTIVITY_LIMIT - WARNING_TIME);
+        setShowWarning(hasReachedWarning);
+
+        const remainingWarning = Math.max(0, INACTIVITY_LIMIT - WARNING_TIME - elapsed);
+        const remainingLogout = Math.max(0, INACTIVITY_LIMIT - elapsed);
+
         warningTimer.current = setTimeout(() => setShowWarning(true), remainingWarning);
         logoutTimer.current = setTimeout(() => performLogout(true), remainingLogout);
       }
