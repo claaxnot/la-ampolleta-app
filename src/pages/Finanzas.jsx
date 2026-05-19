@@ -256,7 +256,7 @@ export default function Finanzas() {
     }
   };
 
-  // Generador de nómina bancaria chilena en formato Excel
+  // Generador de nómina bancaria chilena en formato Excel (2 Hojas)
   const handleDownloadNomina = () => {
     if (selectedIds.length === 0) {
       toast.error("Selecciona al menos un pago para generar la nómina.");
@@ -266,7 +266,7 @@ export default function Finanzas() {
     try {
       const selectedPayments = payments.filter(p => selectedIds.includes(p.id));
 
-      // Agrupar por RUT/ID para sumar los montos por persona
+      // 1. HOJA 1: RESUMEN DE TRANSFERENCIAS (Agrupar y sumar montos pendientes o seleccionados)
       const grouped = {};
       selectedPayments.forEach(p => {
         const key = p.staff_rut || p.staff_id;
@@ -287,8 +287,7 @@ export default function Finanzas() {
         grouped[key].monto_total += parseFloat(p.monto) || 0;
       });
 
-      // Mapear con la estructura exacta de exportToExcel en Staff.jsx
-      const dataToExport = Object.values(grouped).map(item => ({
+      const dataResumen = Object.values(grouped).map(item => ({
         "Nombre": item.name,
         "RUT": item.rut,
         "Correo": item.email,
@@ -303,41 +302,8 @@ export default function Finanzas() {
         "Mensaje corre beneficiario": item.mensaje_beneficiario || "",
       }));
 
-      // Generar el archivo Excel
-      const worksheet = XLSX.utils.json_to_sheet(dataToExport);
-      const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, worksheet, "Pagos Staff");
-
-      // Generar buffer y descargar como Blob de forma ultra compatible
-      const excelBuffer = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
-      const blob = new Blob([excelBuffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-
-      const fileName = `NOMINA_PAGOS_AMPOLLETA_${new Date().toISOString().slice(0, 10)}.xlsx`;
-      
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = fileName;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-
-      toast.success("¡Nómina de Excel de Pagos descargada con éxito!");
-    } catch (error) {
-      console.error("Error al exportar Excel:", error);
-      toast.error(`Error al generar Excel: ${error.message || "Error desconocido"}`);
-    }
-  };
-
-  const handleExportFilteredReport = () => {
-    if (filteredPayments.length === 0) {
-      toast.error("No hay registros en el filtro actual para exportar.");
-      return;
-    }
-
-    try {
-      const dataToExport = filteredPayments.map(p => ({
+      // 2. HOJA 2: DESGLOSE COMPLETO POR EVENTO
+      const dataDesglose = selectedPayments.map(p => ({
         "Nombre Staff": p.staff_name,
         "RUT Staff": p.staff_rut,
         "Correo": p.staff_email,
@@ -352,26 +318,158 @@ export default function Finanzas() {
         "Mensaje": p.mensaje_beneficiario || ""
       }));
 
-      // Generar el archivo Excel
-      const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+      // Crear Libro de Trabajo (Workbook)
       const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, worksheet, "Reporte Filtrado");
 
-      // Ajustar anchos de columnas automáticamente para que se vea premium
-      const maxColWidths = [];
-      dataToExport.forEach(row => {
+      // Generar Hoja 1
+      const worksheetResumen = XLSX.utils.json_to_sheet(dataResumen);
+      // Auto-ajustar columnas Hoja 1
+      const maxColWidthsResumen = [];
+      dataResumen.forEach(row => {
         Object.keys(row).forEach((key, colIndex) => {
           const value = row[key] ? String(row[key]) : "";
           const length = Math.max(value.length, key.length) + 3;
-          maxColWidths[colIndex] = Math.max(maxColWidths[colIndex] || 10, length);
+          maxColWidthsResumen[colIndex] = Math.max(maxColWidthsResumen[colIndex] || 10, length);
         });
       });
-      worksheet["!cols"] = maxColWidths.map(w => ({ wch: w }));
+      worksheetResumen["!cols"] = maxColWidthsResumen.map(w => ({ wch: w }));
+      XLSX.utils.book_append_sheet(workbook, worksheetResumen, "Resumen Transferencias");
 
+      // Generar Hoja 2
+      const worksheetDesglose = XLSX.utils.json_to_sheet(dataDesglose);
+      // Auto-ajustar columnas Hoja 2
+      const maxColWidthsDesglose = [];
+      dataDesglose.forEach(row => {
+        Object.keys(row).forEach((key, colIndex) => {
+          const value = row[key] ? String(row[key]) : "";
+          const length = Math.max(value.length, key.length) + 3;
+          maxColWidthsDesglose[colIndex] = Math.max(maxColWidthsDesglose[colIndex] || 10, length);
+        });
+      });
+      worksheetDesglose["!cols"] = maxColWidthsDesglose.map(w => ({ wch: w }));
+      XLSX.utils.book_append_sheet(workbook, worksheetDesglose, "Detalle de Eventos");
+
+      // Guardar archivo
       const excelBuffer = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
       const blob = new Blob([excelBuffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
 
-      // Nombre inteligente con fecha y filtros
+      const fileName = `NOMINA_PAGOS_AMPOLLETA_${new Date().toISOString().slice(0, 10)}.xlsx`;
+      
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      toast.success("¡Nómina de Excel de Pagos (2 Hojas) descargada con éxito!");
+    } catch (error) {
+      console.error("Error al exportar Excel:", error);
+      toast.error(`Error al generar Excel: ${error.message || "Error desconocido"}`);
+    }
+  };
+
+  // Generador de reporte financiero filtrado (2 Hojas)
+  const handleExportFilteredReport = () => {
+    if (filteredPayments.length === 0) {
+      toast.error("No hay registros en el filtro actual para exportar.");
+      return;
+    }
+
+    try {
+      // 1. HOJA 1: RESUMEN DE TRANSFERENCIAS (Suma de pagos PENDIENTES del filtro actual por persona)
+      const grouped = {};
+      filteredPayments.forEach(p => {
+        const key = p.staff_rut || p.staff_id;
+        if (!grouped[key]) {
+          grouped[key] = {
+            name: p.staff_name,
+            rut: p.staff_rut,
+            email: p.staff_email,
+            role: p.staff_role,
+            cuenta_origen: p.cuenta_origen,
+            cuenta_destino: p.cuenta_destino,
+            codigo_banco_destino: p.codigo_banco_destino,
+            glosa_transferencia: p.glosa_transferencia,
+            mensaje_beneficiario: p.mensaje_beneficiario,
+            monto_total: 0
+          };
+        }
+        // Sumar solo los pagos pendientes de la persona en este conjunto filtrado
+        if (p.status !== "Pagado") {
+          grouped[key].monto_total += parseFloat(p.monto) || 0;
+        }
+      });
+
+      const dataResumen = Object.values(grouped).map(item => ({
+        "Nombre": item.name,
+        "RUT": item.rut,
+        "Correo": item.email,
+        "Rol": item.role,
+        "Cuenta Origen": item.cuenta_origen || "",
+        "Moneda Origen": "CLP",
+        "Moneda Destino": "CLP",
+        "Codigo banco destino": item.codigo_banco_destino || "",
+        "Cuenta destino": item.cuenta_destino || "",
+        "Monto Transferencia": item.monto_total,
+        "Glosa personalizada transferencia": item.glosa_transferencia || "",
+        "Mensaje corre beneficiario": item.mensaje_beneficiario || "",
+      }));
+
+      // 2. HOJA 2: DESGLOSE COMPLETO POR EVENTO
+      const dataDesglose = filteredPayments.map(p => ({
+        "Nombre Staff": p.staff_name,
+        "RUT Staff": p.staff_rut,
+        "Correo": p.staff_email,
+        "Rol Staff": p.staff_role,
+        "Evento": p.event_name,
+        "Fecha Evento": p.event_date,
+        "Monto Honorario": p.monto,
+        "Estado Pago": p.status,
+        "Banco Destino": p.banco_name,
+        "Cuenta Destino": p.cuenta_destino || "No registrada",
+        "Glosa": p.glosa_transferencia || "",
+        "Mensaje": p.mensaje_beneficiario || ""
+      }));
+
+      // Crear Libro de Trabajo (Workbook)
+      const workbook = XLSX.utils.book_new();
+
+      // Generar Hoja 1
+      const worksheetResumen = XLSX.utils.json_to_sheet(dataResumen);
+      // Auto-ajustar columnas Hoja 1
+      const maxColWidthsResumen = [];
+      dataResumen.forEach(row => {
+        Object.keys(row).forEach((key, colIndex) => {
+          const value = row[key] ? String(row[key]) : "";
+          const length = Math.max(value.length, key.length) + 3;
+          maxColWidthsResumen[colIndex] = Math.max(maxColWidthsResumen[colIndex] || 10, length);
+        });
+      });
+      worksheetResumen["!cols"] = maxColWidthsResumen.map(w => ({ wch: w }));
+      XLSX.utils.book_append_sheet(workbook, worksheetResumen, "Resumen Transferencias");
+
+      // Generar Hoja 2
+      const worksheetDesglose = XLSX.utils.json_to_sheet(dataDesglose);
+      // Auto-ajustar columnas Hoja 2
+      const maxColWidthsDesglose = [];
+      dataDesglose.forEach(row => {
+        Object.keys(row).forEach((key, colIndex) => {
+          const value = row[key] ? String(row[key]) : "";
+          const length = Math.max(value.length, key.length) + 3;
+          maxColWidthsDesglose[colIndex] = Math.max(maxColWidthsDesglose[colIndex] || 10, length);
+        });
+      });
+      worksheetDesglose["!cols"] = maxColWidthsDesglose.map(w => ({ wch: w }));
+      XLSX.utils.book_append_sheet(workbook, worksheetDesglose, "Detalle de Eventos");
+
+      // Guardar archivo
+      const excelBuffer = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
+      const blob = new Blob([excelBuffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+
+      // Nombre inteligente
       const filterStr = statusFilter === "all" ? "TODOS" : statusFilter === "paid" ? "PAGADOS" : "PENDIENTES";
       const fileName = `REPORTE_FINANZAS_${filterStr}_${new Date().toISOString().slice(0, 10)}.xlsx`;
       
@@ -384,7 +482,7 @@ export default function Finanzas() {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
 
-      toast.success("¡Reporte financiero filtrado descargado con éxito!");
+      toast.success("¡Reporte financiero filtrado (2 Hojas) descargado con éxito!");
     } catch (error) {
       console.error("Error al exportar reporte filtrado:", error);
       toast.error(`Error al generar reporte: ${error.message || "Error desconocido"}`);
