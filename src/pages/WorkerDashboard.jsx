@@ -10,6 +10,12 @@ import {
   Activity, 
   Sparkles, 
   Sun, 
+  Cloud,
+  CloudRain,
+  CloudSnow,
+  CloudLightning,
+  CloudFog,
+  CloudSun,
   Info, 
   AlertTriangle,
   Check,
@@ -59,11 +65,102 @@ export default function WorkerDashboard({ user }) {
   const [workerProfile, setWorkerProfile] = useState(null);
   const [financeMonthFilter, setFinanceMonthFilter] = useState("all");
 
+  // Estado del Clima en tiempo real por Geolocalización IP / Open-Meteo
+  const [weatherData, setWeatherData] = useState({ temp: 18, city: "Santiago", icon: "sun" });
+
+  useEffect(() => {
+    const fetchWeather = async () => {
+      try {
+        const ipRes = await fetch("https://ipapi.co/json/");
+        const ipData = await ipRes.json();
+        
+        const city = ipData.city || "Santiago";
+        const lat = ipData.latitude || -33.4489;
+        const lon = ipData.longitude || -70.6693;
+
+        const weatherRes = await fetch(
+          `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true`
+        );
+        const wData = await weatherRes.json();
+        
+        if (wData && wData.current_weather) {
+          const temp = Math.round(wData.current_weather.temperature);
+          const weatherCode = wData.current_weather.weathercode;
+          
+          let icon = "sun";
+          if (weatherCode >= 1 && weatherCode <= 3) icon = "cloudy";
+          else if (weatherCode >= 45 && weatherCode <= 48) icon = "fog";
+          else if (weatherCode >= 51 && weatherCode <= 67) icon = "rain";
+          else if (weatherCode >= 71 && weatherCode <= 77) icon = "snow";
+          else if (weatherCode >= 80 && weatherCode <= 82) icon = "rain";
+          else if (weatherCode >= 95 && weatherCode <= 99) icon = "storm";
+          
+          setWeatherData({ temp, city, icon });
+        }
+      } catch (err) {
+        console.warn("⚠️ [WEATHER API] - Error al obtener clima en tiempo real, usando Santiago:", err);
+      }
+    };
+
+    fetchWeather();
+  }, []);
+
+  const renderWeatherIcon = () => {
+    switch (weatherData.icon) {
+      case "cloudy":
+        return <Cloud className="w-3.5 h-3.5 text-blue-300" />;
+      case "fog":
+        return <CloudFog className="w-3.5 h-3.5 text-gray-400" />;
+      case "rain":
+        return <CloudRain className="w-3.5 h-3.5 text-sky-400" />;
+      case "snow":
+        return <CloudSnow className="w-3.5 h-3.5 text-white animate-bounce" />;
+      case "storm":
+        return <CloudLightning className="w-3.5 h-3.5 text-yellow-400" />;
+      case "sun":
+      default:
+        return <Sun className="w-3.5 h-3.5 text-amber-400" />;
+    }
+  };
+
   const completedEvents = React.useMemo(() => {
     return assignedEvents.filter(event => {
       const isFinished = event.date ? new Date(event.date) < new Date() : false;
       return event.assignment_status === "Confirmado" && isFinished;
     });
+  }, [assignedEvents]);
+
+  // Lista de eventos mostrados en el Dashboard:
+  // 1. Oculta eventos completados de meses anteriores.
+  // 2. Ordena los eventos por proximidad (fecha más cercana primero).
+  const displayedEvents = React.useMemo(() => {
+    if (!assignedEvents) return [];
+    
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonthStr = String(now.getMonth() + 1).padStart(2, '0');
+    const currentMonthPrefix = `${currentYear}-${currentMonthStr}`; // "YYYY-MM"
+    
+    return assignedEvents
+      .filter(event => {
+        const eventStatus = event.status ? event.status.toLowerCase() : "";
+        const isFinished = event.date ? new Date(event.date + 'T23:59:59') < now : false;
+        const isCompleted = eventStatus === "completado" || eventStatus === "finalizado" || isFinished;
+        
+        if (isCompleted) {
+          // Si está completado, mostrar solo si es del mes actual
+          return event.date && event.date.startsWith(currentMonthPrefix);
+        }
+        
+        // Si está activo (futuro o en progreso), mostrar siempre
+        return true;
+      })
+      .sort((a, b) => {
+        // Ordenar por proximidad (fecha más cercana primero)
+        const dateA = new Date(`${a.date}T${a.time || '00:00'}`);
+        const dateB = new Date(`${b.date}T${b.time || '00:00'}`);
+        return dateA - dateB;
+      });
   }, [assignedEvents]);
 
   // Obtener los periodos únicos de meses para rellenar el dropdown
@@ -666,9 +763,9 @@ export default function WorkerDashboard({ user }) {
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
                 Sistema operativo online
               </span>
-              <span className="text-xs px-3 py-1 rounded-full bg-white/5 text-gray-300 border border-white/5 flex items-center gap-1.5">
-                <Sun className="w-3.5 h-3.5 text-amber-400" />
-                18° · Santiago
+              <span className="text-xs px-3 py-1 rounded-full bg-white/5 text-gray-300 border border-white/5 flex items-center gap-1.5 shadow-sm">
+                {renderWeatherIcon()}
+                {weatherData.temp}° · {weatherData.city}
               </span>
             </div>
             
@@ -744,14 +841,14 @@ export default function WorkerDashboard({ user }) {
               </svg>
               <p className="font-semibold text-sm">Cargando próximos eventos...</p>
             </GlassCard>
-          ) : assignedEvents.length === 0 ? (
+          ) : displayedEvents.length === 0 ? (
             <GlassCard className="p-12 text-center text-gray-400 border border-white/5">
               <CalendarDays className="w-12 h-12 text-gray-600 mx-auto mb-3" />
               <p className="font-semibold">No tienes eventos asignados por el momento.</p>
               <p className="text-xs text-gray-500 mt-1">Cuando seas asignado a una producción, aparecerá aquí.</p>
             </GlassCard>
           ) : (
-            assignedEvents.map(event => {
+            displayedEvents.map(event => {
               const isPending = event.assignment_status === 'Pendiente';
               const isConfirmed = event.assignment_status === 'Confirmado';
               const isRejected = event.assignment_status === 'Rechazado';
