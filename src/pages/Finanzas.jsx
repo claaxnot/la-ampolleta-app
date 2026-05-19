@@ -204,14 +204,18 @@ export default function Finanzas() {
   }, []);
 
   const handleSelectAll = () => {
-    if (selectedIds.length === filteredPayments.length) {
+    const pendingPayments = filteredPayments.filter(p => p.status !== "Pagado");
+    if (selectedIds.length === pendingPayments.length) {
       setSelectedIds([]);
     } else {
-      setSelectedIds(filteredPayments.map(p => p.id));
+      setSelectedIds(pendingPayments.map(p => p.id));
     }
   };
 
   const handleSelectOne = (id) => {
+    const payment = payments.find(p => p.id === id);
+    if (payment && payment.status === "Pagado") return; // Impedir selección individual si ya está pagado
+
     setSelectedIds(prev =>
       prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
     );
@@ -219,7 +223,16 @@ export default function Finanzas() {
 
   // Marcar como pagados masivamente
   const handleMarkAsPaid = async () => {
-    if (selectedIds.length === 0) return;
+    // Filtrar de los ids seleccionados solo aquellos que realmente estén pendientes
+    const pendingSelectedIds = selectedIds.filter(id => {
+      const p = payments.find(item => item.id === id);
+      return p && p.status !== "Pagado";
+    });
+
+    if (pendingSelectedIds.length === 0) {
+      toast.error("Ninguno de los registros seleccionados está pendiente de pago.");
+      return;
+    }
 
     const loadingToast = toast.loading("Actualizando estados de pago...");
     try {
@@ -227,7 +240,7 @@ export default function Finanzas() {
       const { error } = await supabase
         .from("event_assignments")
         .update({ payment_status: "Pagado" })
-        .in("id", selectedIds);
+        .in("id", pendingSelectedIds);
 
       if (error) throw error;
 
@@ -237,8 +250,7 @@ export default function Finanzas() {
     } catch (err) {
       console.warn("⚠️ [FINANZAS UPDATE FAILED]: Se simuló la actualización en interfaz.", err);
       // Fallback local en estado si no tiene la columna de base de datos
-      setPayments(prev => prev.map(p => selectedIds.includes(p.id) ? { ...p, status: "Pagado" } : p));
-      calculateStats(payments.map(p => selectedIds.includes(p.id) ? { ...p, status: "Pagado" } : p));
+      setPayments(prev => prev.map(p => pendingSelectedIds.includes(p.id) ? { ...p, status: "Pagado" } : p));
       setSelectedIds([]);
       toast.success("¡Transacciones marcadas como Pagadas localmente!", { id: loadingToast });
     }
@@ -559,11 +571,14 @@ export default function Finanzas() {
                       onClick={handleSelectAll}
                       className="text-gray-400 hover:text-white transition-colors"
                     >
-                      {selectedIds.length === filteredPayments.length && filteredPayments.length > 0 ? (
-                        <CheckSquare className="w-5 h-5 text-amber-500" />
-                      ) : (
-                        <Square className="w-5 h-5" />
-                      )}
+                      {(() => {
+                        const pending = filteredPayments.filter(item => item.status !== "Pagado");
+                        return selectedIds.length === pending.length && pending.length > 0 ? (
+                          <CheckSquare className="w-5 h-5 text-amber-500" />
+                        ) : (
+                          <Square className="w-5 h-5" />
+                        );
+                      })()}
                     </button>
                   </th>
                   <th className="py-4 px-6">Trabajador (Staff)</th>
@@ -597,16 +612,20 @@ export default function Finanzas() {
                         className={`transition-colors duration-200 ${isSelected ? 'bg-amber-500/5' : 'hover:bg-gray-800/10'}`}
                       >
                         <td className="py-4 px-6">
-                          <button
-                            onClick={() => handleSelectOne(p.id)}
-                            className="text-gray-400 hover:text-white transition-colors"
-                          >
-                            {isSelected ? (
-                              <CheckSquare className="w-5 h-5 text-amber-500" />
-                            ) : (
-                              <Square className="w-5 h-5" />
-                            )}
-                          </button>
+                          {p.status === "Pagado" ? (
+                            <CheckSquare className="w-5 h-5 text-gray-600/50 cursor-not-allowed" title="Ya está pagado" />
+                          ) : (
+                            <button
+                              onClick={() => handleSelectOne(p.id)}
+                              className="text-gray-400 hover:text-white transition-colors"
+                            >
+                              {isSelected ? (
+                                <CheckSquare className="w-5 h-5 text-amber-500" />
+                              ) : (
+                                <Square className="w-5 h-5" />
+                              )}
+                            </button>
+                          )}
                         </td>
                         <td className="py-4 px-6">
                           <div className="flex flex-col">

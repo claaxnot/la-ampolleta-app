@@ -678,6 +678,18 @@ export default function WorkerDashboard({ user }) {
   };
 
   const handleStatusChange = async (assignmentId, newStatus) => {
+    const eventInfo = assignedEvents.find(e => e.assignment_id === assignmentId);
+    if (eventInfo) {
+      const eventStatus = eventInfo.status ? eventInfo.status.toLowerCase() : "";
+      const isFinished = eventInfo.date ? new Date(eventInfo.date + 'T23:59:59') < new Date() : false;
+      const isEventCompleted = eventStatus === "completado" || eventStatus === "finalizado" || isFinished;
+
+      if (isEventCompleted) {
+        toast.error("No puedes cambiar tu asistencia en un evento que ya está completado o finalizado.");
+        return;
+      }
+    }
+
     const { error } = await supabase
       .from('event_assignments')
       .update({ status: newStatus })
@@ -1016,7 +1028,7 @@ export default function WorkerDashboard({ user }) {
                       </div>
 
                       <div className="flex flex-row lg:flex-col justify-end items-center gap-3 mt-4 lg:mt-0 lg:self-center w-full lg:w-auto">
-                        {isPending && (
+                        {!isEventCompleted && isPending && (
                           <>
                             <motion.button 
                               whileHover={{ scale: 1.03 }}
@@ -1037,7 +1049,7 @@ export default function WorkerDashboard({ user }) {
                           </>
                         )}
                         
-                        {isConfirmed && (
+                        {!isEventCompleted && isConfirmed && (
                           <div className="flex flex-col gap-2 w-full lg:w-44">
                             <span className="flex items-center justify-center gap-1.5 px-4 py-2.5 bg-emerald-500/10 text-emerald-400 rounded-xl border border-emerald-500/30 font-bold text-sm shadow-inner text-center">
                               ✓ Confirmada
@@ -1052,7 +1064,7 @@ export default function WorkerDashboard({ user }) {
                           </div>
                         )}
 
-                        {isRejected && (
+                        {!isEventCompleted && isRejected && (
                           <div className="flex flex-col gap-2 w-full lg:w-44">
                             <span className="flex items-center justify-center gap-1.5 px-4 py-2.5 bg-red-500/10 text-red-400 rounded-xl border border-red-500/30 font-bold text-sm shadow-inner text-center">
                               ✗ Rechazado
@@ -1064,6 +1076,18 @@ export default function WorkerDashboard({ user }) {
                             >
                               Cambiar a Confirmado
                             </motion.button>
+                          </div>
+                        )}
+
+                        {isEventCompleted && (
+                          <div className="flex flex-col gap-1 w-full lg:w-44">
+                            <span className={`flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl border font-extrabold text-xs shadow-inner text-center tracking-wide ${
+                              isConfirmed ? 'bg-emerald-500/5 text-emerald-400/60 border-emerald-500/10' :
+                              isRejected ? 'bg-red-500/5 text-red-400/60 border-red-500/10' :
+                              'bg-gray-500/5 text-gray-400/60 border-gray-500/10'
+                            }`}>
+                              {isConfirmed ? '✓ Asistió' : isRejected ? '✗ No Asistió' : 'Sin respuesta'}
+                            </span>
                           </div>
                         )}
 
