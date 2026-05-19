@@ -18,8 +18,11 @@ export default function Events({ user }) {
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState(null);
   
-  const currentMonthValue = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
-  const [selectedMonth, setSelectedMonth] = useState(currentMonthValue);
+  const currentYearStr = String(new Date().getFullYear());
+  const currentMonthStr = String(new Date().getMonth() + 1).padStart(2, '0');
+
+  const [selectedYear, setSelectedYear] = useState(currentYearStr);
+  const [selectedMonth, setSelectedMonth] = useState(currentMonthStr);
 
   const handleSearch = (term) => setSearch(term);
   const handleFilter = (status) => setFilter(status);
@@ -199,17 +202,53 @@ export default function Events({ user }) {
     }
   };
 
+  // 1. Obtener lista inteligente de AÑOS que tienen eventos (+ el año actual por defecto)
+  const yearsWithEvents = [...new Set(events.map(e => e.date ? e.date.substring(0, 4) : ""))].filter(Boolean);
+  if (!yearsWithEvents.includes(currentYearStr)) {
+    yearsWithEvents.push(currentYearStr);
+  }
+  yearsWithEvents.sort((a, b) => b - a); // Mostrar años más recientes primero
+
+  // 2. Obtener lista inteligente de MESES que tienen eventos en el año seleccionado
+  const eventsForYear = selectedYear === 'all'
+    ? events
+    : events.filter(e => e.date && e.date.startsWith(selectedYear));
+    
+  const monthsWithEvents = [...new Set(eventsForYear.map(e => e.date ? e.date.substring(5, 7) : ""))].filter(Boolean);
+  
+  // Asegurar que el mes actual sea seleccionable si estamos en el año actual
+  if (selectedYear === currentYearStr && !monthsWithEvents.includes(currentMonthStr)) {
+    monthsWithEvents.push(currentMonthStr);
+  }
+  monthsWithEvents.sort();
+
+  const monthNames = [
+    "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+    "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
+  ];
+
+  const monthOptions = monthsWithEvents.map(m => ({
+    value: m,
+    label: monthNames[parseInt(m) - 1]
+  }));
+
   const filteredEvents = events.filter((e) => {
     const matchesSearch = e.name.toLowerCase().includes(search.toLowerCase());
     const matchesFilter = filter ? e.status.toLowerCase() === filter : true;
     
+    // Filtro por Año
+    let matchesYear = true;
+    if (selectedYear && selectedYear !== 'all') {
+      matchesYear = e.date && e.date.startsWith(selectedYear);
+    }
+    
     // Filtro por Mes
     let matchesMonth = true;
     if (selectedMonth && selectedMonth !== 'all') {
-      matchesMonth = e.date && e.date.startsWith(selectedMonth);
+      matchesMonth = e.date && e.date.substring(5, 7) === selectedMonth;
     }
     
-    return matchesSearch && matchesFilter && matchesMonth;
+    return matchesSearch && matchesFilter && matchesYear && matchesMonth;
   });
 
   const getStatusColor = (status) => {
@@ -235,8 +274,12 @@ export default function Events({ user }) {
         onFilter={handleFilter} 
         onAdd={() => openModal()} 
         canCreate={rolePermissions.canCreate} 
+        selectedYear={selectedYear}
+        onYearChange={setSelectedYear}
+        yearOptions={yearsWithEvents}
         selectedMonth={selectedMonth} 
         onMonthChange={setSelectedMonth} 
+        monthOptions={monthOptions}
       />
       <div className="bg-black/40 backdrop-blur-3xl border border-white/10 rounded-3xl overflow-hidden shadow-[0_8px_32px_0_rgba(0,0,0,0.5)] relative z-10 mt-6">
         <div className="overflow-x-auto">

@@ -16,8 +16,12 @@ export default function EventToolbar({
   onFilter, 
   onAdd, 
   canCreate = true, 
+  selectedYear,
+  onYearChange,
+  yearOptions = [],
   selectedMonth, 
-  onMonthChange 
+  onMonthChange,
+  monthOptions = []
 }) {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
@@ -32,31 +36,6 @@ export default function EventToolbar({
     const val = e.target.value;
     setStatus(val);
     onFilter(val);
-  };
-
-  // Generar opciones de meses en español: año anterior, actual y siguiente
-  const generateMonthOptions = () => {
-    const options = [];
-    const now = new Date();
-    const currentYear = now.getFullYear();
-    
-    const monthNames = [
-      "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
-      "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
-    ];
-    
-    const years = [currentYear - 1, currentYear, currentYear + 1];
-    
-    years.forEach(year => {
-      monthNames.forEach((name, idx) => {
-        const monthVal = `${year}-${String(idx + 1).padStart(2, '0')}`;
-        options.push({
-          value: monthVal,
-          label: `${name} ${year}`
-        });
-      });
-    });
-    return options;
   };
 
   return (
@@ -82,6 +61,21 @@ export default function EventToolbar({
       </div>
 
       <div className="flex flex-col sm:flex-row gap-4 items-center w-full xl:w-auto ml-auto">
+        {/* Filtro por Año */}
+        <div className="flex items-center space-x-2 w-full sm:w-auto">
+          <span className="text-gray-300 text-sm font-semibold whitespace-nowrap shrink-0">Año:</span>
+          <select
+            value={selectedYear}
+            onChange={(e) => onYearChange(e.target.value)}
+            className="w-full sm:w-auto px-4 py-2 bg-black/40 border border-white/10 rounded-xl text-white focus:outline-none focus:border-primary/50 transition-colors text-sm"
+          >
+            <option value="all">Todos</option>
+            {yearOptions.map(y => (
+              <option key={y} value={y}>{y}</option>
+            ))}
+          </select>
+        </div>
+
         {/* Filtro por Mes */}
         <div className="flex items-center space-x-2 w-full sm:w-auto">
           <span className="text-gray-300 text-sm font-semibold whitespace-nowrap shrink-0">Mes:</span>
@@ -90,8 +84,8 @@ export default function EventToolbar({
             onChange={(e) => onMonthChange(e.target.value)}
             className="w-full sm:w-auto px-4 py-2 bg-black/40 border border-white/10 rounded-xl text-white focus:outline-none focus:border-primary/50 transition-colors text-sm"
           >
-            <option value="all">Todos los meses</option>
-            {generateMonthOptions().map(opt => (
+            <option value="all">Todos</option>
+            {monthOptions.map(opt => (
               <option key={opt.value} value={opt.value}>{opt.label}</option>
             ))}
           </select>
