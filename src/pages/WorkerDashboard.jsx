@@ -608,6 +608,7 @@ export default function WorkerDashboard({ user }) {
     const now = new Date();
     const sortedFuture = assignedEvents
       .filter(e => {
+        if (e.assignment_status === "Rechazado" || e.status === "Rechazado") return false;
         const evDate = new Date(`${e.date}T${e.time || '00:00'}`);
         return evDate > now;
       })
