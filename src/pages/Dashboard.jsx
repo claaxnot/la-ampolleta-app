@@ -90,7 +90,7 @@ export default function Dashboard() {
   };
 
   const totalEvents = events.length;
-  const totalStaff = staffCount;
+  const totalStaff = Math.max(0, staffCount - 1);
 
   const upcomingEvents = events.filter(e => {
     const statusLower = e.status ? e.status.toLowerCase() : "";
@@ -102,10 +102,18 @@ export default function Dashboard() {
     return eventDate >= today;
   }).length;
 
+  const currentMonthEvents = events.filter(e => {
+    if (!e.date) return false;
+    const [eYear, eMonth] = e.date.split('-').map(Number);
+    const today = new Date();
+    return eYear === today.getFullYear() && eMonth === (today.getMonth() + 1);
+  }).length;
+
   const stats = [
     { title: "Eventos Totales", value: totalEvents, icon: CalendarDays, color: "bg-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.4)]" },
     { title: "Personal", value: totalStaff, icon: Users, color: "bg-purple-500 shadow-[0_0_15px_rgba(168,85,247,0.4)]" },
     { title: "Próximos Eventos", value: upcomingEvents, icon: Zap, color: "bg-amber-500 shadow-[0_0_15px_rgba(245,158,11,0.4)]" },
+    { title: "Eventos del Mes", value: currentMonthEvents, icon: CalendarDays, color: "bg-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.4)]" },
   ];
 
   const recentEvents = events
@@ -140,7 +148,7 @@ export default function Dashboard() {
       </motion.header>
 
       {/* Stat cards */}
-      <motion.section variants={itemVariants} className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+      <motion.section variants={itemVariants} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         {stats.map((stat, i) => (
           <motion.div key={i} whileHover={{ y: -5, scale: 1.02 }} transition={{ type: "spring", stiffness: 300 }}>
             <StatCard
