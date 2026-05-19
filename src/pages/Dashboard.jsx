@@ -111,9 +111,9 @@ export default function Dashboard() {
 
   const stats = [
     { title: "Eventos Totales", value: totalEvents, icon: CalendarDays, color: "bg-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.4)]" },
+    { title: "Eventos del Mes", value: currentMonthEvents, icon: CalendarDays, color: "bg-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.4)]" },
     { title: "Personal", value: totalStaff, icon: Users, color: "bg-purple-500 shadow-[0_0_15px_rgba(168,85,247,0.4)]" },
     { title: "Próximos Eventos", value: upcomingEvents, icon: Zap, color: "bg-amber-500 shadow-[0_0_15px_rgba(245,158,11,0.4)]" },
-    { title: "Eventos del Mes", value: currentMonthEvents, icon: CalendarDays, color: "bg-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.4)]" },
   ];
 
   const recentEvents = events
