@@ -173,7 +173,7 @@ export default function TopBar({ user, onToggleMenu }) {
       // Worker
       const { data: assignments } = await supabase
         .from('event_assignments')
-        .select('id, status, created_at, events(name)')
+        .select('id, status, payment_status, created_at, events(name)')
         .eq('staff_id', user.id)
         .order('created_at', { ascending: false })
         .limit(5);
@@ -191,6 +191,17 @@ export default function TopBar({ user, onToggleMenu }) {
             date: new Date(a.created_at),
             read: readIds.includes(`a-${a.id}-${a.status}`)
           });
+
+          // Si el pago ya fue realizado, agregamos la notificación de pago
+          if (a.payment_status === "Pagado") {
+            combinedNotifs.push({
+              id: `p-${a.id}-paid`,
+              message: `💰 Pago de Honorarios Realizado: Se liquidó tu pago para "${a.events?.name || 'Un evento'}"`,
+              time: getTimeAgo(a.created_at),
+              date: new Date(a.created_at),
+              read: readIds.includes(`p-${a.id}-paid`)
+            });
+          }
         });
       }
 

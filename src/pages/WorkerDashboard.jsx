@@ -162,6 +162,18 @@ export default function WorkerDashboard({ user }) {
           read: false
         });
       }
+
+      // 4. Notificación de Pago de Honorarios Realizado
+      if (e.payment_status === "Pagado") {
+        list.push({
+          id: `payment-${e.assignment_id}`,
+          title: "💰 Pago de Honorarios Realizado",
+          desc: `Se ha procesado y liquidado con éxito el pago por tu participación en el evento "${e.name}".`,
+          type: "info",
+          time: "Liquidado",
+          read: false
+        });
+      }
     });
 
     return list;
@@ -678,10 +690,10 @@ export default function WorkerDashboard({ user }) {
         </div>
       </motion.div>
 
-      {/* Selector de Pestañas Premium */}
+      {/* Selector de Pestañas Premium (Visible solo en móviles/tablets) */}
       <motion.div 
         variants={itemVariants}
-        className="flex items-center gap-2 bg-gray-900/60 p-1.5 rounded-2xl border border-white/5 mb-6 backdrop-blur-sm max-w-md relative z-10"
+        className="flex md:hidden items-center gap-2 bg-gray-900/60 p-1.5 rounded-2xl border border-white/5 mb-6 backdrop-blur-sm max-w-md relative z-10"
       >
         <button
           onClick={() => setActiveSubTab("dashboard")}
