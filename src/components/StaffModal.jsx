@@ -204,16 +204,8 @@ export default function StaffModal({ isOpen, onClose, onSubmit, initialData = {}
                       <input id="codigo_banco_destino" {...register("codigo_banco_destino")} className="w-full bg-gray-800/50 border border-gray-700 rounded-xl p-2 text-white placeholder-gray-500" />
                     </div>
                     <div className="flex flex-col">
-                      <label htmlFor="monto_transferencia" className="text-gray-300 mb-1 text-sm">Monto Transferencia</label>
-                      <input id="monto_transferencia" type="number" {...register("monto_transferencia")} className="w-full bg-gray-800/50 border border-gray-700 rounded-xl p-2 text-white placeholder-gray-500" />
-                    </div>
-                    <div className="flex flex-col">
                       <label htmlFor="glosa_transferencia" className="text-gray-300 mb-1 text-sm">Glosa Transferencia</label>
                       <input id="glosa_transferencia" {...register("glosa_transferencia")} className="w-full bg-gray-800/50 border border-gray-700 rounded-xl p-2 text-white placeholder-gray-500" />
-                    </div>
-                    <div className="flex flex-col">
-                      <label htmlFor="mensaje_beneficiario" className="text-gray-300 mb-1 text-sm">Mensaje Beneficiario</label>
-                      <input id="mensaje_beneficiario" {...register("mensaje_beneficiario")} className="w-full bg-gray-800/50 border border-gray-700 rounded-xl p-2 text-white placeholder-gray-500" />
                     </div>
                   </div>
                 </div>

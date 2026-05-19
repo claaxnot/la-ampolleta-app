@@ -238,9 +238,7 @@ export default function Staff() {
         "Cuenta destino": member.cuenta_destino || "",
         "Moneda Destino": "CLP",
         "Codigo banco destino": member.codigo_banco_destino || "",
-        "Monto Transferencia": member.monto_transferencia || "",
         "Glosa personalizada transferencia": member.glosa_transferencia || "",
-        "Mensaje corre beneficiario": member.mensaje_beneficiario || "",
       }));
 
       const worksheet = XLSX.utils.json_to_sheet(dataToExport);
