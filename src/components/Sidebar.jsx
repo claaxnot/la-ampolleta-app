@@ -4,6 +4,7 @@ import { LayoutDashboard, CalendarDays, Users, Calendar, LogOut, Lightbulb, User
 
 export default function Sidebar({ user, onLogout, isOpen, setIsOpen }) {
   const location = useLocation();
+  const [logoError, setLogoError] = React.useState(false);
 
   const adminLinks = [
     { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -52,8 +53,17 @@ export default function Sidebar({ user, onLogout, isOpen, setIsOpen }) {
         <div className="p-6 relative z-10">
           <div className="flex items-center justify-between md:justify-center mb-8">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-accent/20 rounded-xl">
-                <Lightbulb className="w-8 h-8 text-accent" />
+              <div className="p-1.5 bg-white/5 backdrop-blur-md rounded-xl border border-white/10 hover:border-accent/30 transition-all duration-300">
+                {!logoError ? (
+                  <img 
+                    src="/isotipo.png" 
+                    alt="Logo" 
+                    onError={() => setLogoError(true)}
+                    className="w-8 h-8 object-contain drop-shadow-[0_0_8px_rgba(245,158,11,0.4)]" 
+                  />
+                ) : (
+                  <Lightbulb className="w-8 h-8 text-accent" />
+                )}
               </div>
               <div className="flex flex-col">
                 <span className="text-xl font-bold tracking-tight text-white leading-tight">La Ampolleta</span>

@@ -14,6 +14,7 @@ export default function Login({ onLogin }) {
   const [message, setMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [logoError, setLogoError] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -139,8 +140,17 @@ export default function Login({ onLogin }) {
     <div className="flex items-center justify-center min-h-screen bg-transparent text-white relative overflow-hidden p-4 md:p-0">
       <GlassCard className="w-full max-w-md p-6 md:p-8">
         <div className="flex flex-col items-center mb-8">
-          <div className="w-16 h-16 bg-gradient-to-br from-primary/20 to-red-600/20 rounded-2xl flex items-center justify-center mb-4 shadow-lg border border-primary/20">
-            <Lightbulb className="w-8 h-8 text-primary" />
+          <div className="w-20 h-20 bg-white/5 backdrop-blur-xl rounded-2xl flex items-center justify-center mb-4 shadow-xl border border-white/10 hover:border-accent/30 transition-all duration-300">
+            {!logoError ? (
+              <img 
+                src="/logo.png" 
+                alt="Logo" 
+                onError={() => setLogoError(true)}
+                className="w-14 h-14 object-contain drop-shadow-[0_0_12px_rgba(245,158,11,0.4)]" 
+              />
+            ) : (
+              <Lightbulb className="w-8 h-8 text-accent animate-pulse" />
+            )}
           </div>
           <h2 className="text-3xl font-bold text-white mb-1">Bienvenido</h2>
           <p className="text-gray-400 text-sm">Ingresa a La Ampolleta Producciones</p>
