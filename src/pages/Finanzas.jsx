@@ -330,6 +330,67 @@ export default function Finanzas() {
     }
   };
 
+  const handleExportFilteredReport = () => {
+    if (filteredPayments.length === 0) {
+      toast.error("No hay registros en el filtro actual para exportar.");
+      return;
+    }
+
+    try {
+      const dataToExport = filteredPayments.map(p => ({
+        "Nombre Staff": p.staff_name,
+        "RUT Staff": p.staff_rut,
+        "Correo": p.staff_email,
+        "Rol Staff": p.staff_role,
+        "Evento": p.event_name,
+        "Fecha Evento": p.event_date,
+        "Monto Honorario": p.monto,
+        "Estado Pago": p.status,
+        "Banco Destino": p.banco_name,
+        "Cuenta Destino": p.cuenta_destino || "No registrada",
+        "Glosa": p.glosa_transferencia || "",
+        "Mensaje": p.mensaje_beneficiario || ""
+      }));
+
+      // Generar el archivo Excel
+      const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Reporte Filtrado");
+
+      // Ajustar anchos de columnas automáticamente para que se vea premium
+      const maxColWidths = [];
+      dataToExport.forEach(row => {
+        Object.keys(row).forEach((key, colIndex) => {
+          const value = row[key] ? String(row[key]) : "";
+          const length = Math.max(value.length, key.length) + 3;
+          maxColWidths[colIndex] = Math.max(maxColWidths[colIndex] || 10, length);
+        });
+      });
+      worksheet["!cols"] = maxColWidths.map(w => ({ wch: w }));
+
+      const excelBuffer = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
+      const blob = new Blob([excelBuffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+
+      // Nombre inteligente con fecha y filtros
+      const filterStr = statusFilter === "all" ? "TODOS" : statusFilter === "paid" ? "PAGADOS" : "PENDIENTES";
+      const fileName = `REPORTE_FINANZAS_${filterStr}_${new Date().toISOString().slice(0, 10)}.xlsx`;
+      
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      toast.success("¡Reporte financiero filtrado descargado con éxito!");
+    } catch (error) {
+      console.error("Error al exportar reporte filtrado:", error);
+      toast.error(`Error al generar reporte: ${error.message || "Error desconocido"}`);
+    }
+  };
+
   const uniqueMonths = React.useMemo(() => {
     const periods = new Set();
     payments.forEach(p => {
@@ -531,8 +592,8 @@ export default function Finanzas() {
           </div>
         </div>
 
-        {/* Acciones masivas */}
-        {selectedIds.length > 0 && (
+        {/* Acciones masivas o reporte filtrado */}
+        {selectedIds.length > 0 ? (
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
@@ -556,6 +617,14 @@ export default function Finanzas() {
               <CheckCircle className="w-3.5 h-3.5" /> Marcar Pagado
             </Button>
           </motion.div>
+        ) : (
+          <Button
+            variant="amber"
+            onClick={handleExportFilteredReport}
+            className="flex items-center gap-2 text-xs py-2.5 px-4 bg-amber-500/10 border border-amber-500/20 text-amber-300 font-bold hover:bg-amber-500/20 hover:border-amber-500/40 rounded-xl transition-all h-[38px] self-start md:self-auto shadow-sm"
+          >
+            <Download className="w-3.5 h-3.5 text-amber-400" /> Exportar Reporte Filtrado
+          </Button>
         )}
       </motion.div>
 
