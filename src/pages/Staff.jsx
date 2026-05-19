@@ -235,15 +235,15 @@ export default function Staff() {
         "Rol": member.role,
         "Cuenta Origen": member.cuenta_origen || "",
         "Moneda Origen": "CLP",
-        "Cuenta destino": member.cuenta_destino || "",
         "Moneda Destino": "CLP",
         "Codigo banco destino": member.codigo_banco_destino || "",
+        "Cuenta destino": member.cuenta_destino || "",
         "Glosa personalizada transferencia": member.glosa_transferencia || "",
       }));
 
       const worksheet = XLSX.utils.json_to_sheet(dataToExport);
       const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, worksheet, "Pagos Staff");
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Datos Staff");
 
       // Generar buffer y descargar como Blob de forma ultra compatible
       const excelBuffer = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
@@ -252,7 +252,7 @@ export default function Staff() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = "Pagos_Staff.xlsx";
+      a.download = "Datos_Staff.xlsx";
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
