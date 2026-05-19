@@ -100,10 +100,11 @@ export default function EventToolbar({
             className="w-full sm:w-auto px-4 py-2 bg-black/40 border border-white/10 rounded-xl text-white focus:outline-none focus:border-primary/50 transition-colors text-sm"
           >
             <option value="">Todos los estados</option>
-            <option value="planned">Planificado</option>
-            <option value="confirmed">Confirmado</option>
-            <option value="active">Activo</option>
-            <option value="completed">Completado</option>
+            <option value="planificado">Planificado</option>
+            <option value="confirmado">Confirmado</option>
+            <option value="en progreso">En progreso</option>
+            <option value="finalizado">Finalizado</option>
+            <option value="cancelado">Cancelado</option>
           </select>
         </div>
 

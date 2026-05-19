@@ -354,7 +354,7 @@ export default function Events({ user }) {
             time: "",
             location: "",
             description: "",
-            status: "planned",
+            status: "Planificado",
             assignedStaff: []
           }}
         />

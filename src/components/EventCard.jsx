@@ -12,11 +12,24 @@ import Button from '../components/Button.jsx';
  *   onView: (event) => void
  */
 export default function EventCard({ event, onEdit, onDelete, onView }) {
-  const statusColors = {
-    planned: 'bg-blue-600/10 text-blue-400 border-blue-600/20',
-    confirmed: 'bg-green-600/10 text-green-400 border-green-600/20',
-    active: 'bg-purple-600/10 text-purple-400 border-purple-600/20',
-    completed: 'bg-gray-600/10 text-gray-400 border-gray-600/20',
+  const getStatusColor = (status) => {
+    switch (status?.toLowerCase()) {
+      case "confirmado":
+      case "confirmed":
+      case "active":
+      case "activo":
+        return "bg-emerald-500/10 text-emerald-400 border-emerald-500/20";
+      case "completado":
+      case "completed":
+      case "finalizado":
+        return "bg-gray-500/10 text-gray-400 border-gray-500/20";
+      case "planned":
+      case "planificado":
+      case "pendiente":
+      case "en progreso":
+      default:
+        return "bg-amber-500/10 text-amber-400 border-amber-500/20";
+    }
   };
 
   return (
@@ -41,7 +54,7 @@ export default function EventCard({ event, onEdit, onDelete, onView }) {
       <td className="p-4 text-sm text-gray-300">{event.location}</td>
       <td className="p-4">
         <span
-          className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border ${statusColors[event.status]}`}
+          className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border ${getStatusColor(event.status)}`}
         >
           {event.status}
         </span>
