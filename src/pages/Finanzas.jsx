@@ -251,54 +251,71 @@ export default function Finanzas() {
       return;
     }
 
-    const selectedPayments = payments.filter(p => selectedIds.includes(p.id));
+    try {
+      const selectedPayments = payments.filter(p => selectedIds.includes(p.id));
 
-    // Agrupar por RUT/ID para sumar los montos por persona
-    const grouped = {};
-    selectedPayments.forEach(p => {
-      const key = p.staff_rut || p.staff_id;
-      if (!grouped[key]) {
-        grouped[key] = {
-          name: p.staff_name,
-          rut: p.staff_rut,
-          email: p.staff_email,
-          role: p.staff_role,
-          cuenta_origen: p.cuenta_origen,
-          cuenta_destino: p.cuenta_destino,
-          codigo_banco_destino: p.codigo_banco_destino,
-          glosa_transferencia: p.glosa_transferencia,
-          mensaje_beneficiario: p.mensaje_beneficiario,
-          monto_total: 0
-        };
-      }
-      grouped[key].monto_total += parseFloat(p.monto) || 0;
-    });
+      // Agrupar por RUT/ID para sumar los montos por persona
+      const grouped = {};
+      selectedPayments.forEach(p => {
+        const key = p.staff_rut || p.staff_id;
+        if (!grouped[key]) {
+          grouped[key] = {
+            name: p.staff_name,
+            rut: p.staff_rut,
+            email: p.staff_email,
+            role: p.staff_role,
+            cuenta_origen: p.cuenta_origen,
+            cuenta_destino: p.cuenta_destino,
+            codigo_banco_destino: p.codigo_banco_destino,
+            glosa_transferencia: p.glosa_transferencia,
+            mensaje_beneficiario: p.mensaje_beneficiario,
+            monto_total: 0
+          };
+        }
+        grouped[key].monto_total += parseFloat(p.monto) || 0;
+      });
 
-    // Mapear con la estructura exacta de exportToExcel en Staff.jsx
-    const dataToExport = Object.values(grouped).map(item => ({
-      "Nombre": item.name,
-      "RUT": item.rut,
-      "Correo": item.email,
-      "Rol": item.role,
-      "Cuenta Origen": item.cuenta_origen || "",
-      "Moneda Origen": "CLP",
-      "Moneda Destino": "CLP",
-      "Codigo banco destino": item.codigo_banco_destino || "",
-      "Cuenta destino": item.cuenta_destino || "",
-      "Monto Transferencia": item.monto_total,
-      "Glosa personalizada transferencia": item.glosa_transferencia || "",
-      "Mensaje corre beneficiario": item.mensaje_beneficiario || "",
-    }));
+      // Mapear con la estructura exacta de exportToExcel en Staff.jsx
+      const dataToExport = Object.values(grouped).map(item => ({
+        "Nombre": item.name,
+        "RUT": item.rut,
+        "Correo": item.email,
+        "Rol": item.role,
+        "Cuenta Origen": item.cuenta_origen || "",
+        "Moneda Origen": "CLP",
+        "Moneda Destino": "CLP",
+        "Codigo banco destino": item.codigo_banco_destino || "",
+        "Cuenta destino": item.cuenta_destino || "",
+        "Monto Transferencia": item.monto_total,
+        "Glosa personalizada transferencia": item.glosa_transferencia || "",
+        "Mensaje corre beneficiario": item.mensaje_beneficiario || "",
+      }));
 
-    // Generar el archivo Excel
-    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Pagos Staff");
+      // Generar el archivo Excel
+      const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Pagos Staff");
 
-    const fileName = `NOMINA_PAGOS_AMPOLLETA_${new Date().toISOString().slice(0, 10)}.xlsx`;
-    XLSX.writeFile(workbook, fileName);
+      // Generar buffer y descargar como Blob de forma ultra compatible
+      const excelBuffer = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
+      const blob = new Blob([excelBuffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
 
-    toast.success("¡Nómina de Excel de Pagos descargada con éxito!");
+      const fileName = `NOMINA_PAGOS_AMPOLLETA_${new Date().toISOString().slice(0, 10)}.xlsx`;
+      
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      toast.success("¡Nómina de Excel de Pagos descargada con éxito!");
+    } catch (error) {
+      console.error("Error al exportar Excel:", error);
+      toast.error(`Error al generar Excel: ${error.message || "Error desconocido"}`);
+    }
   };
 
   const uniqueMonths = React.useMemo(() => {

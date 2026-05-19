@@ -316,7 +316,7 @@ export default function TopBar({ user, onToggleMenu }) {
 
         {/* User Profile Mini */}
         <div className="flex items-center gap-3 pl-4 md:pl-6 border-l border-white/10">
-          <div className="flex flex-col items-end hidden sm:flex">
+          <div className="hidden sm:flex flex-col items-end">
             <span className="text-sm font-medium text-white">{user?.name || (user?.systemRole === 'admin' ? 'Administrador' : 'Usuario')}</span>
             <span className="text-xs text-gray-400 capitalize">{user?.role === 'viewer' ? 'Cliente Viewer' : (user?.role || user?.systemRole)}</span>
           </div>

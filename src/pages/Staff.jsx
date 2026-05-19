@@ -227,25 +227,44 @@ export default function Staff() {
   });
 
   const exportToExcel = () => {
-    const dataToExport = filteredStaff.map(member => ({
-      "Nombre": member.name,
-      "RUT": member.rut,
-      "Correo": member.email,
-      "Rol": member.role,
-      "Cuenta Origen": member.cuenta_origen || "",
-      "Moneda Origen": "CLP",
-      "Cuenta destino": member.cuenta_destino || "",
-      "Moneda Destino": "CLP",
-      "Codigo banco destino": member.codigo_banco_destino || "",
-      "Monto Transferencia": member.monto_transferencia || "",
-      "Glosa personalizada transferencia": member.glosa_transferencia || "",
-      "Mensaje corre beneficiario": member.mensaje_beneficiario || "",
-    }));
+    try {
+      const dataToExport = filteredStaff.map(member => ({
+        "Nombre": member.name,
+        "RUT": member.rut,
+        "Correo": member.email,
+        "Rol": member.role,
+        "Cuenta Origen": member.cuenta_origen || "",
+        "Moneda Origen": "CLP",
+        "Cuenta destino": member.cuenta_destino || "",
+        "Moneda Destino": "CLP",
+        "Codigo banco destino": member.codigo_banco_destino || "",
+        "Monto Transferencia": member.monto_transferencia || "",
+        "Glosa personalizada transferencia": member.glosa_transferencia || "",
+        "Mensaje corre beneficiario": member.mensaje_beneficiario || "",
+      }));
 
-    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Pagos Staff");
-    XLSX.writeFile(workbook, "Pagos_Staff.xlsx");
+      const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Pagos Staff");
+
+      // Generar buffer y descargar como Blob de forma ultra compatible
+      const excelBuffer = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
+      const blob = new Blob([excelBuffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "Pagos_Staff.xlsx";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      toast.success("¡Excel de Staff descargado con éxito!");
+    } catch (error) {
+      console.error("Error al exportar Excel de staff:", error);
+      toast.error(`Error al generar Excel: ${error.message || "Error desconocido"}`);
+    }
   };
 
   return (
