@@ -156,7 +156,14 @@ export default function WorkerDashboard({ user }) {
         return true;
       })
       .sort((a, b) => {
-        // Ordenar por proximidad (fecha más cercana primero)
+        const isACompleted = (a.status ? a.status.toLowerCase() : "") === "completado" || (a.status ? a.status.toLowerCase() : "") === "finalizado" || (a.date && new Date(a.date + 'T23:59:59') < now);
+        const isBCompleted = (b.status ? b.status.toLowerCase() : "") === "completado" || (b.status ? b.status.toLowerCase() : "") === "finalizado" || (b.date && new Date(b.date + 'T23:59:59') < now);
+        
+        // Si uno está completado y el otro no, el completado va al final
+        if (isACompleted && !isBCompleted) return 1;
+        if (!isACompleted && isBCompleted) return -1;
+        
+        // Si ambos están en el mismo estado de completación, ordenar por proximidad
         const dateA = new Date(`${a.date}T${a.time || '00:00'}`);
         const dateB = new Date(`${b.date}T${b.time || '00:00'}`);
         return dateA - dateB;
@@ -868,11 +875,19 @@ export default function WorkerDashboard({ user }) {
               const shouldShowSupervisor = !isEventSimpleType && (event.profiles?.name || isPlanPending);
               const shouldShowCallTime = !isWorkerSimpleRole && !isEventSimpleType && (event.call_time || isPlanPending);
 
+              // Determinar si el evento ya está completado/finalizado
+              const eventStatus = event.status ? event.status.toLowerCase() : "";
+              const isFinished = event.date ? new Date(event.date + 'T23:59:59') < new Date() : false;
+              const isEventCompleted = eventStatus === "completado" || eventStatus === "finalizado" || isFinished;
+
               // Dynamic styling based on assignment status
               let glowColor = "border-white/5 hover:border-amber-500/20";
               let statusBadge = "bg-amber-500/20 text-amber-300 border-amber-500/30";
               
-              if (isConfirmed) {
+              if (isEventCompleted) {
+                glowColor = "border-white/5 opacity-60 hover:opacity-95 hover:border-gray-500/30 transition-all duration-300 shadow-[0_0_15px_rgba(255,255,255,0.02)]";
+                statusBadge = "bg-gray-500/20 text-gray-400 border-gray-500/30";
+              } else if (isConfirmed) {
                 glowColor = "border-emerald-500/20 shadow-[0_0_20px_rgba(16,185,129,0.05)] hover:border-emerald-500/40";
                 statusBadge = "bg-emerald-500/20 text-emerald-300 border-emerald-500/30 shadow-[0_0_10px_rgba(16,185,129,0.1)]";
               } else if (isRejected) {
@@ -898,20 +913,24 @@ export default function WorkerDashboard({ user }) {
                   transition={{ duration: 0.2 }}
                   layout
                 >
-                  <GlassCard className={`p-6 border-l-4 ${isConfirmed ? 'border-l-emerald-500' : isRejected ? 'border-l-red-500' : 'border-l-amber-500'} ${glowColor} transition-all duration-300 relative overflow-hidden`}>
+                  <GlassCard className={`p-6 border-l-4 ${isEventCompleted ? 'border-l-gray-500' : isConfirmed ? 'border-l-emerald-500' : isRejected ? 'border-l-red-500' : 'border-l-amber-500'} ${glowColor} transition-all duration-300 relative overflow-hidden`}>
                     
-                    {/* Badge indicador de Planificación Pendiente */}
-                    {isPlanPending && (
+                    {/* Badge indicador de Planificación Pendiente o Completado */}
+                    {isEventCompleted ? (
+                      <div className="absolute top-0 right-0 bg-gray-500/20 border-l border-b border-gray-500/30 text-gray-400 px-3 py-1 rounded-bl-xl text-[9px] font-extrabold uppercase tracking-widest flex items-center gap-1 shadow-sm">
+                        <CheckCircle className="w-3 h-3 text-gray-400" /> Evento Finalizado
+                      </div>
+                    ) : isPlanPending ? (
                       <div className="absolute top-0 right-0 bg-amber-500/20 border-l border-b border-amber-500/30 text-amber-300 px-3 py-1 rounded-bl-xl text-[9px] font-extrabold uppercase tracking-widest animate-pulse">
                         Planificación Pendiente
                       </div>
-                    )}
+                    ) : null}
 
                     <div className="flex flex-col lg:flex-row justify-between gap-6">
                       <div className="flex-1 space-y-4">
                         <div className="flex items-center justify-between flex-wrap gap-2">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <h3 className="text-xl font-bold text-white tracking-wide">{event.name}</h3>
+                            <h3 className={`text-xl font-bold tracking-wide transition-all ${isEventCompleted ? 'text-gray-400 line-through decoration-gray-500/50' : 'text-white'}`}>{event.name}</h3>
                             <span className="text-[10px] px-2 py-0.5 rounded border border-white/10 bg-white/5 text-gray-400 font-semibold uppercase tracking-wider">
                               {event.type || "Producción técnica"}
                             </span>
@@ -924,9 +943,16 @@ export default function WorkerDashboard({ user }) {
                               Prioridad {priorityName}
                             </span>
                           </div>
-                          <span className={`px-3 py-1 rounded-full text-xs font-semibold border capitalize ${statusBadge}`}>
-                            Asistencia: {event.assignment_status}
-                          </span>
+                          <div className="flex items-center gap-2">
+                            <span className={`px-3 py-1 rounded-full text-xs font-semibold border capitalize ${statusBadge}`}>
+                              Asistencia: {event.assignment_status}
+                            </span>
+                            {isEventCompleted && (
+                              <span className="px-3 py-1 rounded-full text-xs font-semibold border bg-gray-500/10 text-gray-400 border-gray-500/20 shadow-inner uppercase tracking-wider text-[10px]">
+                                Finalizado
+                              </span>
+                            )}
+                          </div>
                         </div>
 
                         {/* Grid de Datos Adaptativo */}
