@@ -403,6 +403,35 @@ export default function WorkerDashboard({ user }) {
           }
         }
       )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'event_assignments' },
+        async (payload) => {
+          if (payload.new && payload.new.staff_id === user.id) {
+            console.log("🔔 [REALTIME] - Asignación o Pago actualizado en BD:", payload.new);
+            
+            // Si el estado de pago cambió a "Pagado", notificar
+            if (payload.old && payload.old.payment_status !== "Pagado" && payload.new.payment_status === "Pagado") {
+              toast.success("¡Recibiste un nuevo pago! Revisa tu historial.", {
+                icon: "💰",
+                duration: 5000,
+                style: {
+                  background: 'rgba(16, 185, 129, 0.95)',
+                  color: '#fff',
+                  border: '1px solid rgba(16, 185, 129, 0.3)',
+                  boxShadow: '0 0 20px rgba(16, 185, 129, 0.2)'
+                }
+              });
+              addActivity("Se procesó y liquidó el pago de uno de tus eventos.", "success");
+            } else {
+              toast.success("Información de asignación o pago actualizada", { icon: "🔄" });
+            }
+            
+            // Recargar eventos para refrescar montos y estados en la interfaz
+            fetchMyEvents(user.id);
+          }
+        }
+      )
       .subscribe();
 
     return () => {
@@ -432,6 +461,8 @@ export default function WorkerDashboard({ user }) {
       .select(`
         id,
         status,
+        payment_status,
+        custom_rate,
         event_id,
         events (
           id, name, date, time, location, client, status, description,
@@ -448,6 +479,8 @@ export default function WorkerDashboard({ user }) {
       const formattedEvents = data.map(assignment => ({
         assignment_id: assignment.id,
         assignment_status: assignment.status,
+        payment_status: assignment.payment_status,
+        custom_rate: assignment.custom_rate,
         ...assignment.events
       }));
       setAssignedEvents(formattedEvents);
