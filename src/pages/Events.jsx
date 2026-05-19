@@ -17,6 +17,9 @@ export default function Events({ user }) {
   const [editingEvent, setEditingEvent] = useState(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState(null);
+  
+  const currentMonthValue = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
+  const [selectedMonth, setSelectedMonth] = useState(currentMonthValue);
 
   const handleSearch = (term) => setSearch(term);
   const handleFilter = (status) => setFilter(status);
@@ -199,7 +202,14 @@ export default function Events({ user }) {
   const filteredEvents = events.filter((e) => {
     const matchesSearch = e.name.toLowerCase().includes(search.toLowerCase());
     const matchesFilter = filter ? e.status.toLowerCase() === filter : true;
-    return matchesSearch && matchesFilter;
+    
+    // Filtro por Mes
+    let matchesMonth = true;
+    if (selectedMonth && selectedMonth !== 'all') {
+      matchesMonth = e.date && e.date.startsWith(selectedMonth);
+    }
+    
+    return matchesSearch && matchesFilter && matchesMonth;
   });
 
   const getStatusColor = (status) => {
@@ -220,7 +230,14 @@ export default function Events({ user }) {
 
   return (
     <div className="p-8 min-h-screen text-white relative">
-      <EventToolbar onSearch={handleSearch} onFilter={handleFilter} onAdd={() => openModal()} canCreate={rolePermissions.canCreate} />
+      <EventToolbar 
+        onSearch={handleSearch} 
+        onFilter={handleFilter} 
+        onAdd={() => openModal()} 
+        canCreate={rolePermissions.canCreate} 
+        selectedMonth={selectedMonth} 
+        onMonthChange={setSelectedMonth} 
+      />
       <div className="bg-black/40 backdrop-blur-3xl border border-white/10 rounded-3xl overflow-hidden shadow-[0_8px_32px_0_rgba(0,0,0,0.5)] relative z-10 mt-6">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">

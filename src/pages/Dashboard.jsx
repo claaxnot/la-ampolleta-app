@@ -93,6 +93,8 @@ export default function Dashboard() {
   const totalStaff = staffCount;
 
   const upcomingEvents = events.filter(e => {
+    const statusLower = e.status ? e.status.toLowerCase() : "";
+    if (statusLower === "completado" || statusLower === "finalizado" || statusLower === "cancelado") return false;
     const [eYear, eMonth, eDay] = e.date.split('-').map(Number);
     const eventDate = new Date(eYear, eMonth - 1, eDay);
     const today = new Date();
@@ -106,7 +108,12 @@ export default function Dashboard() {
     { title: "Próximos Eventos", value: upcomingEvents, icon: Zap, color: "bg-amber-500 shadow-[0_0_15px_rgba(245,158,11,0.4)]" },
   ];
 
-  const recentEvents = events.slice(0, 5);
+  const recentEvents = events
+    .filter(e => {
+      const statusLower = e.status ? e.status.toLowerCase() : "";
+      return statusLower !== "completado" && statusLower !== "finalizado" && statusLower !== "cancelado";
+    })
+    .slice(0, 5);
 
   return (
     <motion.div
