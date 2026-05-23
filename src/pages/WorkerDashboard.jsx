@@ -1,22 +1,22 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { 
-  CalendarDays, 
-  Clock, 
-  MapPin, 
-  CheckCircle, 
-  XCircle, 
-  Bell, 
-  Activity, 
-  Sparkles, 
-  Sun, 
+import {
+  CalendarDays,
+  Clock,
+  MapPin,
+  CheckCircle,
+  XCircle,
+  Bell,
+  Activity,
+  Sparkles,
+  Sun,
   Cloud,
   CloudRain,
   CloudSnow,
   CloudLightning,
   CloudFog,
   CloudSun,
-  Info, 
+  Info,
   AlertTriangle,
   Check,
   BellOff,
@@ -38,7 +38,7 @@ import { toast } from "react-hot-toast";
 const getDaysInMonth = (year, month) => new Date(year, month + 1, 0).getDate();
 const getFirstDayOfMonth = (year, month) => {
   let day = new Date(year, month, 1).getDay();
-  return day === 0 ? 6 : day - 1; 
+  return day === 0 ? 6 : day - 1;
 };
 const MONTH_NAMES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
 const DAY_NAMES = ["L", "M", "X", "J", "V", "S", "D"];
@@ -60,7 +60,7 @@ export default function WorkerDashboard({ user }) {
   const [syncingDays, setSyncingDays] = useState({});
   const [currentTime, setCurrentTime] = useState(new Date());
   const [selectedDetailedEvent, setSelectedDetailedEvent] = useState(null);
-  
+
   // Perfil del trabajador para consultar su rol real
   const [workerProfile, setWorkerProfile] = useState(null);
   const [financeMonthFilter, setFinanceMonthFilter] = useState("all");
@@ -73,7 +73,7 @@ export default function WorkerDashboard({ user }) {
       try {
         const ipRes = await fetch("https://ipapi.co/json/");
         const ipData = await ipRes.json();
-        
+
         const city = ipData.city || "Santiago";
         const lat = ipData.latitude || -33.4489;
         const lon = ipData.longitude || -70.6693;
@@ -82,11 +82,11 @@ export default function WorkerDashboard({ user }) {
           `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true`
         );
         const wData = await weatherRes.json();
-        
+
         if (wData && wData.current_weather) {
           const temp = Math.round(wData.current_weather.temperature);
           const weatherCode = wData.current_weather.weathercode;
-          
+
           let icon = "sun";
           if (weatherCode >= 1 && weatherCode <= 3) icon = "cloudy";
           else if (weatherCode >= 45 && weatherCode <= 48) icon = "fog";
@@ -94,7 +94,7 @@ export default function WorkerDashboard({ user }) {
           else if (weatherCode >= 71 && weatherCode <= 77) icon = "snow";
           else if (weatherCode >= 80 && weatherCode <= 82) icon = "rain";
           else if (weatherCode >= 95 && weatherCode <= 99) icon = "storm";
-          
+
           setWeatherData({ temp, city, icon });
         }
       } catch (err) {
@@ -135,34 +135,34 @@ export default function WorkerDashboard({ user }) {
   // 2. Ordena los eventos por proximidad (fecha más cercana primero).
   const displayedEvents = React.useMemo(() => {
     if (!assignedEvents) return [];
-    
+
     const now = new Date();
     const currentYear = now.getFullYear();
     const currentMonthStr = String(now.getMonth() + 1).padStart(2, '0');
     const currentMonthPrefix = `${currentYear}-${currentMonthStr}`; // "YYYY-MM"
-    
+
     return assignedEvents
       .filter(event => {
         const eventStatus = event.status ? event.status.toLowerCase() : "";
         const isFinished = event.date ? new Date(event.date + 'T23:59:59') < now : false;
         const isCompleted = eventStatus === "completado" || eventStatus === "finalizado" || isFinished;
-        
+
         if (isCompleted) {
           // Si está completado, mostrar solo si es del mes actual
           return event.date && event.date.startsWith(currentMonthPrefix);
         }
-        
+
         // Si está activo (futuro o en progreso), mostrar siempre
         return true;
       })
       .sort((a, b) => {
         const isACompleted = (a.status ? a.status.toLowerCase() : "") === "completado" || (a.status ? a.status.toLowerCase() : "") === "finalizado" || (a.date && new Date(a.date + 'T23:59:59') < now);
         const isBCompleted = (b.status ? b.status.toLowerCase() : "") === "completado" || (b.status ? b.status.toLowerCase() : "") === "finalizado" || (b.date && new Date(b.date + 'T23:59:59') < now);
-        
+
         // Si uno está completado y el otro no, el completado va al final
         if (isACompleted && !isBCompleted) return 1;
         if (!isACompleted && isBCompleted) return -1;
-        
+
         // Si ambos están en el mismo estado de completación, ordenar por proximidad
         const dateA = new Date(`${a.date}T${a.time || '00:00'}`);
         const dateB = new Date(`${b.date}T${b.time || '00:00'}`);
@@ -216,7 +216,7 @@ export default function WorkerDashboard({ user }) {
     const date = new Date(dateString);
     const now = new Date();
     const diffInSeconds = Math.floor((now - date) / 1000);
-    
+
     if (diffInSeconds < 60) return `Hace unos segundos`;
     if (diffInSeconds < 3600) return `Hace ${Math.floor(diffInSeconds / 60)} min`;
     if (diffInSeconds < 86400) return `Hace ${Math.floor(diffInSeconds / 3600)} horas`;
@@ -229,16 +229,16 @@ export default function WorkerDashboard({ user }) {
 
   const generateDynamicNotifications = (eventsList) => {
     if (!eventsList || eventsList.length === 0) return [];
-    
+
     const list = [];
     eventsList.forEach(e => {
       const isPending = e.assignment_status === "Pendiente";
-      
+
       // 1. Notificación de Asignación
       list.push({
         id: `assign-${e.assignment_id}`,
         title: isPending ? "📅 Nueva Asignación de Evento" : "✅ Asistencia Confirmada",
-        desc: isPending 
+        desc: isPending
           ? `Has sido asignado para el evento "${e.name}" el ${e.date}. Por favor responde a la citación.`
           : `Confirmaste tu asistencia para el evento "${e.name}" el ${e.date}.`,
         type: isPending ? "warning" : "info",
@@ -293,7 +293,7 @@ export default function WorkerDashboard({ user }) {
         .select('*')
         .eq('user_id', workerId)
         .order('created_at', { ascending: false });
-      
+
       if (error) {
         console.warn("⚠️ [NOTIFICATIONS TABLE]: La tabla no existe o error en consulta, usando notificaciones dinámicas reales.");
         setNotifications(generateDynamicNotifications(currentEventsList));
@@ -316,7 +316,7 @@ export default function WorkerDashboard({ user }) {
       setNotifications(generateDynamicNotifications(currentEventsList));
     }
   };
-  
+
   // Real-time Activity Feed state
   const [activities, setActivities] = useState([
     { id: 1, text: "Sistema operativo inicializado correctamente.", type: "system", time: "Hace unos minutos" },
@@ -333,7 +333,7 @@ export default function WorkerDashboard({ user }) {
   const markAsRead = async (id) => {
     setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
     toast.success("Notificación marcada como leída", { duration: 1500 });
-    
+
     if (typeof id === 'string') {
       try {
         await supabase
@@ -349,7 +349,7 @@ export default function WorkerDashboard({ user }) {
   const markAllAsRead = async () => {
     setNotifications(prev => prev.map(n => ({ ...n, read: true })));
     toast.success("Todas las notificaciones leídas", { duration: 1500 });
-    
+
     if (user?.id) {
       try {
         await supabase
@@ -375,7 +375,7 @@ export default function WorkerDashboard({ user }) {
     if (user?.id) {
       fetchMyEvents(user.id);
       fetchMyAvailability(user.id);
-      
+
       // Cargar perfil real del trabajador
       supabase.from('profiles').select('*').eq('id', user.id).single().then(({ data }) => {
         if (data) {
@@ -451,13 +451,13 @@ export default function WorkerDashboard({ user }) {
         { event: 'UPDATE', schema: 'public', table: 'events' },
         async (payload) => {
           const updatedEvent = payload.new;
-          
+
           // Verificar si el trabajador está asignado a este evento actualizado
           const isAssigned = assignedEvents.some(e => e.id === updatedEvent.id);
           if (isAssigned) {
             console.log("🔔 [REALTIME] - Evento asignado actualizado en BD:", updatedEvent);
             const oldEvent = assignedEvents.find(e => e.id === updatedEvent.id);
-            
+
             const newNotifs = [];
             let changesText = [];
 
@@ -501,7 +501,7 @@ export default function WorkerDashboard({ user }) {
             if (newNotifs.length > 0) {
               setNotifications(prev => [...newNotifs, ...prev]);
               addActivity(`Se actualizó la información de tu evento: "${updatedEvent.name}" (${changesText.join(", ")}).`, "event");
-              
+
               toast.success(`¡Tu evento "${updatedEvent.name}" fue actualizado!`, {
                 icon: "🔔",
                 duration: 5000,
@@ -528,7 +528,7 @@ export default function WorkerDashboard({ user }) {
         async (payload) => {
           if (payload.new && payload.new.staff_id === user.id) {
             console.log("🔔 [REALTIME] - Asignación o Pago actualizado en BD:", payload.new);
-            
+
             // Si el estado de pago cambió a "Pagado", notificar
             if (payload.old && payload.old.payment_status !== "Pagado" && payload.new.payment_status === "Pagado") {
               toast.success("¡Recibiste un nuevo pago! Revisa tu historial.", {
@@ -545,7 +545,7 @@ export default function WorkerDashboard({ user }) {
             } else {
               toast.success("Información de asignación o pago actualizada", { icon: "🔄" });
             }
-            
+
             // Recargar eventos para refrescar montos y estados en la interfaz
             fetchMyEvents(user.id);
           }
@@ -563,7 +563,7 @@ export default function WorkerDashboard({ user }) {
       .from('staff_availability')
       .select('date, status')
       .eq('staff_id', workerId);
-      
+
     if (data) {
       const availObj = {};
       data.forEach(item => {
@@ -593,7 +593,7 @@ export default function WorkerDashboard({ user }) {
         )
       `)
       .eq('staff_id', workerId);
-      
+
     if (data) {
       const formattedEvents = data.map(assignment => ({
         assignment_id: assignment.id,
@@ -662,7 +662,7 @@ export default function WorkerDashboard({ user }) {
           date: dateStr,
           status: nextStatus
         }, { onConflict: 'staff_id, date' });
-        
+
         addActivity(
           `Marcaste el ${d}/${m} como ${nextStatus === "available" ? "Disponible" : "No disponible"}`,
           nextStatus === "available" ? "success" : "warning"
@@ -694,12 +694,12 @@ export default function WorkerDashboard({ user }) {
       .from('event_assignments')
       .update({ status: newStatus })
       .eq('id', assignmentId);
-    
+
     if (!error) {
       const eventInfo = assignedEvents.find(e => e.assignment_id === assignmentId);
       addActivity(`Cambiaste tu estado en "${eventInfo?.name || 'Evento'}" a ${newStatus}`, newStatus === "Confirmado" ? "success" : "danger");
       toast.success(`Asistencia marcada como: ${newStatus}`);
-      
+
       // Crear notificación física de confirmación/rechazo para el trabajador
       try {
         await supabase.from('notifications').insert({
@@ -711,7 +711,7 @@ export default function WorkerDashboard({ user }) {
       } catch (err) {
         console.warn("⚠️ [NOTIFICATIONS TABLE]: La tabla notifications no existe aún.");
       }
-      
+
       fetchMyEvents(user.id);
     } else {
       toast.error("Error al actualizar la asistencia.");
@@ -731,7 +731,7 @@ export default function WorkerDashboard({ user }) {
       .sort((a, b) => new Date(`${a.date}T${a.time || '00:00'}`) - new Date(`${b.date}T${b.time || '00:00'}`));
     return sortedFuture[0] || null;
   };
-  
+
   const nextEvent = getNextEvent();
 
   const getCountdownString = () => {
@@ -740,12 +740,12 @@ export default function WorkerDashboard({ user }) {
     const evDate = new Date(`${nextEvent.date}T${nextEvent.time || '00:00'}`);
     const diffMs = evDate - now;
     if (diffMs <= 0) return "¡Evento iniciado!";
-    
+
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
     const diffHrs = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
     const diffMins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
     const diffSecs = Math.floor((diffMs % (1000 * 60)) / 1000);
-    
+
     if (diffDays > 0) {
       return `${diffDays}d ${diffHrs}h ${diffMins}m`;
     }
@@ -757,7 +757,7 @@ export default function WorkerDashboard({ user }) {
   const isWorkerSimpleRole = workerRoleName.includes("anfitriona") || workerRoleName.includes("promotora") || workerRoleName.includes("modelo");
 
   return (
-    <motion.div 
+    <motion.div
       className="p-6 lg:p-8 min-h-[calc(100vh-64px)] relative overflow-hidden"
       variants={containerVariants}
       initial="hidden"
@@ -768,7 +768,7 @@ export default function WorkerDashboard({ user }) {
       <div className="absolute bottom-10 left-10 w-[400px] h-[400px] bg-emerald-500/5 rounded-full blur-[100px] pointer-events-none" />
 
       {/* Hero Section */}
-      <motion.div 
+      <motion.div
         variants={itemVariants}
         className="relative overflow-hidden rounded-3xl p-6 lg:p-8 bg-gradient-to-br from-gray-900/90 via-gray-900 to-amber-950/20 border border-white/5 mb-8 shadow-2xl backdrop-blur-md"
       >
@@ -787,7 +787,7 @@ export default function WorkerDashboard({ user }) {
                 {weatherData.temp}° · {weatherData.city}
               </span>
             </div>
-            
+
             <h1 className="text-3xl lg:text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-white via-gray-200 to-amber-400 tracking-tight">
               Hola, {user?.name || "Trabajador"}
             </h1>
@@ -814,28 +814,26 @@ export default function WorkerDashboard({ user }) {
       </motion.div>
 
       {/* Selector de Pestañas Premium (Visible solo en móviles/tablets) */}
-      <motion.div 
+      <motion.div
         variants={itemVariants}
         className="flex md:hidden items-center gap-2 bg-gray-900/60 p-1.5 rounded-2xl border border-white/5 mb-6 backdrop-blur-sm max-w-md relative z-10"
       >
         <button
           onClick={() => setActiveSubTab("dashboard")}
-          className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-sm font-bold transition-all duration-300 ${
-            activeSubTab === "dashboard"
+          className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-sm font-bold transition-all duration-300 ${activeSubTab === "dashboard"
               ? "bg-amber-500/20 text-amber-300 border border-amber-500/30 shadow-[0_0_12px_rgba(245,158,11,0.15)]"
               : "text-gray-400 hover:bg-white/5 hover:text-gray-200"
-          }`}
+            }`}
         >
           <CalendarDays className="w-4 h-4" />
-          Dashboard Principal
+          Menu Principal
         </button>
         <button
           onClick={() => setActiveSubTab("finanzas")}
-          className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-sm font-bold transition-all duration-300 ${
-            activeSubTab === "finanzas"
+          className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-sm font-bold transition-all duration-300 ${activeSubTab === "finanzas"
               ? "bg-amber-500/20 text-amber-300 border border-amber-500/30 shadow-[0_0_12px_rgba(245,158,11,0.15)]"
               : "text-gray-400 hover:bg-white/5 hover:text-gray-200"
-          }`}
+            }`}
         >
           <DollarSign className="w-4 h-4" />
           Finanzas y Mis Datos
@@ -844,485 +842,479 @@ export default function WorkerDashboard({ user }) {
 
       {activeSubTab === "dashboard" && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 relative z-10">
-        
-        {/* Mis Asignaciones (Left Side) */}
-        <motion.section variants={itemVariants} className="lg:col-span-2 flex flex-col gap-5">
-          <h2 className="text-xl font-bold text-white flex items-center gap-2 mb-1">
-            <CalendarDays className="w-5.5 h-5.5 text-amber-400" />
-            Mis Próximos Eventos
-          </h2>
-          
-          {isLoading ? (
-            <GlassCard className="p-12 text-center text-gray-400 border border-white/5">
-              <svg className="animate-spin h-8 w-8 text-amber-400 mx-auto mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
-              <p className="font-semibold text-sm">Cargando próximos eventos...</p>
-            </GlassCard>
-          ) : displayedEvents.length === 0 ? (
-            <GlassCard className="p-12 text-center text-gray-400 border border-white/5">
-              <CalendarDays className="w-12 h-12 text-gray-600 mx-auto mb-3" />
-              <p className="font-semibold">No tienes eventos asignados por el momento.</p>
-              <p className="text-xs text-gray-500 mt-1">Cuando seas asignado a una producción, aparecerá aquí.</p>
-            </GlassCard>
-          ) : (
-            displayedEvents.map(event => {
-              const isPending = event.assignment_status === 'Pendiente';
-              const isConfirmed = event.assignment_status === 'Confirmado';
-              const isRejected = event.assignment_status === 'Rechazado';
 
-              const isEventSimpleType = event.type === "Anfitrionas" || event.type === "Promotoría";
-              
-              // Planificación Técnica / Operacional Pendiente
-              const isPlanPending = event.operational_info_pending ?? false;
+          {/* Mis Asignaciones (Left Side) */}
+          <motion.section variants={itemVariants} className="lg:col-span-2 flex flex-col gap-5">
+            <h2 className="text-xl font-bold text-white flex items-center gap-2 mb-1">
+              <CalendarDays className="w-5.5 h-5.5 text-amber-400" />
+              Mis Próximos Eventos
+            </h2>
 
-              // Decidir si mostrar el bloque operacional o el timeline técnico en el dashboard
-              const shouldShowOperationalSection = 
-                !isWorkerSimpleRole && 
-                !isEventSimpleType && 
-                (isPlanPending || event.setup_time || event.call_time || event.end_time);
+            {isLoading ? (
+              <GlassCard className="p-12 text-center text-gray-400 border border-white/5">
+                <svg className="animate-spin h-8 w-8 text-amber-400 mx-auto mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <p className="font-semibold text-sm">Cargando próximos eventos...</p>
+              </GlassCard>
+            ) : displayedEvents.length === 0 ? (
+              <GlassCard className="p-12 text-center text-gray-400 border border-white/5">
+                <CalendarDays className="w-12 h-12 text-gray-600 mx-auto mb-3" />
+                <p className="font-semibold">No tienes eventos asignados por el momento.</p>
+                <p className="text-xs text-gray-500 mt-1">Cuando seas asignado a una producción, aparecerá aquí.</p>
+              </GlassCard>
+            ) : (
+              displayedEvents.map(event => {
+                const isPending = event.assignment_status === 'Pendiente';
+                const isConfirmed = event.assignment_status === 'Confirmado';
+                const isRejected = event.assignment_status === 'Rechazado';
 
-              // Decidir si mostrar supervisor y citación
-              const shouldShowSupervisor = !isEventSimpleType && (event.profiles?.name || isPlanPending);
-              const shouldShowCallTime = !isWorkerSimpleRole && !isEventSimpleType && (event.call_time || isPlanPending);
+                const isEventSimpleType = event.type === "Anfitrionas" || event.type === "Promotoría";
 
-              // Determinar si el evento ya está completado/finalizado
-              const eventStatus = event.status ? event.status.toLowerCase() : "";
-              const isFinished = event.date ? new Date(event.date + 'T23:59:59') < new Date() : false;
-              const isEventCompleted = eventStatus === "completado" || eventStatus === "finalizado" || isFinished;
+                // Planificación Técnica / Operacional Pendiente
+                const isPlanPending = event.operational_info_pending ?? false;
 
-              // Dynamic styling based on assignment status
-              let glowColor = "border-white/5 hover:border-amber-500/20";
-              let statusBadge = "bg-amber-500/20 text-amber-300 border-amber-500/30";
-              
-              if (isEventCompleted) {
-                glowColor = "border-white/5 opacity-60 hover:opacity-95 hover:border-gray-500/30 transition-all duration-300 shadow-[0_0_15px_rgba(255,255,255,0.02)]";
-                statusBadge = "bg-gray-500/20 text-gray-400 border-gray-500/30";
-              } else if (isConfirmed) {
-                glowColor = "border-emerald-500/20 shadow-[0_0_20px_rgba(16,185,129,0.05)] hover:border-emerald-500/40";
-                statusBadge = "bg-emerald-500/20 text-emerald-300 border-emerald-500/30 shadow-[0_0_10px_rgba(16,185,129,0.1)]";
-              } else if (isRejected) {
-                glowColor = "border-red-500/20 shadow-[0_0_20px_rgba(239,68,68,0.05)] hover:border-red-500/40";
-                statusBadge = "bg-red-500/20 text-red-300 border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.1)]";
-              }
+                // Decidir si mostrar el bloque operacional o el timeline técnico en el dashboard
+                const shouldShowOperationalSection =
+                  !isWorkerSimpleRole &&
+                  !isEventSimpleType &&
+                  (isPlanPending || event.setup_time || event.call_time || event.end_time);
 
-              // Real presentation time and supervisor name from DB
-              const presentationTime = event.call_time 
-                ? `${event.call_time.slice(0, 5)} hrs` 
-                : (isPlanPending ? 'Por definir' : null);
+                // Decidir si mostrar supervisor y citación
+                const shouldShowSupervisor = !isEventSimpleType && (event.profiles?.name || isPlanPending);
+                const shouldShowCallTime = !isWorkerSimpleRole && !isEventSimpleType && (event.call_time || isPlanPending);
 
-              const supervisorName = event.profiles?.name 
-                ? event.profiles.name 
-                : (isPlanPending ? 'Por definir' : null);
+                // Determinar si el evento ya está completado/finalizado
+                const eventStatus = event.status ? event.status.toLowerCase() : "";
+                const isFinished = event.date ? new Date(event.date + 'T23:59:59') < new Date() : false;
+                const isEventCompleted = eventStatus === "completado" || eventStatus === "finalizado" || isFinished;
 
-              const priorityName = event.priority || 'Media';
+                // Dynamic styling based on assignment status
+                let glowColor = "border-white/5 hover:border-amber-500/20";
+                let statusBadge = "bg-amber-500/20 text-amber-300 border-amber-500/30";
 
-              return (
-                <motion.div
-                  key={event.id}
-                  whileHover={{ y: -4, scale: 1.01 }}
-                  transition={{ duration: 0.2 }}
-                  layout
-                >
-                  <GlassCard className={`p-6 border-l-4 ${isEventCompleted ? 'border-l-gray-500' : isConfirmed ? 'border-l-emerald-500' : isRejected ? 'border-l-red-500' : 'border-l-amber-500'} ${glowColor} transition-all duration-300 relative overflow-hidden`}>
-                    
-                    {/* Badge indicador de Planificación Pendiente o Completado */}
-                    {isEventCompleted ? (
-                      <div className="absolute top-0 right-0 bg-gray-500/20 border-l border-b border-gray-500/30 text-gray-400 px-3 py-1 rounded-bl-xl text-[9px] font-extrabold uppercase tracking-widest flex items-center gap-1 shadow-sm">
-                        <CheckCircle className="w-3 h-3 text-gray-400" /> Evento Finalizado
-                      </div>
-                    ) : isPlanPending ? (
-                      <div className="absolute top-0 right-0 bg-amber-500/20 border-l border-b border-amber-500/30 text-amber-300 px-3 py-1 rounded-bl-xl text-[9px] font-extrabold uppercase tracking-widest animate-pulse">
-                        Planificación Pendiente
-                      </div>
-                    ) : null}
+                if (isEventCompleted) {
+                  glowColor = "border-white/5 opacity-60 hover:opacity-95 hover:border-gray-500/30 transition-all duration-300 shadow-[0_0_15px_rgba(255,255,255,0.02)]";
+                  statusBadge = "bg-gray-500/20 text-gray-400 border-gray-500/30";
+                } else if (isConfirmed) {
+                  glowColor = "border-emerald-500/20 shadow-[0_0_20px_rgba(16,185,129,0.05)] hover:border-emerald-500/40";
+                  statusBadge = "bg-emerald-500/20 text-emerald-300 border-emerald-500/30 shadow-[0_0_10px_rgba(16,185,129,0.1)]";
+                } else if (isRejected) {
+                  glowColor = "border-red-500/20 shadow-[0_0_20px_rgba(239,68,68,0.05)] hover:border-red-500/40";
+                  statusBadge = "bg-red-500/20 text-red-300 border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.1)]";
+                }
 
-                    <div className="flex flex-col lg:flex-row justify-between gap-6">
-                      <div className="flex-1 space-y-4">
-                        <div className="flex items-center justify-between flex-wrap gap-2">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <h3 className={`text-xl font-bold tracking-wide transition-all ${isEventCompleted ? 'text-gray-400 line-through decoration-gray-500/50' : 'text-white'}`}>{event.name}</h3>
-                            <span className="text-[10px] px-2 py-0.5 rounded border border-white/10 bg-white/5 text-gray-400 font-semibold uppercase tracking-wider">
-                              {event.type || "Producción técnica"}
-                            </span>
-                            <span className={`text-[10px] px-2 py-0.5 rounded border font-semibold ${
-                              priorityName === "Crítica" ? "bg-red-500/20 text-red-300 border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.1)]" :
-                              priorityName === "Alta" ? "bg-amber-500/20 text-amber-300 border-amber-500/30" :
-                              priorityName === "Media" ? "bg-blue-500/20 text-blue-300 border-blue-500/30" :
-                              "bg-gray-500/20 text-gray-400 border-gray-500/30"
-                            }`}>
-                              Prioridad {priorityName}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <span className={`px-3 py-1 rounded-full text-xs font-semibold border capitalize ${statusBadge}`}>
-                              Asistencia: {event.assignment_status}
-                            </span>
-                            {isEventCompleted && (
-                              <span className="px-3 py-1 rounded-full text-xs font-semibold border bg-gray-500/10 text-gray-400 border-gray-500/20 shadow-inner uppercase tracking-wider text-[10px]">
-                                Finalizado
+                // Real presentation time and supervisor name from DB
+                const presentationTime = event.call_time
+                  ? `${event.call_time.slice(0, 5)} hrs`
+                  : (isPlanPending ? 'Por definir' : null);
+
+                const supervisorName = event.profiles?.name
+                  ? event.profiles.name
+                  : (isPlanPending ? 'Por definir' : null);
+
+                const priorityName = event.priority || 'Media';
+
+                return (
+                  <motion.div
+                    key={event.id}
+                    whileHover={{ y: -4, scale: 1.01 }}
+                    transition={{ duration: 0.2 }}
+                    layout
+                  >
+                    <GlassCard className={`p-6 border-l-4 ${isEventCompleted ? 'border-l-gray-500' : isConfirmed ? 'border-l-emerald-500' : isRejected ? 'border-l-red-500' : 'border-l-amber-500'} ${glowColor} transition-all duration-300 relative overflow-hidden`}>
+
+                      {/* Badge indicador de Planificación Pendiente o Completado */}
+                      {isEventCompleted ? (
+                        <div className="absolute top-0 right-0 bg-gray-500/20 border-l border-b border-gray-500/30 text-gray-400 px-3 py-1 rounded-bl-xl text-[9px] font-extrabold uppercase tracking-widest flex items-center gap-1 shadow-sm">
+                          <CheckCircle className="w-3 h-3 text-gray-400" /> Evento Finalizado
+                        </div>
+                      ) : isPlanPending ? (
+                        <div className="absolute top-0 right-0 bg-amber-500/20 border-l border-b border-amber-500/30 text-amber-300 px-3 py-1 rounded-bl-xl text-[9px] font-extrabold uppercase tracking-widest animate-pulse">
+                          Planificación Pendiente
+                        </div>
+                      ) : null}
+
+                      <div className="flex flex-col lg:flex-row justify-between gap-6">
+                        <div className="flex-1 space-y-4">
+                          <div className="flex items-center justify-between flex-wrap gap-2">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h3 className={`text-xl font-bold tracking-wide transition-all ${isEventCompleted ? 'text-gray-400 line-through decoration-gray-500/50' : 'text-white'}`}>{event.name}</h3>
+                              <span className="text-[10px] px-2 py-0.5 rounded border border-white/10 bg-white/5 text-gray-400 font-semibold uppercase tracking-wider">
+                                {event.type || "Producción técnica"}
                               </span>
+                              <span className={`text-[10px] px-2 py-0.5 rounded border font-semibold ${priorityName === "Crítica" ? "bg-red-500/20 text-red-300 border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.1)]" :
+                                  priorityName === "Alta" ? "bg-amber-500/20 text-amber-300 border-amber-500/30" :
+                                    priorityName === "Media" ? "bg-blue-500/20 text-blue-300 border-blue-500/30" :
+                                      "bg-gray-500/20 text-gray-400 border-gray-500/30"
+                                }`}>
+                                Prioridad {priorityName}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className={`px-3 py-1 rounded-full text-xs font-semibold border capitalize ${statusBadge}`}>
+                                Asistencia: {event.assignment_status}
+                              </span>
+                              {isEventCompleted && (
+                                <span className="px-3 py-1 rounded-full text-xs font-semibold border bg-gray-500/10 text-gray-400 border-gray-500/20 shadow-inner uppercase tracking-wider text-[10px]">
+                                  Finalizado
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Grid de Datos Adaptativo */}
+                          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm text-gray-300 bg-black/40 p-4 rounded-2xl border border-white/5 shadow-inner">
+                            <div className="flex flex-col gap-0.5">
+                              <span className="text-[10px] text-gray-500 uppercase tracking-wider font-extrabold">Fecha</span>
+                              <span className="flex items-center gap-1.5 font-semibold text-gray-100">
+                                <CalendarDays className="w-4 h-4 text-amber-400" />
+                                {event.date.split('-').reverse().join('/')}
+                              </span>
+                            </div>
+
+                            <div className="flex flex-col gap-0.5">
+                              <span className="text-[10px] text-gray-500 uppercase tracking-wider font-extrabold">Recinto</span>
+                              <span className="flex items-center gap-1.5 font-semibold text-gray-100 truncate">
+                                <MapPin className="w-4 h-4 text-amber-400" />
+                                {event.location}
+                              </span>
+                            </div>
+
+                            <div className="flex flex-col gap-0.5">
+                              <span className="text-[10px] text-gray-500 uppercase tracking-wider font-extrabold">Showtime</span>
+                              <span className="flex items-center gap-1.5 font-semibold text-gray-100">
+                                🎬 {event.time ? event.time.slice(0, 5) : 'Por definir'}
+                              </span>
+                            </div>
+
+                            <div className="flex flex-col gap-0.5">
+                              <span className="text-[10px] text-gray-500 uppercase tracking-wider font-extrabold">Tu Rol</span>
+                              <span className="flex items-center gap-1.5 font-semibold text-gray-100 capitalize">
+                                🛠️ {workerProfile?.role || user?.role || "Staff"}
+                              </span>
+                            </div>
+
+                            {shouldShowCallTime && presentationTime && (
+                              <div className="flex flex-col gap-0.5">
+                                <span className="text-[10px] text-gray-500 uppercase tracking-wider font-extrabold">Presentación</span>
+                                <span className={`flex items-center gap-1.5 font-semibold ${presentationTime === "Por definir" ? "text-amber-500/50 italic animate-pulse" : "text-amber-300"}`}>
+                                  <Clock className="w-4 h-4 text-amber-400" />
+                                  {presentationTime}
+                                </span>
+                              </div>
+                            )}
+
+                            {shouldShowSupervisor && supervisorName && (
+                              <div className="flex flex-col gap-0.5">
+                                <span className="text-[10px] text-gray-500 uppercase tracking-wider font-extrabold">Supervisor</span>
+                                <span className={`flex items-center gap-1.5 font-semibold ${supervisorName === "Por definir" ? "text-gray-500 italic animate-pulse" : "text-gray-100 truncate"}`}>
+                                  👤 {supervisorName}
+                                </span>
+                              </div>
                             )}
                           </div>
-                        </div>
 
-                        {/* Grid de Datos Adaptativo */}
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm text-gray-300 bg-black/40 p-4 rounded-2xl border border-white/5 shadow-inner">
-                          <div className="flex flex-col gap-0.5">
-                            <span className="text-[10px] text-gray-500 uppercase tracking-wider font-extrabold">Fecha</span>
-                            <span className="flex items-center gap-1.5 font-semibold text-gray-100">
-                              <CalendarDays className="w-4 h-4 text-amber-400" /> 
-                              {event.date.split('-').reverse().join('/')}
-                            </span>
-                          </div>
-                          
-                          <div className="flex flex-col gap-0.5">
-                            <span className="text-[10px] text-gray-500 uppercase tracking-wider font-extrabold">Recinto</span>
-                            <span className="flex items-center gap-1.5 font-semibold text-gray-100 truncate">
-                              <MapPin className="w-4 h-4 text-amber-400" /> 
-                              {event.location}
-                            </span>
-                          </div>
-
-                          <div className="flex flex-col gap-0.5">
-                            <span className="text-[10px] text-gray-500 uppercase tracking-wider font-extrabold">Showtime</span>
-                            <span className="flex items-center gap-1.5 font-semibold text-gray-100">
-                              🎬 {event.time ? event.time.slice(0, 5) : 'Por definir'}
-                            </span>
-                          </div>
-
-                          <div className="flex flex-col gap-0.5">
-                            <span className="text-[10px] text-gray-500 uppercase tracking-wider font-extrabold">Tu Rol</span>
-                            <span className="flex items-center gap-1.5 font-semibold text-gray-100 capitalize">
-                              🛠️ {workerProfile?.role || user?.role || "Staff"}
-                            </span>
-                          </div>
-
-                          {shouldShowCallTime && presentationTime && (
-                            <div className="flex flex-col gap-0.5">
-                              <span className="text-[10px] text-gray-500 uppercase tracking-wider font-extrabold">Presentación</span>
-                              <span className={`flex items-center gap-1.5 font-semibold ${presentationTime === "Por definir" ? "text-amber-500/50 italic animate-pulse" : "text-amber-300"}`}>
-                                <Clock className="w-4 h-4 text-amber-400" /> 
-                                {presentationTime}
-                              </span>
-                            </div>
-                          )}
-
-                          {shouldShowSupervisor && supervisorName && (
-                            <div className="flex flex-col gap-0.5">
-                              <span className="text-[10px] text-gray-500 uppercase tracking-wider font-extrabold">Supervisor</span>
-                              <span className={`flex items-center gap-1.5 font-semibold ${supervisorName === "Por definir" ? "text-gray-500 italic animate-pulse" : "text-gray-100 truncate"}`}>
-                                👤 {supervisorName}
-                              </span>
+                          {/* Notas operativas si existen */}
+                          {event.operational_notes && (
+                            <div className="text-xs bg-amber-500/5 text-amber-300 border border-amber-500/10 p-3 rounded-xl leading-relaxed">
+                              <strong>⚠️ Notas de Operación:</strong> {event.operational_notes}
                             </div>
                           )}
                         </div>
 
-                        {/* Notas operativas si existen */}
-                        {event.operational_notes && (
-                          <div className="text-xs bg-amber-500/5 text-amber-300 border border-amber-500/10 p-3 rounded-xl leading-relaxed">
-                            <strong>⚠️ Notas de Operación:</strong> {event.operational_notes}
-                          </div>
-                        )}
+                        <div className="flex flex-row lg:flex-col justify-end items-center gap-3 mt-4 lg:mt-0 lg:self-center w-full lg:w-auto">
+                          {!isEventCompleted && isPending && (
+                            <>
+                              <motion.button
+                                whileHover={{ scale: 1.03 }}
+                                whileTap={{ scale: 0.97 }}
+                                onClick={() => handleStatusChange(event.assignment_id, 'Confirmado')}
+                                className="flex items-center justify-center gap-2 px-5 py-2.5 bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500 hover:text-gray-900 rounded-xl transition-all duration-300 border border-emerald-500/50 shadow-md font-bold text-sm w-full lg:w-44"
+                              >
+                                <CheckCircle className="w-4 h-4" /> Confirmar
+                              </motion.button>
+                              <motion.button
+                                whileHover={{ scale: 1.03 }}
+                                whileTap={{ scale: 0.97 }}
+                                onClick={() => handleStatusChange(event.assignment_id, 'Rechazado')}
+                                className="flex items-center justify-center gap-2 px-5 py-2.5 bg-red-500/20 text-red-300 hover:bg-red-500 hover:text-white rounded-xl transition-all duration-300 border border-red-500/50 shadow-md font-bold text-sm w-full lg:w-44"
+                              >
+                                <XCircle className="w-4 h-4" /> Rechazar
+                              </motion.button>
+                            </>
+                          )}
+
+                          {!isEventCompleted && isConfirmed && (
+                            <div className="flex flex-col gap-2 w-full lg:w-44">
+                              <span className="flex items-center justify-center gap-1.5 px-4 py-2.5 bg-emerald-500/10 text-emerald-400 rounded-xl border border-emerald-500/30 font-bold text-sm shadow-inner text-center">
+                                ✓ Confirmada
+                              </span>
+                              <motion.button
+                                whileTap={{ scale: 0.95 }}
+                                onClick={() => handleStatusChange(event.assignment_id, 'Rechazado')}
+                                className="text-xs text-red-400 hover:text-red-300 transition-colors py-1 hover:underline text-center"
+                              >
+                                Cancelar Asistencia
+                              </motion.button>
+                            </div>
+                          )}
+
+                          {!isEventCompleted && isRejected && (
+                            <div className="flex flex-col gap-2 w-full lg:w-44">
+                              <span className="flex items-center justify-center gap-1.5 px-4 py-2.5 bg-red-500/10 text-red-400 rounded-xl border border-red-500/30 font-bold text-sm shadow-inner text-center">
+                                ✗ Rechazado
+                              </span>
+                              <motion.button
+                                whileTap={{ scale: 0.95 }}
+                                onClick={() => handleStatusChange(event.assignment_id, 'Confirmado')}
+                                className="text-xs text-emerald-400 hover:text-emerald-300 transition-colors py-1 hover:underline text-center"
+                              >
+                                Cambiar a Confirmado
+                              </motion.button>
+                            </div>
+                          )}
+
+                          {isEventCompleted && (
+                            <div className="flex flex-col gap-1 w-full lg:w-44">
+                              <span className={`flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl border font-extrabold text-xs shadow-inner text-center tracking-wide ${isConfirmed ? 'bg-emerald-500/5 text-emerald-400/60 border-emerald-500/10' :
+                                  isRejected ? 'bg-red-500/5 text-red-400/60 border-red-500/10' :
+                                    'bg-gray-500/5 text-gray-400/60 border-gray-500/10'
+                                }`}>
+                                {isConfirmed ? '✓ Asistió' : isRejected ? '✗ No Asistió' : 'Sin respuesta'}
+                              </span>
+                            </div>
+                          )}
+
+                          <motion.button
+                            whileHover={{ scale: 1.03 }}
+                            whileTap={{ scale: 0.97 }}
+                            onClick={() => setSelectedDetailedEvent(event)}
+                            className="flex items-center justify-center gap-1.5 px-5 py-2.5 bg-white/5 text-gray-300 hover:bg-white/10 rounded-xl border border-white/10 text-sm font-semibold transition-all duration-300 w-full lg:w-44"
+                          >
+                            Ver detalles
+                          </motion.button>
+                        </div>
                       </div>
 
-                      <div className="flex flex-row lg:flex-col justify-end items-center gap-3 mt-4 lg:mt-0 lg:self-center w-full lg:w-auto">
-                        {!isEventCompleted && isPending && (
-                          <>
-                            <motion.button 
-                              whileHover={{ scale: 1.03 }}
-                              whileTap={{ scale: 0.97 }}
-                              onClick={() => handleStatusChange(event.assignment_id, 'Confirmado')}
-                              className="flex items-center justify-center gap-2 px-5 py-2.5 bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500 hover:text-gray-900 rounded-xl transition-all duration-300 border border-emerald-500/50 shadow-md font-bold text-sm w-full lg:w-44"
-                            >
-                              <CheckCircle className="w-4 h-4" /> Confirmar
-                            </motion.button>
-                            <motion.button 
-                              whileHover={{ scale: 1.03 }}
-                              whileTap={{ scale: 0.97 }}
-                              onClick={() => handleStatusChange(event.assignment_id, 'Rechazado')}
-                              className="flex items-center justify-center gap-2 px-5 py-2.5 bg-red-500/20 text-red-300 hover:bg-red-500 hover:text-white rounded-xl transition-all duration-300 border border-red-500/50 shadow-md font-bold text-sm w-full lg:w-44"
-                            >
-                              <XCircle className="w-4 h-4" /> Rechazar
-                            </motion.button>
-                          </>
-                        )}
-                        
-                        {!isEventCompleted && isConfirmed && (
-                          <div className="flex flex-col gap-2 w-full lg:w-44">
-                            <span className="flex items-center justify-center gap-1.5 px-4 py-2.5 bg-emerald-500/10 text-emerald-400 rounded-xl border border-emerald-500/30 font-bold text-sm shadow-inner text-center">
-                              ✓ Confirmada
-                            </span>
-                            <motion.button
-                              whileTap={{ scale: 0.95 }}
-                              onClick={() => handleStatusChange(event.assignment_id, 'Rechazado')}
-                              className="text-xs text-red-400 hover:text-red-300 transition-colors py-1 hover:underline text-center"
-                            >
-                              Cancelar Asistencia
-                            </motion.button>
-                          </div>
-                        )}
+                      {/* Timeline Operativo Adaptativo e Inteligente */}
+                      {isConfirmed && shouldShowOperationalSection && (
+                        <div className="mt-6 border-t border-white/5 pt-6">
+                          <h4 className="text-xs font-extrabold uppercase tracking-wider text-amber-400 mb-4 flex items-center gap-1.5">
+                            📋 Cronograma Operativo Técnico
+                          </h4>
+                          <div className="relative pl-6 border-l border-white/10 space-y-4">
 
-                        {!isEventCompleted && isRejected && (
-                          <div className="flex flex-col gap-2 w-full lg:w-44">
-                            <span className="flex items-center justify-center gap-1.5 px-4 py-2.5 bg-red-500/10 text-red-400 rounded-xl border border-red-500/30 font-bold text-sm shadow-inner text-center">
-                              ✗ Rechazado
-                            </span>
-                            <motion.button
-                              whileTap={{ scale: 0.95 }}
-                              onClick={() => handleStatusChange(event.assignment_id, 'Confirmado')}
-                              className="text-xs text-emerald-400 hover:text-emerald-300 transition-colors py-1 hover:underline text-center"
-                            >
-                              Cambiar a Confirmado
-                            </motion.button>
-                          </div>
-                        )}
+                            {/* 1. Montaje */}
+                            {(!isEventSimpleType || isPlanPending) && (
+                              <div className="relative group">
+                                <div className={`absolute -left-[30px] top-1.5 w-4 h-4 rounded-full border-4 border-gray-950 group-hover:scale-125 transition-transform duration-300 ${event.setup_time ? 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]' : 'bg-gray-700'
+                                  }`} />
+                                <div className="flex items-center justify-between text-xs md:text-sm">
+                                  <span className={`font-bold font-mono ${event.setup_time ? 'text-emerald-300' : 'text-gray-500 italic animate-pulse'}`}>
+                                    {event.setup_time ? event.setup_time.slice(0, 5) : 'Por definir'}
+                                  </span>
+                                  <span className={event.setup_time ? 'text-gray-200' : 'text-gray-500 italic'}>
+                                    {event.setup_time ? 'Inicio de montaje técnico y descarga' : 'Horario de montaje técnico por definir'}
+                                  </span>
+                                  <span className="text-[10px] bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded border border-emerald-500/20 font-medium">Montaje</span>
+                                </div>
+                              </div>
+                            )}
 
-                        {isEventCompleted && (
-                          <div className="flex flex-col gap-1 w-full lg:w-44">
-                            <span className={`flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl border font-extrabold text-xs shadow-inner text-center tracking-wide ${
-                              isConfirmed ? 'bg-emerald-500/5 text-emerald-400/60 border-emerald-500/10' :
-                              isRejected ? 'bg-red-500/5 text-red-400/60 border-red-500/10' :
-                              'bg-gray-500/5 text-gray-400/60 border-gray-500/10'
-                            }`}>
-                              {isConfirmed ? '✓ Asistió' : isRejected ? '✗ No Asistió' : 'Sin respuesta'}
-                            </span>
-                          </div>
-                        )}
+                            {/* 2. Presentación (Llegada) */}
+                            <div className="relative group">
+                              <div className={`absolute -left-[30px] top-1.5 w-4 h-4 rounded-full border-4 border-gray-950 group-hover:scale-125 transition-transform duration-300 ${event.call_time ? 'bg-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.5)]' : 'bg-gray-700'
+                                }`} />
+                              <div className="flex items-center justify-between text-xs md:text-sm">
+                                <span className={`font-bold font-mono ${event.call_time ? 'text-amber-300' : 'text-gray-500 italic animate-pulse'}`}>
+                                  {event.call_time ? event.call_time.slice(0, 5) : 'Por definir'}
+                                </span>
+                                <span className={event.call_time ? 'text-gray-200' : 'text-gray-500 italic'}>
+                                  {event.call_time ? 'Hora de presentación en recinto (Call Time)' : 'Hora de citación por definir'}
+                                </span>
+                                <span className="text-[10px] bg-amber-500/10 text-amber-400 px-2 py-0.5 rounded border border-amber-500/20 font-medium">Llegada</span>
+                              </div>
+                            </div>
 
-                        <motion.button
-                          whileHover={{ scale: 1.03 }}
-                          whileTap={{ scale: 0.97 }}
-                          onClick={() => setSelectedDetailedEvent(event)}
-                          className="flex items-center justify-center gap-1.5 px-5 py-2.5 bg-white/5 text-gray-300 hover:bg-white/10 rounded-xl border border-white/10 text-sm font-semibold transition-all duration-300 w-full lg:w-44"
-                        >
-                          Ver detalles
-                        </motion.button>
-                      </div>
+                            {/* 3. Showtime (Siempre visible) */}
+                            <div className="relative group">
+                              <div className="absolute -left-[30px] top-1.5 w-4 h-4 rounded-full bg-blue-500 border-4 border-gray-950 shadow-[0_0_10px_rgba(59,130,246,0.5)] group-hover:scale-125 transition-transform duration-300" />
+                              <div className="flex items-center justify-between text-xs md:text-sm">
+                                <span className="font-bold text-blue-300 font-mono">{event.time ? event.time.slice(0, 5) : 'Por definir'}</span>
+                                <span className="text-gray-200">Inicio de show / Activación principal</span>
+                                <span className="text-[10px] bg-blue-500/10 text-blue-400 px-2 py-0.5 rounded border border-blue-500/20 font-medium">Showtime</span>
+                              </div>
+                            </div>
+
+                            {/* 4. Término */}
+                            {(!isEventSimpleType || isPlanPending) && (
+                              <div className="relative group">
+                                <div className={`absolute -left-[30px] top-1.5 w-4 h-4 rounded-full border-4 border-gray-950 group-hover:scale-125 transition-transform duration-300 ${event.end_time ? 'bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.5)]' : 'bg-gray-700'
+                                  }`} />
+                                <div className="flex items-center justify-between text-xs md:text-sm">
+                                  <span className={`font-bold font-mono ${event.end_time ? 'text-red-300' : 'text-gray-500 italic animate-pulse'}`}>
+                                    {event.end_time ? event.end_time.slice(0, 5) : 'Por definir'}
+                                  </span>
+                                  <span className={event.end_time ? 'text-gray-200' : 'text-gray-500 italic'}>
+                                    {event.end_time ? 'Finalización del evento y desmontaje' : 'Hora de desmontaje y término por definir'}
+                                  </span>
+                                  <span className="text-[10px] bg-red-500/10 text-red-400 px-2 py-0.5 rounded border border-red-500/20 font-medium">Término</span>
+                                </div>
+                              </div>
+                            )}
+
+                          </div>
+                        </div>
+                      )}
+                    </GlassCard>
+                  </motion.div>
+                );
+              })
+            )}
+          </motion.section>
+
+          {/* Panel lateral: Estado, Disponibilidad, Notificaciones, Actividad (Right Side) */}
+          <motion.section variants={itemVariants} className="lg:col-span-1 space-y-6">
+
+            {/* Notificaciones Panel */}
+            <GlassCard className="p-6 border border-white/5">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+                  <Bell className="w-5 h-5 text-amber-400 animate-bounce" />
+                  Notificaciones
+                </h2>
+                {notifications.some(n => !n.read) && (
+                  <button
+                    onClick={markAllAsRead}
+                    className="text-[10px] text-amber-400 hover:text-amber-300 transition-colors hover:underline font-bold"
+                  >
+                    Marcar todas
+                  </button>
+                )}
+              </div>
+
+              <div className={`space-y-3 pr-0.5 ${showAllNotifications ? "max-h-[360px] overflow-y-auto scrollbar-thin scrollbar-thumb-white/10" : ""}`}>
+                <AnimatePresence initial={false}>
+                  {notifications.length === 0 ? (
+                    <div className="text-center py-6 text-gray-500 text-xs flex flex-col items-center gap-2">
+                      <BellOff className="w-8 h-8 text-gray-700" />
+                      <span>Sin notificaciones pendientes</span>
                     </div>
+                  ) : (
+                    (showAllNotifications ? notifications : notifications.slice(0, 5)).map(n => {
+                      let cardStyle = "border-amber-500/10 bg-amber-500/5 hover:bg-amber-500/10";
+                      let icon = <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />;
+                      if (n.type === "info") {
+                        cardStyle = "border-blue-500/10 bg-blue-500/5 hover:bg-blue-500/10";
+                        icon = <Info className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />;
+                      } else if (n.type === "danger") {
+                        cardStyle = "border-red-500/10 bg-red-500/5 hover:bg-red-500/10";
+                        icon = <XCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />;
+                      }
 
-                    {/* Timeline Operativo Adaptativo e Inteligente */}
-                    {isConfirmed && shouldShowOperationalSection && (
-                      <div className="mt-6 border-t border-white/5 pt-6">
-                        <h4 className="text-xs font-extrabold uppercase tracking-wider text-amber-400 mb-4 flex items-center gap-1.5">
-                          📋 Cronograma Operativo Técnico
-                        </h4>
-                        <div className="relative pl-6 border-l border-white/10 space-y-4">
-                          
-                          {/* 1. Montaje */}
-                          {(!isEventSimpleType || isPlanPending) && (
-                            <div className="relative group">
-                              <div className={`absolute -left-[30px] top-1.5 w-4 h-4 rounded-full border-4 border-gray-950 group-hover:scale-125 transition-transform duration-300 ${
-                                event.setup_time ? 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]' : 'bg-gray-700'
-                              }`} />
-                              <div className="flex items-center justify-between text-xs md:text-sm">
-                                <span className={`font-bold font-mono ${event.setup_time ? 'text-emerald-300' : 'text-gray-500 italic animate-pulse'}`}>
-                                  {event.setup_time ? event.setup_time.slice(0, 5) : 'Por definir'}
-                                </span>
-                                <span className={event.setup_time ? 'text-gray-200' : 'text-gray-500 italic'}>
-                                  {event.setup_time ? 'Inicio de montaje técnico y descarga' : 'Horario de montaje técnico por definir'}
-                                </span>
-                                <span className="text-[10px] bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded border border-emerald-500/20 font-medium">Montaje</span>
-                              </div>
-                            </div>
+                      return (
+                        <motion.div
+                          key={n.id}
+                          initial={{ opacity: 0, y: -10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0 }}
+                          layout
+                          className={`p-3 rounded-2xl border text-xs flex gap-2.5 transition-all duration-300 relative group overflow-hidden ${cardStyle} ${!n.read ? 'shadow-[0_0_12px_rgba(245,158,11,0.06)] border-amber-500/30' : 'opacity-55 hover:opacity-80'
+                            }`}
+                        >
+                          {/* Glow decorativo sutil si no está leída */}
+                          {!n.read && (
+                            <div className="absolute inset-0 bg-gradient-to-r from-amber-500/0 via-amber-500/5 to-amber-500/0 animate-pulse pointer-events-none" />
                           )}
 
-                          {/* 2. Presentación (Llegada) */}
-                          <div className="relative group">
-                            <div className={`absolute -left-[30px] top-1.5 w-4 h-4 rounded-full border-4 border-gray-950 group-hover:scale-125 transition-transform duration-300 ${
-                              event.call_time ? 'bg-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.5)]' : 'bg-gray-700'
-                            }`} />
-                            <div className="flex items-center justify-between text-xs md:text-sm">
-                              <span className={`font-bold font-mono ${event.call_time ? 'text-amber-300' : 'text-gray-500 italic animate-pulse'}`}>
-                                {event.call_time ? event.call_time.slice(0, 5) : 'Por definir'}
-                              </span>
-                              <span className={event.call_time ? 'text-gray-200' : 'text-gray-500 italic'}>
-                                {event.call_time ? 'Hora de presentación en recinto (Call Time)' : 'Hora de citación por definir'}
-                              </span>
-                              <span className="text-[10px] bg-amber-500/10 text-amber-400 px-2 py-0.5 rounded border border-amber-500/20 font-medium">Llegada</span>
+                          {icon}
+                          <div className="space-y-1 flex-1 min-w-0 relative z-10">
+                            <div className="flex justify-between items-start gap-1">
+                              <strong className="text-gray-100 font-bold leading-tight truncate pr-8">{n.title}</strong>
+                              <span className="text-[8px] text-gray-500 font-medium whitespace-nowrap">{n.time}</span>
                             </div>
+                            <p className="text-gray-300 leading-normal text-[11px]">{n.desc}</p>
+
+                            {/* Acciones de la notificación */}
+                            {!n.read && (
+                              <button
+                                onClick={() => markAsRead(n.id)}
+                                className="text-[9px] text-amber-400 hover:text-amber-300 font-bold mt-1 block hover:underline"
+                              >
+                                Marcar como leído
+                              </button>
+                            )}
                           </div>
 
-                          {/* 3. Showtime (Siempre visible) */}
-                          <div className="relative group">
-                            <div className="absolute -left-[30px] top-1.5 w-4 h-4 rounded-full bg-blue-500 border-4 border-gray-950 shadow-[0_0_10px_rgba(59,130,246,0.5)] group-hover:scale-125 transition-transform duration-300" />
-                            <div className="flex items-center justify-between text-xs md:text-sm">
-                              <span className="font-bold text-blue-300 font-mono">{event.time ? event.time.slice(0, 5) : 'Por definir'}</span>
-                              <span className="text-gray-200">Inicio de show / Activación principal</span>
-                              <span className="text-[10px] bg-blue-500/10 text-blue-400 px-2 py-0.5 rounded border border-blue-500/20 font-medium">Showtime</span>
-                            </div>
-                          </div>
-
-                          {/* 4. Término */}
-                          {(!isEventSimpleType || isPlanPending) && (
-                            <div className="relative group">
-                              <div className={`absolute -left-[30px] top-1.5 w-4 h-4 rounded-full border-4 border-gray-950 group-hover:scale-125 transition-transform duration-300 ${
-                                event.end_time ? 'bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.5)]' : 'bg-gray-700'
-                              }`} />
-                              <div className="flex items-center justify-between text-xs md:text-sm">
-                                <span className={`font-bold font-mono ${event.end_time ? 'text-red-300' : 'text-gray-500 italic animate-pulse'}`}>
-                                  {event.end_time ? event.end_time.slice(0, 5) : 'Por definir'}
-                                </span>
-                                <span className={event.end_time ? 'text-gray-200' : 'text-gray-500 italic'}>
-                                  {event.end_time ? 'Finalización del evento y desmontaje' : 'Hora de desmontaje y término por definir'}
-                                </span>
-                                <span className="text-[10px] bg-red-500/10 text-red-400 px-2 py-0.5 rounded border border-red-500/20 font-medium">Término</span>
-                              </div>
-                            </div>
+                          {/* Badge de Nuevo */}
+                          {!n.read && (
+                            <span className="absolute top-2 right-2 bg-amber-500 text-gray-900 text-[8px] font-extrabold px-1.5 py-0.5 rounded-full uppercase tracking-wider scale-90">
+                              Nuevo
+                            </span>
                           )}
+                        </motion.div>
+                      );
+                    })
+                  )}
+                </AnimatePresence>
+              </div>
 
-                        </div>
-                      </div>
-                    )}
-                  </GlassCard>
-                </motion.div>
-              );
-            })
-          )}
-        </motion.section>
-
-        {/* Panel lateral: Estado, Disponibilidad, Notificaciones, Actividad (Right Side) */}
-        <motion.section variants={itemVariants} className="lg:col-span-1 space-y-6">
-          
-          {/* Notificaciones Panel */}
-          <GlassCard className="p-6 border border-white/5">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-semibold text-white flex items-center gap-2">
-                <Bell className="w-5 h-5 text-amber-400 animate-bounce" />
-                Notificaciones
-              </h2>
-              {notifications.some(n => !n.read) && (
-                <button 
-                  onClick={markAllAsRead}
-                  className="text-[10px] text-amber-400 hover:text-amber-300 transition-colors hover:underline font-bold"
+              {notifications.length > 5 && (
+                <button
+                  onClick={() => setShowAllNotifications(!showAllNotifications)}
+                  className="w-full text-center py-2 text-xs font-bold text-amber-400 hover:text-amber-300 transition-colors mt-2 border-t border-white/5 pt-3 hover:underline flex items-center justify-center gap-1.5"
                 >
-                  Marcar todas
+                  {showAllNotifications ? (
+                    <>
+                      <span>Ver menos</span>
+                      <ChevronUp className="w-3.5 h-3.5" />
+                    </>
+                  ) : (
+                    <>
+                      <span>Ver todas ({notifications.length})</span>
+                      <ChevronDown className="w-3.5 h-3.5" />
+                    </>
+                  )}
                 </button>
               )}
-            </div>
+            </GlassCard>
 
-            <div className={`space-y-3 pr-0.5 ${showAllNotifications ? "max-h-[360px] overflow-y-auto scrollbar-thin scrollbar-thumb-white/10" : ""}`}>
-              <AnimatePresence initial={false}>
-                {notifications.length === 0 ? (
-                  <div className="text-center py-6 text-gray-500 text-xs flex flex-col items-center gap-2">
-                    <BellOff className="w-8 h-8 text-gray-700" />
-                    <span>Sin notificaciones pendientes</span>
-                  </div>
-                ) : (
-                  (showAllNotifications ? notifications : notifications.slice(0, 5)).map(n => {
-                    let cardStyle = "border-amber-500/10 bg-amber-500/5 hover:bg-amber-500/10";
-                    let icon = <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />;
-                    if (n.type === "info") {
-                      cardStyle = "border-blue-500/10 bg-blue-500/5 hover:bg-blue-500/10";
-                      icon = <Info className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />;
-                    } else if (n.type === "danger") {
-                      cardStyle = "border-red-500/10 bg-red-500/5 hover:bg-red-500/10";
-                      icon = <XCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />;
-                    }
-
-                    return (
-                      <motion.div
-                        key={n.id}
-                        initial={{ opacity: 0, y: -10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0 }}
-                        layout
-                        className={`p-3 rounded-2xl border text-xs flex gap-2.5 transition-all duration-300 relative group overflow-hidden ${cardStyle} ${
-                          !n.read ? 'shadow-[0_0_12px_rgba(245,158,11,0.06)] border-amber-500/30' : 'opacity-55 hover:opacity-80'
-                        }`}
-                      >
-                        {/* Glow decorativo sutil si no está leída */}
-                        {!n.read && (
-                          <div className="absolute inset-0 bg-gradient-to-r from-amber-500/0 via-amber-500/5 to-amber-500/0 animate-pulse pointer-events-none" />
-                        )}
-
-                        {icon}
-                        <div className="space-y-1 flex-1 min-w-0 relative z-10">
-                          <div className="flex justify-between items-start gap-1">
-                            <strong className="text-gray-100 font-bold leading-tight truncate pr-8">{n.title}</strong>
-                            <span className="text-[8px] text-gray-500 font-medium whitespace-nowrap">{n.time}</span>
-                          </div>
-                          <p className="text-gray-300 leading-normal text-[11px]">{n.desc}</p>
-                          
-                          {/* Acciones de la notificación */}
-                          {!n.read && (
-                            <button
-                              onClick={() => markAsRead(n.id)}
-                              className="text-[9px] text-amber-400 hover:text-amber-300 font-bold mt-1 block hover:underline"
-                            >
-                              Marcar como leído
-                            </button>
-                          )}
-                        </div>
-
-                        {/* Badge de Nuevo */}
-                        {!n.read && (
-                          <span className="absolute top-2 right-2 bg-amber-500 text-gray-900 text-[8px] font-extrabold px-1.5 py-0.5 rounded-full uppercase tracking-wider scale-90">
-                            Nuevo
-                          </span>
-                        )}
-                      </motion.div>
-                    );
-                  })
-                )}
-              </AnimatePresence>
-            </div>
-
-            {notifications.length > 5 && (
-              <button
-                onClick={() => setShowAllNotifications(!showAllNotifications)}
-                className="w-full text-center py-2 text-xs font-bold text-amber-400 hover:text-amber-300 transition-colors mt-2 border-t border-white/5 pt-3 hover:underline flex items-center justify-center gap-1.5"
-              >
-                {showAllNotifications ? (
-                  <>
-                    <span>Ver menos</span>
-                    <ChevronUp className="w-3.5 h-3.5" />
-                  </>
-                ) : (
-                  <>
-                    <span>Ver todas ({notifications.length})</span>
-                    <ChevronDown className="w-3.5 h-3.5" />
-                  </>
-                )}
-              </button>
-            )}
-          </GlassCard>
-          
-          {/* Mi Estado & Disponibilidad */}
-          <GlassCard className="p-6 border border-white/5">
-            <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-              <Sparkles className="w-5 h-5 text-amber-400" />
-              Mi Estado
-            </h2>
-            <div className="flex items-center gap-4 mb-5 bg-black/20 p-3 rounded-2xl border border-white/5">
-              <img 
-                src={user?.avatar_url || user?.avatar || "https://ui-avatars.com/api/?name=" + (user?.name || "User")} 
-                alt="Avatar" 
-                className="w-14 h-14 rounded-full border-2 border-amber-500 object-cover shadow-[0_0_15px_rgba(245,158,11,0.2)]" 
-              />
-              <div className="overflow-hidden">
-                <p className="font-bold text-white truncate">{user?.name || "Trabajador"}</p>
-                <p className="text-xs text-amber-400 capitalize font-semibold tracking-wider mt-0.5">{workerProfile?.role || user?.role || "Staff"}</p>
-              </div>
-            </div>
-
-            <div className="bg-black/30 rounded-2xl p-4 border border-white/5">
-              <div className="flex justify-between items-center mb-4">
-                <p className="text-xs font-extrabold uppercase tracking-wider text-amber-400">Definir Disponibilidad</p>
-                <div className="flex gap-2.5 items-center text-xs text-gray-400">
-                   <button onClick={handlePrevMonth} className="hover:text-white bg-white/5 hover:bg-white/10 w-6 h-6 flex items-center justify-center rounded-lg border border-white/5 transition-all duration-300">&lt;</button>
-                   <span className="w-18 text-center font-bold text-gray-200 capitalize">{MONTH_NAMES[currentMonth].slice(0,3)} {currentYear}</span>
-                   <button onClick={handleNextMonth} className="hover:text-white bg-white/5 hover:bg-white/10 w-6 h-6 flex items-center justify-center rounded-lg border border-white/5 transition-all duration-300">&gt;</button>
+            {/* Mi Estado & Disponibilidad */}
+            <GlassCard className="p-6 border border-white/5">
+              <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-amber-400" />
+                Mi Estado
+              </h2>
+              <div className="flex items-center gap-4 mb-5 bg-black/20 p-3 rounded-2xl border border-white/5">
+                <img
+                  src={user?.avatar_url || user?.avatar || "https://ui-avatars.com/api/?name=" + (user?.name || "User")}
+                  alt="Avatar"
+                  className="w-14 h-14 rounded-full border-2 border-amber-500 object-cover shadow-[0_0_15px_rgba(245,158,11,0.2)]"
+                />
+                <div className="overflow-hidden">
+                  <p className="font-bold text-white truncate">{user?.name || "Trabajador"}</p>
+                  <p className="text-xs text-amber-400 capitalize font-semibold tracking-wider mt-0.5">{workerProfile?.role || user?.role || "Staff"}</p>
                 </div>
               </div>
-              
-              <div className="grid grid-cols-7 gap-1 text-center text-[10px] mb-2 text-gray-500 font-extrabold uppercase tracking-widest">
-                 {DAY_NAMES.map(d => <div key={d}>{d}</div>)}
-              </div>
-              <div className="grid grid-cols-7 gap-1">
-                 {blanks.map(b => <div key={`b-${b}`} className="aspect-square rounded-lg bg-transparent" />)}
-                 {days.map(day => {
+
+              <div className="bg-black/30 rounded-2xl p-4 border border-white/5">
+                <div className="flex justify-between items-center mb-4">
+                  <p className="text-xs font-extrabold uppercase tracking-wider text-amber-400">Definir Disponibilidad</p>
+                  <div className="flex gap-2.5 items-center text-xs text-gray-400">
+                    <button onClick={handlePrevMonth} className="hover:text-white bg-white/5 hover:bg-white/10 w-6 h-6 flex items-center justify-center rounded-lg border border-white/5 transition-all duration-300">&lt;</button>
+                    <span className="w-18 text-center font-bold text-gray-200 capitalize">{MONTH_NAMES[currentMonth].slice(0, 3)} {currentYear}</span>
+                    <button onClick={handleNextMonth} className="hover:text-white bg-white/5 hover:bg-white/10 w-6 h-6 flex items-center justify-center rounded-lg border border-white/5 transition-all duration-300">&gt;</button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-7 gap-1 text-center text-[10px] mb-2 text-gray-500 font-extrabold uppercase tracking-widest">
+                  {DAY_NAMES.map(d => <div key={d}>{d}</div>)}
+                </div>
+                <div className="grid grid-cols-7 gap-1">
+                  {blanks.map(b => <div key={`b-${b}`} className="aspect-square rounded-lg bg-transparent" />)}
+                  {days.map(day => {
                     const y = currentYear;
                     const m = String(currentMonth + 1).padStart(2, '0');
                     const d = String(day).padStart(2, '0');
@@ -1332,7 +1324,7 @@ export default function WorkerDashboard({ user }) {
 
                     // Check if day has an assigned event
                     const hasAssignedEvent = assignedEvents.some(event => event.date === dateStr);
-                    
+
                     let bgClass = "bg-white/5 hover:bg-white/10 text-gray-300 border border-transparent";
                     let tooltipText = "Sin definir disponibilidad";
 
@@ -1364,58 +1356,58 @@ export default function WorkerDashboard({ user }) {
                             day
                           )}
                         </button>
-                        
+
                         {/* Custom Animated Tooltip */}
                         <div className="absolute bottom-full mb-2 hidden group-hover:block z-[99] bg-gray-950/95 border border-white/10 text-[10px] text-white rounded-lg px-2.5 py-1 shadow-2xl whitespace-nowrap pointer-events-none transition-all duration-300 transform translate-y-1">
-                           {tooltipText}
+                          {tooltipText}
                         </div>
                       </div>
                     );
-                 })}
+                  })}
+                </div>
+
+                <div className="mt-5 flex flex-col gap-2 text-[11px] text-gray-400 border-t border-white/5 pt-4">
+                  <div className="flex items-center gap-2"><div className="w-3 h-3 rounded bg-emerald-500/20 border border-emerald-500/40"></div> Disponible</div>
+                  <div className="flex items-center gap-2"><div className="w-3 h-3 rounded bg-red-500/20 border border-red-500/40"></div> No Disponible</div>
+                  <div className="flex items-center gap-2"><div className="w-3 h-3 rounded bg-amber-500/20 border border-amber-500/40"></div> Evento Asignado (Bloqueado)</div>
+                  <p className="mt-2 text-[10px] text-gray-500 italic leading-relaxed">
+                    * Haz clic en los días desbloqueados para alternar tus preferences de disponibilidad en tiempo real.
+                  </p>
+                </div>
               </div>
-              
-              <div className="mt-5 flex flex-col gap-2 text-[11px] text-gray-400 border-t border-white/5 pt-4">
-                 <div className="flex items-center gap-2"><div className="w-3 h-3 rounded bg-emerald-500/20 border border-emerald-500/40"></div> Disponible</div>
-                 <div className="flex items-center gap-2"><div className="w-3 h-3 rounded bg-red-500/20 border border-red-500/40"></div> No Disponible</div>
-                 <div className="flex items-center gap-2"><div className="w-3 h-3 rounded bg-amber-500/20 border border-amber-500/40"></div> Evento Asignado (Bloqueado)</div>
-                 <p className="mt-2 text-[10px] text-gray-500 italic leading-relaxed">
-                   * Haz clic en los días desbloqueados para alternar tus preferences de disponibilidad en tiempo real.
-                 </p>
+            </GlassCard>
+
+
+            {/* Feed de Actividad Panel */}
+            <GlassCard className="p-6 border border-white/5">
+              <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                <Activity className="w-5 h-5 text-amber-400" />
+                Actividad Reciente
+              </h2>
+              <div className="space-y-4 max-h-56 overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-white/10">
+                <AnimatePresence initial={false}>
+                  {activities.map(act => (
+                    <motion.div
+                      key={act.id}
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0 }}
+                      className="flex gap-2.5 items-start text-xs border-b border-white/5 pb-3 last:border-b-0 last:pb-0"
+                    >
+                      <div className="w-2 h-2 rounded-full bg-amber-500 mt-1.5 shrink-0 animate-pulse" />
+                      <div className="space-y-0.5">
+                        <p className="text-gray-200 font-medium leading-normal">{act.text}</p>
+                        <span className="text-[9px] text-gray-500 block font-semibold">{act.time}</span>
+                      </div>
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
               </div>
-            </div>
-          </GlassCard>
+            </GlassCard>
 
+          </motion.section>
 
-          {/* Feed de Actividad Panel */}
-          <GlassCard className="p-6 border border-white/5">
-            <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-              <Activity className="w-5 h-5 text-amber-400" />
-              Actividad Reciente
-            </h2>
-            <div className="space-y-4 max-h-56 overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-white/10">
-              <AnimatePresence initial={false}>
-                {activities.map(act => (
-                  <motion.div 
-                    key={act.id} 
-                    initial={{ opacity: 0, x: -10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0 }}
-                    className="flex gap-2.5 items-start text-xs border-b border-white/5 pb-3 last:border-b-0 last:pb-0"
-                  >
-                    <div className="w-2 h-2 rounded-full bg-amber-500 mt-1.5 shrink-0 animate-pulse" />
-                    <div className="space-y-0.5">
-                      <p className="text-gray-200 font-medium leading-normal">{act.text}</p>
-                      <span className="text-[9px] text-gray-500 block font-semibold">{act.time}</span>
-                    </div>
-                  </motion.div>
-                ))}
-              </AnimatePresence>
-            </div>
-          </GlassCard>
-
-        </motion.section>
-
-      </div>
+        </div>
       )}
 
       {activeSubTab === "finanzas" && (() => {
@@ -1484,7 +1476,7 @@ export default function WorkerDashboard({ user }) {
             if (error) throw error;
 
             toast.success("¡Datos de transferencia actualizados con éxito!");
-            
+
             setWorkerProfile(prev => ({
               ...prev,
               cuenta_destino: bankForm.cuenta_destino,
@@ -1568,7 +1560,7 @@ export default function WorkerDashboard({ user }) {
                     <Coins className="w-5 h-5 text-amber-400" />
                     Historial de Pagos de Producciones
                   </h3>
-                  
+
                   <div className="overflow-x-auto">
                     <table className="w-full text-left border-collapse text-sm">
                       <thead>
@@ -1597,11 +1589,10 @@ export default function WorkerDashboard({ user }) {
                                 <td className="py-3.5 px-4 text-gray-400">{event.date}</td>
                                 <td className="py-3.5 px-4 font-extrabold text-amber-400">${rate.toLocaleString("es-CL")}</td>
                                 <td className="py-3.5 px-4 text-center">
-                                  <span className={`px-2.5 py-1 rounded-full text-2xs font-extrabold border ${
-                                    isPaid 
-                                      ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' 
+                                  <span className={`px-2.5 py-1 rounded-full text-2xs font-extrabold border ${isPaid
+                                      ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
                                       : 'bg-red-500/10 border-red-500/30 text-red-400'
-                                  }`}>
+                                    }`}>
                                     {isPaid ? "Pagado" : "Pendiente"}
                                   </span>
                                 </td>
@@ -1619,7 +1610,7 @@ export default function WorkerDashboard({ user }) {
               <motion.section variants={itemVariants} className="lg:col-span-1 space-y-4">
                 <GlassCard className="p-6 border border-white/5 relative overflow-hidden">
                   <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-full blur-2xl pointer-events-none" />
-                  
+
                   <h3 className="text-lg font-bold text-white mb-1 flex items-center gap-2">
                     <Landmark className="w-5 h-5 text-amber-400" />
                     Mis Datos de Transferencia
@@ -1716,8 +1707,8 @@ export default function WorkerDashboard({ user }) {
                 className="relative w-full max-w-lg bg-gray-900 border border-white/10 rounded-3xl p-6 shadow-2xl overflow-hidden"
               >
                 <div className="absolute top-0 right-0 w-48 h-48 bg-amber-500/10 rounded-full blur-[60px] pointer-events-none" />
-                
-                <button 
+
+                <button
                   onClick={() => setSelectedDetailedEvent(null)}
                   className="absolute top-4 right-4 text-gray-400 hover:text-white transition-colors"
                 >
@@ -1730,7 +1721,7 @@ export default function WorkerDashboard({ user }) {
                     {selectedDetailedEvent.type || "Producción técnica"}
                   </span>
                 </div>
-                
+
                 <div className="space-y-4 text-sm text-gray-300">
                   <div className="bg-white/5 p-4 rounded-xl space-y-2 border border-white/5 shadow-inner">
                     <p><strong className="text-amber-400">Cliente:</strong> {selectedDetailedEvent.client || 'Por definir'}</p>
@@ -1741,7 +1732,7 @@ export default function WorkerDashboard({ user }) {
 
                   <div className="bg-black/30 p-4 rounded-xl space-y-1.5 border border-white/5 text-xs">
                     <h4 className="font-bold uppercase tracking-wider text-amber-400 mb-1.5">⏱ Horarios de Producción</h4>
-                    
+
                     {shouldShowSetup && (
                       <p>
                         <strong className="text-gray-400">Montaje:</strong>{' '}
@@ -1750,7 +1741,7 @@ export default function WorkerDashboard({ user }) {
                         </span>
                       </p>
                     )}
-                    
+
                     {shouldShowCall && (
                       <p>
                         <strong className="text-gray-400">Presentación:</strong>{' '}
@@ -1759,14 +1750,14 @@ export default function WorkerDashboard({ user }) {
                         </span>
                       </p>
                     )}
-                    
+
                     <p>
                       <strong className="text-gray-400">Inicio Show:</strong>{' '}
                       <span>
                         {selectedDetailedEvent.time ? `${selectedDetailedEvent.time.slice(0, 5)} hrs` : 'Por definir'}
                       </span>
                     </p>
-                    
+
                     {shouldShowEnd && (
                       <p>
                         <strong className="text-gray-400">Término Show:</strong>{' '}
