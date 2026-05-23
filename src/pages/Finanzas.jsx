@@ -313,6 +313,31 @@ export default function Finanzas() {
       toast.error("Esta solicitud no cuenta con un comprobante adjunto.");
       return;
     }
+    
+    // Open a blank window synchronously to bypass iOS Safari's popup blocker
+    const newWindow = window.open("about:blank", "_blank");
+    if (newWindow) {
+      newWindow.document.write(`
+        <html>
+          <head>
+            <title>Cargando Comprobante...</title>
+            <style>
+              body { background-color: #111827; color: #f59e0b; font-family: sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+              .loader { border: 4px solid rgba(245, 158, 11, 0.1); border-top: 4px solid #f59e0b; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin-bottom: 20px; }
+              @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+              .container { text-align: center; }
+            </style>
+          </head>
+          <body>
+            <div class="container">
+              <div class="loader"></div>
+              <div>Generando enlace seguro...</div>
+            </div>
+          </body>
+        </html>
+      `);
+    }
+
     const loadingToast = toast.loading("Generando enlace seguro...");
     try {
       const { data, error } = await supabase.storage
@@ -323,11 +348,17 @@ export default function Finanzas() {
 
       if (data?.signedUrl) {
         toast.success("¡Enlace generado! Abriendo comprobante...", { id: loadingToast });
-        window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+        if (newWindow) {
+          newWindow.location.href = data.signedUrl;
+        } else {
+          // Fallback if popup blocker completely blocked about:blank
+          window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+        }
       } else {
         throw new Error("No se pudo obtener el enlace firmado.");
       }
     } catch (err) {
+      if (newWindow) newWindow.close();
       console.error("Error al obtener signed url:", err);
       toast.error("Error al generar enlace seguro para el comprobante.", { id: loadingToast });
     }
