@@ -144,7 +144,16 @@ export default function Staff() {
 
         const { createClient } = await import('@supabase/supabase-js');
         const tempClient = createClient(supabaseUrl, supabaseAnonKey, {
-          auth: { persistSession: false, autoRefreshToken: false }
+          auth: {
+            persistSession: false,
+            autoRefreshToken: false,
+            detectSessionInUrl: false,
+            storage: {
+              getItem: () => null,
+              setItem: () => {},
+              removeItem: () => {}
+            }
+          }
         });
 
         const { data: authData, error: authError } = await tempClient.auth.signUp({
