@@ -37,6 +37,7 @@ import {
 import GlassCard from "../components/GlassCard.jsx";
 import { supabase } from "../lib/supabase.js";
 import { toast } from "react-hot-toast";
+import DatePicker from "../components/DatePicker.jsx";
 
 
 // Helper functions for mini calendar
@@ -2034,13 +2035,11 @@ export default function WorkerDashboard({ user }) {
                           </div>
 
                           <div className="flex flex-col">
-                            <label className="text-gray-300 mb-1 text-xs font-bold uppercase tracking-wider">Fecha del Gasto</label>
-                            <input
-                              type="date"
+                            <DatePicker
+                              label="Fecha del Gasto"
+                              id="expense_date"
                               value={expenseForm.expense_date}
-                              onChange={(e) => setExpenseForm({ ...expenseForm, expense_date: e.target.value })}
-                              className="w-full bg-gray-950/60 border border-white/10 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-amber-500 transition-all"
-                              required
+                              onChange={(date) => setExpenseForm({ ...expenseForm, expense_date: date })}
                             />
                           </div>
 
