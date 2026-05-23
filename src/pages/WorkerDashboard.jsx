@@ -68,6 +68,10 @@ export default function WorkerDashboard({ user }) {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [selectedDetailedEvent, setSelectedDetailedEvent] = useState(null);
 
+  // Control de asistencia (Check-In / Check-Out)
+  const [attendanceLogs, setAttendanceLogs] = useState({});
+  const [loadingAttendanceId, setLoadingAttendanceId] = useState(null);
+
   // Perfil del trabajador para consultar su rol real
   const [workerProfile, setWorkerProfile] = useState(null);
   const [financeMonthFilter, setFinanceMonthFilter] = useState("all");
@@ -596,6 +600,125 @@ export default function WorkerDashboard({ user }) {
     }
   };
 
+  const fetchAttendanceLogs = async (workerId) => {
+    if (!workerId) return;
+    try {
+      const { data, error } = await supabase
+        .from('event_attendance_logs')
+        .select('*')
+        .eq('worker_id', workerId);
+      
+      if (data) {
+        const logsMap = {};
+        data.forEach(log => {
+          logsMap[log.event_id] = log;
+        });
+        setAttendanceLogs(logsMap);
+      }
+    } catch (err) {
+      console.error("Error fetching attendance logs:", err);
+    }
+  };
+
+  const handleMarkCheckIn = async (eventId, assignmentId) => {
+    if (!eventId || !assignmentId) return;
+    setLoadingAttendanceId(`in-${eventId}`);
+    try {
+      const { data, error } = await supabase.rpc('mark_event_check_in', {
+        p_event_id: eventId,
+        p_assignment_id: assignmentId
+      });
+
+      if (error) {
+        toast.error(error.message || "Error al registrar la entrada.");
+      } else {
+        toast.success("¡Entrada registrada con éxito!", {
+          icon: "⚡",
+          style: {
+            background: 'rgba(245, 158, 11, 0.95)',
+            color: '#fff',
+            border: '1px solid rgba(245, 158, 11, 0.3)',
+          }
+        });
+        await fetchAttendanceLogs(user.id);
+      }
+    } catch (err) {
+      console.error("Error in check-in:", err);
+      toast.error("Ocurrió un error inesperado al registrar la entrada.");
+    } finally {
+      setLoadingAttendanceId(null);
+    }
+  };
+
+  const handleMarkCheckOut = async (eventId, assignmentId) => {
+    if (!eventId || !assignmentId) return;
+    setLoadingAttendanceId(`out-${eventId}`);
+    try {
+      const { data, error } = await supabase.rpc('mark_event_check_out', {
+        p_event_id: eventId,
+        p_assignment_id: assignmentId
+      });
+
+      if (error) {
+        toast.error(error.message || "Error al registrar la salida.");
+      } else {
+        toast.success("¡Salida registrada con éxito! Jornada finalizada.", {
+          icon: "🎉",
+          style: {
+            background: 'rgba(16, 185, 129, 0.95)',
+            color: '#fff',
+            border: '1px solid rgba(16, 185, 129, 0.3)',
+          }
+        });
+        await fetchAttendanceLogs(user.id);
+      }
+    } catch (err) {
+      console.error("Error in check-out:", err);
+      toast.error("Ocurrió un error inesperado al registrar la salida.");
+    } finally {
+      setLoadingAttendanceId(null);
+    }
+  };
+
+  const formatChileDateTime = (isoString) => {
+    if (!isoString) return "";
+    const date = new Date(isoString);
+    const dateStr = date.toLocaleDateString("es-CL", {
+      timeZone: "America/Santiago",
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric"
+    });
+    const timeStr = date.toLocaleTimeString("es-CL", {
+      timeZone: "America/Santiago",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false
+    });
+    return `${dateStr} ${timeStr}`;
+  };
+
+  const formatChileTimeOnly = (isoString) => {
+    if (!isoString) return "";
+    const date = new Date(isoString);
+    return date.toLocaleTimeString("es-CL", {
+      timeZone: "America/Santiago",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false
+    });
+  };
+
+  const formatDurationMinutes = (mins) => {
+    if (!mins) return "0 min";
+    const hours = Math.floor(mins / 60);
+    const minutes = mins % 60;
+    if (hours > 0) {
+      return `${hours}h ${minutes}m`;
+    }
+    return `${minutes}m`;
+  };
+
   const fetchMyEvents = async (workerId) => {
     setIsLoading(true);
     const { data, error } = await supabase
@@ -610,6 +733,7 @@ export default function WorkerDashboard({ user }) {
           id, name, date, time, location, client, status, description,
           call_time, setup_time, end_time, priority, operational_notes,
           supervisor_id, type, operational_info_pending,
+          attendance_control_enabled, attendance_require_confirmed,
           profiles:supervisor_id (
             name
           )
@@ -627,6 +751,7 @@ export default function WorkerDashboard({ user }) {
       }));
       setAssignedEvents(formattedEvents);
       fetchMyDbNotifications(workerId, formattedEvents);
+      await fetchAttendanceLogs(workerId);
     }
     setIsLoading(false);
   };
@@ -1007,6 +1132,9 @@ export default function WorkerDashboard({ user }) {
                 const isConfirmed = event.assignment_status === 'Confirmado';
                 const isRejected = event.assignment_status === 'Rechazado';
 
+                const log = attendanceLogs[event.id];
+                const checkInDisabled = event.attendance_require_confirmed && !isConfirmed;
+
                 const isEventSimpleType = event.type === "Anfitrionas" || event.type === "Promotoría";
 
                 // Planificación Técnica / Operacional Pendiente
@@ -1157,6 +1285,100 @@ export default function WorkerDashboard({ user }) {
                           {event.operational_notes && (
                             <div className="text-xs bg-amber-500/5 text-amber-300 border border-amber-500/10 p-3 rounded-xl leading-relaxed">
                               <strong>⚠️ Notas de Operación:</strong> {event.operational_notes}
+                            </div>
+                          )}
+
+                          {/* Módulo de Control de Asistencia */}
+                          {event.attendance_control_enabled && (
+                            <div className="mt-4 bg-white/5 border border-white/10 rounded-2xl p-4 space-y-3 shadow-sm backdrop-blur-sm relative z-10">
+                              <div className="flex items-center justify-between">
+                                <span className="text-xs font-extrabold uppercase tracking-widest text-amber-400 flex items-center gap-1.5">
+                                  ⏰ Control de Asistencia
+                                </span>
+                                {log?.verified_by_admin && (
+                                  <span className="text-[9px] px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 font-bold uppercase tracking-wider cursor-help" title={`Corregido manualmente por el Administrador: ${log.admin_adjustment_notes || 'Sin observaciones'}`}>
+                                    ✍️ Corregido por Admin
+                                  </span>
+                                )}
+                              </div>
+
+                              {!log ? (
+                                /* Estado: Sin Entrada */
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-black/30 p-3 rounded-xl border border-white/5">
+                                  <div className="flex flex-col">
+                                    <span className="text-xs text-gray-400">Registra tu ingreso al recinto del evento.</span>
+                                    {checkInDisabled && (
+                                      <span className="text-[10px] text-amber-500 italic mt-0.5">⚠️ Requiere confirmar asistencia primero</span>
+                                    )}
+                                  </div>
+                                  <motion.button
+                                    whileHover={!checkInDisabled ? { scale: 1.02 } : {}}
+                                    whileTap={!checkInDisabled ? { scale: 0.98 } : {}}
+                                    onClick={() => handleMarkCheckIn(event.id, event.assignment_id)}
+                                    disabled={checkInDisabled || loadingAttendanceId === `in-${event.id}`}
+                                    className={`flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-extrabold transition-all duration-300 shrink-0 select-none ${
+                                      checkInDisabled
+                                        ? "bg-gray-800/40 text-gray-500 border border-gray-700/50 cursor-not-allowed"
+                                        : "bg-amber-500/20 text-amber-300 hover:bg-amber-500 hover:text-gray-900 border border-amber-500/50 shadow-md"
+                                    }`}
+                                  >
+                                    {loadingAttendanceId === `in-${event.id}` ? (
+                                      <span className="w-4 h-4 border-2 border-amber-300 border-t-transparent rounded-full animate-spin" />
+                                    ) : (
+                                      <>⚡ Marcar Entrada</>
+                                    )}
+                                  </motion.button>
+                                </div>
+                              ) : !log.check_out_at ? (
+                                /* Estado: Con Entrada, Sin Salida */
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-black/30 p-3 rounded-xl border border-white/5">
+                                  <div className="flex flex-col gap-0.5">
+                                    <span className="text-[9px] text-gray-500 uppercase tracking-widest font-extrabold">Entrada Registrada</span>
+                                    <span className="text-xs text-amber-300 font-bold flex items-center gap-1.5">
+                                      📥 {formatChileDateTime(log.check_in_at)}
+                                    </span>
+                                  </div>
+                                  <motion.button
+                                    whileHover={{ scale: 1.02 }}
+                                    whileTap={{ scale: 0.98 }}
+                                    onClick={() => handleMarkCheckOut(event.id, event.assignment_id)}
+                                    disabled={loadingAttendanceId === `out-${event.id}`}
+                                    className="flex items-center justify-center gap-1.5 px-4 py-2.5 bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500 hover:text-gray-900 rounded-xl text-xs font-extrabold transition-all duration-300 border border-emerald-500/50 shadow-md shrink-0 select-none"
+                                  >
+                                    {loadingAttendanceId === `out-${event.id}` ? (
+                                      <span className="w-4 h-4 border-2 border-emerald-300 border-t-transparent rounded-full animate-spin" />
+                                    ) : (
+                                      <>📤 Marcar Salida</>
+                                    )}
+                                  </motion.button>
+                                </div>
+                              ) : (
+                                /* Estado: Completa (Con Entrada y Salida) */
+                                <div className="bg-emerald-500/5 border border-emerald-500/10 p-3.5 rounded-xl space-y-2.5 shadow-inner">
+                                  <div className="grid grid-cols-2 gap-3 text-xs">
+                                    <div className="flex flex-col gap-0.5">
+                                      <span className="text-[9px] text-gray-500 uppercase tracking-widest font-extrabold">Entrada</span>
+                                      <span className="text-gray-300 font-semibold flex items-center gap-1">
+                                        📥 {formatChileDateTime(log.check_in_at)}
+                                      </span>
+                                    </div>
+                                    <div className="flex flex-col gap-0.5">
+                                      <span className="text-[9px] text-gray-500 uppercase tracking-widest font-extrabold">Salida</span>
+                                      <span className="text-gray-300 font-semibold flex items-center gap-1">
+                                        📤 {formatChileDateTime(log.check_out_at)}
+                                      </span>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center justify-between border-t border-emerald-500/10 pt-2.5 text-xs">
+                                    <span className="text-emerald-400 font-extrabold flex items-center gap-1.5 tracking-wide">
+                                      ✓ Jornada registrada
+                                    </span>
+                                    <span className="text-emerald-300 font-extrabold bg-emerald-500/10 px-2.5 py-1 rounded-lg border border-emerald-500/20">
+                                      Duración: {formatDurationMinutes(log.total_duration_minutes)}
+                                    </span>
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           )}
                         </div>

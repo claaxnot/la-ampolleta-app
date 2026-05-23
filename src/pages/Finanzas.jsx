@@ -130,6 +130,18 @@ export default function Finanzas() {
 
       if (error) throw error;
 
+      // Fetch attendance logs to match
+      const { data: attLogs } = await supabase
+        .from("event_attendance_logs")
+        .select("*");
+      
+      const attMap = {};
+      if (attLogs) {
+        attLogs.forEach(log => {
+          attMap[`${log.event_id}-${log.worker_id}`] = log;
+        });
+      }
+
       // 2. Fetch Expense Requests (Viáticos y Reembolsos)
       const { data: dbExpenses, error: expensesError } = await supabase
         .from("expense_requests")
@@ -198,6 +210,7 @@ export default function Finanzas() {
           const defaultRate = a.profiles?.monto_transferencia ? parseFloat(a.profiles.monto_transferencia) : 25000;
           const rate = a.custom_rate ? parseFloat(a.custom_rate) : defaultRate;
           const isFinished = a.events?.date ? new Date(a.events.date) < new Date() : false;
+          const attLog = attMap[`${a.events?.id}-${a.profiles?.id}`];
 
           return {
             id: a.id,
@@ -217,7 +230,8 @@ export default function Finanzas() {
             banco_name: BANCOS_CHILE[a.profiles?.codigo_banco_destino] || "Banco No Registrado",
             monto: rate,
             status: a.payment_status || "Pendiente",
-            assignment_status: a.status
+            assignment_status: a.status,
+            attendance_log: attLog
           };
         }).filter(a => a.assignment_status === "Confirmado" || a.assignment_status === "Aceptado");
 
@@ -1148,9 +1162,21 @@ export default function Finanzas() {
                               </div>
                             </td>
                             <td className="py-4 px-6 text-left">
-                              <span className="font-extrabold text-amber-400">
-                                ${(parseFloat(p?.monto) || 0).toLocaleString("es-CL")}
-                              </span>
+                              <div className="flex flex-col">
+                                <span className="font-extrabold text-amber-400">
+                                  ${(parseFloat(p?.monto) || 0).toLocaleString("es-CL")}
+                                </span>
+                                {!p.is_expense && p.attendance_log && (
+                                  <span className={`text-[10px] mt-1 font-bold inline-flex items-center gap-1 cursor-help ${
+                                    p.attendance_log.is_complete 
+                                      ? "text-emerald-400" 
+                                      : "text-amber-400 animate-pulse"
+                                  }`} title={p.attendance_log.is_complete ? "Jornada completa registrada" : "Jornada incompleta o salida pendiente"}>
+                                    ⏱️ {Math.floor(p.attendance_log.total_duration_minutes / 60)}h {p.attendance_log.total_duration_minutes % 60}m
+                                    {p.attendance_log.verified_by_admin && " (✍️)"}
+                                  </span>
+                                )}
+                              </div>
                             </td>
                             <td className="py-4 px-6 text-left">
                               {missingBank ? (
@@ -1309,7 +1335,19 @@ export default function Finanzas() {
 
                         {/* Fila Inferior: Monto de Honorario */}
                         <div className="flex items-center justify-between pt-3 border-t border-white/5 mt-1">
-                          <span className="text-[10px] text-gray-500 uppercase font-bold tracking-wider">Monto a Transferir</span>
+                          <div className="flex flex-col">
+                            <span className="text-[10px] text-gray-500 uppercase font-bold tracking-wider">Monto a Transferir</span>
+                            {!p.is_expense && p.attendance_log && (
+                              <span className={`text-[9px] mt-0.5 font-extrabold inline-flex items-center gap-1 ${
+                                p.attendance_log.is_complete 
+                                  ? "text-emerald-400" 
+                                  : "text-amber-400 animate-pulse"
+                              }`}>
+                                ⏱️ {Math.floor(p.attendance_log.total_duration_minutes / 60)}h {p.attendance_log.total_duration_minutes % 60}m
+                                {p.attendance_log.verified_by_admin && " (corregido)"}
+                              </span>
+                            )}
+                          </div>
                           <span className="font-black text-amber-400 text-base">
                             ${(parseFloat(p?.monto) || 0).toLocaleString("es-CL")}
                           </span>

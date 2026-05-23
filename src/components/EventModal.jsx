@@ -39,6 +39,8 @@ const eventSchema = z.object({
   priority: z.string().default("Media"),
   operational_notes: z.string().optional(),
   operational_info_pending: z.boolean().default(false),
+  attendance_control_enabled: z.boolean().default(false),
+  attendance_require_confirmed: z.boolean().default(true),
 }).refine((data) => {
   // Validar: hora presentación < hora inicio
   if (!data.call_time || !data.time || !data.call_time.includes(":") || !data.time.includes(":")) return true;
@@ -89,7 +91,9 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
       end_time: "",
       priority: "Media",
       operational_notes: "",
-      operational_info_pending: false
+      operational_info_pending: false,
+      attendance_control_enabled: false,
+      attendance_require_confirmed: true
     }
   });
 
@@ -272,7 +276,9 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
           end_time: initialData.end_time || "",
           priority: initialData.priority || "Media",
           operational_notes: initialData.operational_notes || "",
-          operational_info_pending: initialData.operational_info_pending || false
+          operational_info_pending: initialData.operational_info_pending || false,
+          attendance_control_enabled: initialData.attendance_control_enabled || false,
+          attendance_require_confirmed: initialData.attendance_require_confirmed !== false
         });
 
         const targetIdForAssignments = initialData.id || initialData.duplicateFromId;
@@ -297,7 +303,9 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
           requiredStaff: 1, description: "", status: "Planificado", staffIds: [],
           type: "Producción técnica", supervisor_id: "", call_time: "",
           setup_time: "", end_time: "", priority: "Media", operational_notes: "",
-          operational_info_pending: false
+          operational_info_pending: false,
+          attendance_control_enabled: false,
+          attendance_require_confirmed: true
         });
       }
     }
@@ -557,6 +565,26 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
                       />
                       <span>Información operacional pendiente</span>
                     </label>
+
+                    <label className="flex items-center gap-2.5 cursor-pointer bg-white/5 hover:bg-white/10 px-3 py-2 rounded-xl border border-white/10 text-xs font-bold text-amber-300 transition-colors shadow-md select-none" title="Activa esta opción para que las trabajadoras puedan registrar su horario de entrada y salida en este evento.">
+                      <input
+                        type="checkbox"
+                        {...register("attendance_control_enabled")}
+                        className="form-checkbox h-4 w-4 text-amber-500 bg-gray-700 border-gray-600 rounded focus:ring-amber-500/50"
+                      />
+                      <span>Habilitar control de ingreso/salida</span>
+                    </label>
+
+                    {watch("attendance_control_enabled") && (
+                      <label className="flex items-center gap-2.5 cursor-pointer bg-white/5 hover:bg-white/10 px-3 py-2 rounded-xl border border-white/10 text-xs font-bold text-emerald-300 transition-colors shadow-md select-none" title="Exigir que la trabajadora tenga su asignación en estado 'Confirmado' o 'Aceptado' para marcar entrada. Si se desmarca, permite marcar en estado 'Pendiente'.">
+                        <input
+                          type="checkbox"
+                          {...register("attendance_require_confirmed")}
+                          className="form-checkbox h-4 w-4 text-emerald-500 bg-gray-700 border-gray-600 rounded focus:ring-emerald-500/50"
+                        />
+                        <span>Exigir asignación confirmada</span>
+                      </label>
+                    )}
                   </div>
 
                   <AnimatePresence initial={false}>

@@ -2,8 +2,9 @@ import React from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import GlassCard from "../components/GlassCard.jsx";
 import Button from "../components/Button.jsx";
-import { X } from "lucide-react";
+import { X, Clock, Edit, Save, AlertTriangle } from "lucide-react";
 import { supabase } from "../lib/supabase.js";
+import { toast } from "react-hot-toast";
 
 /**
  * EventDetails – shows full information for a selected event.
@@ -14,33 +15,101 @@ import { supabase } from "../lib/supabase.js";
  */
 export default function EventDetails({ event, isOpen, onClose }) {
   const [assigned, setAssigned] = React.useState([]);
+  const [attendance, setAttendance] = React.useState({});
+  const [editingStaffId, setEditingStaffId] = React.useState(null);
+  const [editNotes, setEditNotes] = React.useState("");
+  const [editCheckIn, setEditCheckIn] = React.useState("");
+  const [editCheckOut, setEditCheckOut] = React.useState("");
+  const [isSavingCorrection, setIsSavingCorrection] = React.useState(false);
+
+  const formatChileDateTime = (isoString) => {
+    if (!isoString) return "";
+    const date = new Date(isoString);
+    const dateStr = date.toLocaleDateString("es-CL", {
+      timeZone: "America/Santiago",
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric"
+    });
+    const timeStr = date.toLocaleTimeString("es-CL", {
+      timeZone: "America/Santiago",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false
+    });
+    return `${dateStr} ${timeStr}`;
+  };
+
+  const formatDurationMinutes = (mins) => {
+    if (!mins) return "0 min";
+    const hours = Math.floor(mins / 60);
+    const minutes = mins % 60;
+    if (hours > 0) {
+      return `${hours}h ${minutes}m`;
+    }
+    return `${minutes}m`;
+  };
+
+  const toDatetimeLocalString = (isoString) => {
+    if (!isoString) return "";
+    const d = new Date(isoString);
+    const formatter = new Intl.DateTimeFormat("sv-SE", {
+      timeZone: "America/Santiago",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false
+    });
+    const formatted = formatter.format(d);
+    return formatted.replace(" ", "T");
+  };
+
+  const fetchAssignedStaff = async () => {
+    if (!event?.id) return;
+    
+    const { data: assignmentsData } = await supabase
+      .from('event_assignments')
+      .select(`
+        id,
+        staff_id,
+        status,
+        profiles (name, role)
+      `)
+      .eq('event_id', event.id);
+    
+    if (assignmentsData) {
+      setAssigned(assignmentsData.map(d => ({
+        assignment_id: d.id,
+        id: d.staff_id,
+        status: d.status,
+        name: d.profiles?.name || 'Desconocido',
+        role: d.profiles?.role || ''
+      })));
+    }
+
+    // Fetch attendance logs for this event
+    const { data: attendanceData } = await supabase
+      .from('event_attendance_logs')
+      .select('*')
+      .eq('event_id', event.id);
+    
+    if (attendanceData) {
+      const attMap = {};
+      attendanceData.forEach(log => {
+        attMap[log.worker_id] = log;
+      });
+      setAttendance(attMap);
+    }
+  };
 
   React.useEffect(() => {
     if (!isOpen || !event?.id) return;
 
-    const fetchAssignedStaff = async () => {
-      const { data } = await supabase
-        .from('event_assignments')
-        .select(`
-          staff_id,
-          status,
-          profiles (name, role)
-        `)
-        .eq('event_id', event.id);
-      
-      if (data) {
-        setAssigned(data.map(d => ({
-          id: d.staff_id,
-          status: d.status,
-          name: d.profiles?.name || 'Desconocido',
-          role: d.profiles?.role || ''
-        })));
-      }
-    };
-
     fetchAssignedStaff();
 
-    // Suscribirse a cambios de asignaciones para este evento en tiempo real
+    // Suscribirse a cambios en tiempo real de asignaciones y logs
     const channel = supabase
       .channel(`event-details-realtime-${event.id}`)
       .on(
@@ -52,7 +121,20 @@ export default function EventDetails({ event, isOpen, onClose }) {
           filter: `event_id=eq.${event.id}` 
         },
         () => {
-          console.log("🔔 [REALTIME EVENT DETAILS] - Cambio de estado de asignación detectado. Actualizando...");
+          console.log("🔔 [REALTIME EVENT DETAILS] - Cambio de asignaciones detectado. Actualizando...");
+          fetchAssignedStaff();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'event_attendance_logs',
+          filter: `event_id=eq.${event.id}`
+        },
+        () => {
+          console.log("🔔 [REALTIME EVENT DETAILS] - Cambio de asistencia detectado. Actualizando...");
           fetchAssignedStaff();
         }
       )
@@ -62,6 +144,107 @@ export default function EventDetails({ event, isOpen, onClose }) {
       supabase.removeChannel(channel);
     };
   }, [isOpen, event]);
+
+  const startEditingAttendance = (staffId) => {
+    const log = attendance[staffId];
+    setEditingStaffId(staffId);
+    if (log) {
+      setEditCheckIn(toDatetimeLocalString(log.check_in_at));
+      setEditCheckOut(toDatetimeLocalString(log.check_out_at));
+      setEditNotes(log.admin_adjustment_notes || "");
+    } else {
+      const evDate = event.date || new Date().toISOString().split("T")[0];
+      setEditCheckIn(`${evDate}T09:00`);
+      setEditCheckOut(`${evDate}T18:00`);
+      setEditNotes("");
+    }
+  };
+
+  const handleSaveCorrection = async (staffId, assignmentId) => {
+    if (!editNotes.trim()) {
+      toast.error("Por favor, ingresa el motivo de la corrección.");
+      return;
+    }
+
+    if (!editCheckIn) {
+      toast.error("La hora de entrada es obligatoria.");
+      return;
+    }
+
+    setIsSavingCorrection(true);
+    try {
+      const { data: { user: adminUser } } = await supabase.auth.getUser();
+      if (!adminUser) {
+        toast.error("Sesión de administrador no válida.");
+        setIsSavingCorrection(false);
+        return;
+      }
+
+      const checkInISO = new Date(editCheckIn).toISOString();
+      const checkOutISO = editCheckOut ? new Date(editCheckOut).toISOString() : null;
+
+      let durationMins = 0;
+      if (checkOutISO) {
+        const diffMs = new Date(checkOutISO) - new Date(checkInISO);
+        durationMins = Math.max(0, Math.floor(diffMs / 60000));
+      }
+
+      const existingLog = attendance[staffId];
+
+      if (existingLog) {
+        const { error } = await supabase
+          .from('event_attendance_logs')
+          .update({
+            check_in_at: checkInISO,
+            check_out_at: checkOutISO,
+            verified_by_admin: true,
+            admin_adjusted_by: adminUser.id,
+            admin_adjustment_notes: editNotes,
+            is_complete: !!checkOutISO,
+            total_duration_minutes: durationMins,
+            original_check_in_at: existingLog.original_check_in_at || existingLog.check_in_at,
+            original_check_out_at: existingLog.original_check_out_at || existingLog.check_out_at,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', existingLog.id);
+
+        if (error) throw error;
+        toast.success("Asistencia corregida correctamente.");
+      } else {
+        const { error } = await supabase
+          .from('event_attendance_logs')
+          .insert([{
+            event_id: event.id,
+            worker_id: staffId,
+            assignment_id: assignmentId || null,
+            check_in_at: checkInISO,
+            check_out_at: checkOutISO,
+            verified_by_admin: true,
+            admin_adjusted_by: adminUser.id,
+            admin_adjustment_notes: editNotes,
+            is_complete: !!checkOutISO,
+            total_duration_minutes: durationMins,
+            check_in_source: 'admin_manual',
+            check_out_source: 'admin_manual'
+          }]);
+
+        if (error) throw error;
+        toast.success("Asistencia manual registrada.");
+      }
+
+      setEditingStaffId(null);
+      setEditNotes("");
+      setEditCheckIn("");
+      setEditCheckOut("");
+      
+      await fetchAssignedStaff();
+    } catch (err) {
+      console.error("Error saving attendance correction:", err);
+      toast.error(err.message || "Error al guardar los cambios.");
+    } finally {
+      setIsSavingCorrection(false);
+    }
+  };
 
   if (!event) return null;
 
@@ -100,21 +283,156 @@ export default function EventDetails({ event, isOpen, onClose }) {
                 </div>
                 {event.description && (
                   <p><strong>Descripción:</strong> {event.description}</p>
-                )}
-                
-                {/* Staff Asignado con estados visuales detallados */}
+                )}                {/* Staff Asignado con estados visuales detallados y módulo de asistencia */}
                 <div className="flex flex-col gap-2 pt-2 border-t border-white/5">
-                  <strong className="text-sm text-gray-100 mb-1">Staff asignado y confirmación:</strong>
+                  <strong className="text-sm text-gray-100 mb-1">
+                    {event.attendance_control_enabled ? "Auditoría de Asistencia y Personal:" : "Staff asignado y confirmación:"}
+                  </strong>
                   {assigned.length === 0 ? (
                     <span className="text-xs text-gray-400 italic">Ningún trabajador asignado a este evento.</span>
+                  ) : event.attendance_control_enabled ? (
+                    // Vista detallada de Auditoría de Asistencia
+                    <div className="flex flex-col gap-3">
+                      {assigned.map(s => {
+                        const log = attendance[s.id];
+                        const isEditing = editingStaffId === s.id;
+                        
+                        let badgeStyle = "bg-amber-500/10 text-amber-400 border-amber-500/20";
+                        let statusLabel = "Pendiente";
+                        if (s.status === "Confirmado" || s.status === "Aceptado") {
+                          badgeStyle = "bg-emerald-500/10 text-emerald-400 border-emerald-500/20";
+                          statusLabel = "Confirmado";
+                        } else if (s.status === "Rechazado") {
+                          badgeStyle = "bg-red-500/10 text-red-400 border-red-500/20";
+                          statusLabel = "Rechazado";
+                        }
+
+                        return (
+                          <div key={s.id} className="p-4 rounded-2xl bg-black/30 border border-white/5 space-y-3">
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <span className="font-bold text-gray-100 text-sm">{s.name}</span>
+                                <span className="text-[10px] text-gray-500 block capitalize">{s.role}</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className={`px-2 py-0.5 rounded-full border text-[9px] font-extrabold ${badgeStyle}`}>
+                                  {statusLabel}
+                                </span>
+                                {!isEditing && (
+                                  <button
+                                    onClick={() => startEditingAttendance(s.id)}
+                                    className="p-1.5 bg-white/5 hover:bg-white/10 rounded-lg text-amber-400 hover:text-amber-300 border border-white/10 transition-colors shadow-sm"
+                                    title="Corregir asistencia o registrar manual"
+                                  >
+                                    <Edit className="w-3.5 h-3.5" />
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+
+                            {isEditing ? (
+                              // Formulario de edición administrativa
+                              <div className="bg-white/5 border border-white/10 rounded-xl p-3.5 space-y-3">
+                                <div className="text-[10px] font-extrabold text-amber-400 flex items-center gap-1 uppercase tracking-wider">
+                                  <AlertTriangle className="w-3.5 h-3.5 text-amber-400" /> Corrección Administrativa
+                                </div>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                  <div className="flex flex-col gap-1">
+                                    <label className="text-[10px] text-gray-400 font-bold uppercase">Hora de Entrada (Chile)</label>
+                                    <input
+                                      type="datetime-local"
+                                      value={editCheckIn}
+                                      onChange={(e) => setEditCheckIn(e.target.value)}
+                                      className="bg-gray-800/80 border border-gray-700 rounded-lg p-2 text-xs text-white focus:outline-none focus:border-amber-500/50"
+                                    />
+                                  </div>
+                                  <div className="flex flex-col gap-1">
+                                    <label className="text-[10px] text-gray-400 font-bold uppercase">Hora de Salida (Chile)</label>
+                                    <input
+                                      type="datetime-local"
+                                      value={editCheckOut}
+                                      onChange={(e) => setEditCheckOut(e.target.value)}
+                                      className="bg-gray-800/80 border border-gray-700 rounded-lg p-2 text-xs text-white focus:outline-none focus:border-amber-500/50"
+                                    />
+                                  </div>
+                                </div>
+                                <div className="flex flex-col gap-1">
+                                  <label className="text-[10px] text-gray-400 font-bold uppercase">Motivo del Ajuste (Obligatorio)</label>
+                                  <input
+                                    type="text"
+                                    placeholder="Ej: Olvidó marcar salida al finalizar el evento"
+                                    value={editNotes}
+                                    onChange={(e) => setEditNotes(e.target.value)}
+                                    className="bg-gray-800/80 border border-gray-700 rounded-lg p-2 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-amber-500/50 w-full"
+                                  />
+                                </div>
+                                <div className="flex justify-end gap-2 pt-1">
+                                  <button
+                                    onClick={() => setEditingStaffId(null)}
+                                    className="px-3 py-1.5 bg-white/5 hover:bg-white/10 rounded-lg text-xs font-semibold text-gray-300 transition-colors"
+                                  >
+                                    Cancelar
+                                  </button>
+                                  <button
+                                    onClick={() => handleSaveCorrection(s.id, s.assignment_id)}
+                                    disabled={isSavingCorrection}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500 text-gray-900 hover:bg-emerald-400 rounded-lg text-xs font-bold transition-all shadow-md"
+                                  >
+                                    {isSavingCorrection ? (
+                                      <span className="w-3.5 h-3.5 border-2 border-gray-900 border-t-transparent rounded-full animate-spin" />
+                                    ) : (
+                                      <><Save className="w-3.5 h-3.5" /> Guardar</>
+                                    )}
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              // Estado de asistencia actual
+                              <div className="bg-black/20 rounded-xl p-3 border border-white/5 flex flex-wrap justify-between items-center gap-3">
+                                {!log ? (
+                                  <span className="text-xs text-gray-500 italic">No ha registrado entrada / salida</span>
+                                ) : (
+                                  <>
+                                    <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-gray-300">
+                                      <div className="flex flex-col">
+                                        <span className="text-[9px] text-gray-500 uppercase tracking-wider font-extrabold">Entrada</span>
+                                        <span className="font-semibold text-gray-200">📥 {formatChileDateTime(log.check_in_at)}</span>
+                                      </div>
+                                      <div className="flex flex-col">
+                                        <span className="text-[9px] text-gray-500 uppercase tracking-wider font-extrabold">Salida</span>
+                                        <span className="font-semibold text-gray-200">
+                                          {log.check_out_at ? `📤 ${formatChileDateTime(log.check_out_at)}` : "En curso ⏳"}
+                                        </span>
+                                      </div>
+                                    </div>
+
+                                    <div className="flex items-center gap-2">
+                                      {log.verified_by_admin && (
+                                        <span className="text-[8px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 font-bold uppercase tracking-wider cursor-help" title={`Corregido por admin: ${log.admin_adjustment_notes || 'Sin observaciones'}`}>
+                                          ✍️ Corregido
+                                        </span>
+                                      )}
+                                      <span className="text-xs font-extrabold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-lg border border-emerald-500/20 shadow-inner">
+                                        {formatDurationMinutes(log.total_duration_minutes)}
+                                      </span>
+                                    </div>
+                                  </>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
                   ) : (
+                    // Vista simple original
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       {assigned.map(s => {
                         let badgeStyle = "bg-amber-500/10 text-amber-400 border-amber-500/20";
                         let statusIcon = "⏳";
                         let statusLabel = "Pendiente";
                         
-                        if (s.status === "Confirmado") {
+                        if (s.status === "Confirmado" || s.status === "Aceptado") {
                           badgeStyle = "bg-emerald-500/10 text-emerald-400 border-emerald-500/20";
                           statusIcon = "✅";
                           statusLabel = "Confirmado";
