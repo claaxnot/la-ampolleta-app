@@ -304,20 +304,25 @@ export default function Finanzas() {
         grouped[key].monto_total += parseFloat(p.monto) || 0;
       });
 
-      const dataResumen = Object.values(grouped).map(item => ({
-        "Nombre": item.name,
-        "RUT": item.rut,
-        "Correo": item.email,
-        "Rol": item.role,
-        "Cuenta Origen": item.cuenta_origen || "",
-        "Moneda Origen": "CLP",
-        "Moneda Destino": "CLP",
-        "Codigo banco destino": item.codigo_banco_destino || "",
-        "Cuenta destino": item.cuenta_destino || "",
-        "Monto Transferencia": item.monto_total,
-        "Glosa personalizada transferencia": item.glosa_transferencia || "",
-        "Mensaje corre beneficiario": item.mensaje_beneficiario || "",
-      }));
+      const dataResumen = Object.values(grouped).map(item => {
+        const cleanRut = item.rut ? String(item.rut).replace(/\./g, "") : "";
+        const monto = parseFloat(item.monto_total) || 0;
+        return {
+          "Cuenta Origen": item.cuenta_origen || "",
+          "Moneda Origen": "CLP",
+          "Cuenta destino": item.cuenta_destino || "",
+          "Moneda Destino": "CLP",
+          "Codigo banco destino": item.codigo_banco_destino || "",
+          "RUT": cleanRut,
+          "Nombre": item.name || "",
+          "Monto Transferencia": monto,
+          "Glosa personalizada transferencia": item.glosa_transferencia || "",
+          "Correo": item.email || "",
+          "Mensaje corre beneficiario": item.mensaje_beneficiario || "",
+          "Glosa cartola originador": "",
+          "Glosa cartola beneficiario": ""
+        };
+      });
 
       // 2. HOJA 2: DESGLOSE COMPLETO POR EVENTO
       const dataDesglose = selectedPayments.map(p => ({
@@ -420,20 +425,25 @@ export default function Finanzas() {
         }
       });
 
-      const dataResumen = Object.values(grouped).map(item => ({
-        "Nombre": item.name,
-        "RUT": item.rut,
-        "Correo": item.email,
-        "Rol": item.role,
-        "Cuenta Origen": item.cuenta_origen || "",
-        "Moneda Origen": "CLP",
-        "Moneda Destino": "CLP",
-        "Codigo banco destino": item.codigo_banco_destino || "",
-        "Cuenta destino": item.cuenta_destino || "",
-        "Monto Transferencia": item.monto_total,
-        "Glosa personalizada transferencia": item.glosa_transferencia || "",
-        "Mensaje corre beneficiario": item.mensaje_beneficiario || "",
-      }));
+      const dataResumen = Object.values(grouped).map(item => {
+        const cleanRut = item.rut ? String(item.rut).replace(/\./g, "") : "";
+        const monto = parseFloat(item.monto_total) || 0;
+        return {
+          "Cuenta Origen": item.cuenta_origen || "",
+          "Moneda Origen": "CLP",
+          "Cuenta destino": item.cuenta_destino || "",
+          "Moneda Destino": "CLP",
+          "Codigo banco destino": item.codigo_banco_destino || "",
+          "RUT": cleanRut,
+          "Nombre": item.name || "",
+          "Monto Transferencia": monto,
+          "Glosa personalizada transferencia": item.glosa_transferencia || "",
+          "Correo": item.email || "",
+          "Mensaje corre beneficiario": item.mensaje_beneficiario || "",
+          "Glosa cartola originador": "",
+          "Glosa cartola beneficiario": ""
+        };
+      });
 
       // 2. HOJA 2: DESGLOSE COMPLETO POR EVENTO
       const dataDesglose = filteredPayments.map(p => ({
