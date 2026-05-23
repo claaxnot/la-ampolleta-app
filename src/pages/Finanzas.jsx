@@ -873,7 +873,7 @@ export default function Finanzas() {
       </motion.header>
 
       {/* Tabs Administrador de Finanzas */}
-      <motion.div variants={itemVariants} className="flex items-center gap-2 bg-gray-900/60 p-1.5 rounded-xl border border-white/5 w-full max-w-sm sm:max-w-md mb-6 select-none">
+      <motion.div variants={itemVariants} className="flex items-center gap-2 bg-gray-900/60 p-1.5 rounded-xl border border-white/5 w-full max-w-sm sm:max-w-md mb-6">
         <button
           onClick={() => setAdminTab("nominas")}
           className={`flex-1 py-3 px-4 rounded-lg text-xs sm:text-sm font-extrabold transition-all duration-150 flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 ${
@@ -992,7 +992,7 @@ export default function Finanzas() {
                 </div>
               </div>
 
-              <div className="flex items-center bg-gray-800/40 border border-gray-700/60 rounded-xl p-1 gap-1 select-none">
+              <div className="flex items-center bg-gray-800/40 border border-gray-700/60 rounded-xl p-1 gap-1">
                 <button
                   onClick={() => setStatusFilter("all")}
                   className={`px-4 py-2 text-xs font-semibold rounded-lg transition-all duration-150 cursor-pointer active:scale-95 ${statusFilter === "all" ? "bg-amber-500/20 text-amber-300 border border-amber-500/20" : "text-gray-400 hover:text-gray-200"}`}
@@ -1013,7 +1013,7 @@ export default function Finanzas() {
                 </button>
               </div>
 
-              <label className="flex items-center gap-2 cursor-pointer bg-gray-800/40 border border-gray-700/60 rounded-xl px-3.5 py-1.5 text-xs font-semibold text-gray-300 hover:text-white hover:border-amber-500/30 transition-all select-none h-[38px]">
+              <label className="flex items-center gap-2 cursor-pointer bg-gray-800/40 border border-gray-700/60 rounded-xl px-3.5 py-1.5 text-xs font-semibold text-gray-300 hover:text-white hover:border-amber-500/30 transition-all h-[38px]">
                 <input
                   type="checkbox"
                   checked={includeFuture}
@@ -1331,7 +1331,7 @@ export default function Finanzas() {
         >
           {/* Barra de Filtros de Gastos */}
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-gray-900/40 p-4 rounded-2xl border border-white/5 backdrop-blur-md">
-            <div className="flex flex-wrap gap-2 select-none">
+            <div className="flex flex-wrap gap-2">
               {["all", "Pendiente", "En revisión", "Aprobado", "Rechazado", "Pagado"].map((status) => {
                 const label = status === "all" ? "Todos" : status;
                 const count = expenses.filter(e => status === "all" || e.status === status).length;
