@@ -331,7 +331,9 @@ export default function Finanzas() {
       };
 
       if (newStatus === "Aprobado") {
-        const approvedAmount = parseFloat(approvedAmountInput);
+        const approvedAmount = typeof approvedAmountInput === "string"
+          ? parseFloat(String(approvedAmountInput).replace(/\D/g, ""))
+          : parseFloat(approvedAmountInput);
         if (isNaN(approvedAmount) || approvedAmount <= 0) {
           toast.error("El monto aprobado debe ser un número válido mayor a 0.", { id: loadingToast });
           setSubmittingExpenseAction(false);
@@ -1339,93 +1341,108 @@ export default function Finanzas() {
             <div className="lg:col-span-1">
               <div className="sticky top-6">
                 {selectedExpense ? (
-                  <GlassCard className="p-6 border-amber-500/20 space-y-6">
-                    <div className="text-left">
-                      <h3 className="text-lg font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-amber-200 to-amber-400 flex items-center gap-2">
-                        <Sliders className="w-5 h-5 text-amber-400" />
-                        Revisar Solicitud
-                      </h3>
-                      <p className="text-xs text-gray-400 mt-1">Gestiona el estado y monto aprobado de la solicitud.</p>
-                    </div>
+                  /* Hybrid Sidebar on Desktop (lg) / Centered Backdrop Modal on Mobile/Tablet (<lg) */
+                  <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 lg:relative lg:inset-auto lg:bg-transparent lg:backdrop-blur-none lg:z-auto lg:p-0 lg:flex lg:w-full lg:max-w-none">
+                    <GlassCard className="p-6 border-amber-500/20 space-y-6 w-full max-w-md lg:max-w-none relative max-h-[90vh] overflow-y-auto lg:max-h-none lg:overflow-visible shadow-2xl">
+                      {/* Close button for mobile screens */}
+                      <button
+                        onClick={() => setSelectedExpense(null)}
+                        className="absolute top-4 right-4 text-gray-400 hover:text-white lg:hidden bg-white/5 p-2 rounded-full cursor-pointer hover:bg-white/10 transition-colors"
+                        title="Cerrar revisión"
+                      >
+                        <XCircle className="w-5 h-5 text-red-400" />
+                      </button>
 
-                    <div className="space-y-4 text-sm text-left">
-                      <div className="bg-black/30 p-4 rounded-xl border border-white/5 space-y-2">
-                        <p className="text-gray-400 text-xs font-bold uppercase tracking-wide">Detalles de Transferencia</p>
-                        <div className="grid grid-cols-2 gap-2 text-xs">
-                          <div>
-                            <span className="text-gray-500 font-semibold">Banco:</span>
-                            <p className="font-bold text-gray-300">{BANCOS_CHILE[selectedExpense.profiles?.codigo_banco_destino] || "No registrado"}</p>
-                          </div>
-                          <div>
-                            <span className="text-gray-500 font-semibold">Nº Cuenta:</span>
-                            <p className="font-bold text-gray-300 font-mono">{selectedExpense.profiles?.cuenta_destino || "No registrada"}</p>
+                      <div className="text-left">
+                        <h3 className="text-lg font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-amber-200 to-amber-400 flex items-center gap-2">
+                          <Sliders className="w-5 h-5 text-amber-400" />
+                          Revisar Solicitud
+                        </h3>
+                        <p className="text-xs text-gray-400 mt-1">Gestiona el estado y monto aprobado de la solicitud.</p>
+                      </div>
+
+                      <div className="space-y-4 text-sm text-left">
+                        <div className="bg-black/30 p-4 rounded-xl border border-white/5 space-y-2">
+                          <p className="text-gray-400 text-xs font-bold uppercase tracking-wide">Detalles de Transferencia</p>
+                          <div className="grid grid-cols-2 gap-2 text-xs">
+                            <div>
+                              <span className="text-gray-500 font-semibold">Banco:</span>
+                              <p className="font-bold text-gray-300">{BANCOS_CHILE[selectedExpense.profiles?.codigo_banco_destino] || "No registrado"}</p>
+                            </div>
+                            <div>
+                              <span className="text-gray-500 font-semibold">Nº Cuenta:</span>
+                              <p className="font-bold text-gray-300 font-mono">{selectedExpense.profiles?.cuenta_destino || "No registrada"}</p>
+                            </div>
                           </div>
                         </div>
-                      </div>
 
-                      {/* Monto Aprobado Input */}
-                      <div className="space-y-2">
-                        <CurrencyInputCLP
-                          label="Monto Aprobado (CLP)"
-                          id="approved_amount"
-                          value={approvedAmountInput}
-                          onChange={(val) => setApprovedAmountInput(val)}
-                          placeholder="Monto final aprobado"
-                        />
-                        <p className="text-[10px] text-gray-500">
-                          Monto solicitado original: <strong className="text-gray-400">${parseFloat(selectedExpense.requested_amount).toLocaleString("es-CL")}</strong>
-                        </p>
-                      </div>
+                        {/* Monto Aprobado Input */}
+                        <div className="space-y-2">
+                          <CurrencyInputCLP
+                            label="Monto Aprobado (CLP)"
+                            id="approved_amount"
+                            value={approvedAmountInput}
+                            onChange={(val) => setApprovedAmountInput(val)}
+                            placeholder="Monto final aprobado"
+                          />
+                          <p className="text-[10px] text-gray-500">
+                            Monto solicitado original: <strong className="text-gray-400">${parseFloat(selectedExpense.requested_amount).toLocaleString("es-CL")}</strong>
+                          </p>
+                        </div>
 
-                      {/* Comentario Admin */}
-                      <div className="space-y-2">
-                        <label className="block text-xs font-extrabold text-gray-300 uppercase tracking-wide">Comentario Administrativo</label>
-                        <textarea
-                          rows="3"
-                          placeholder="Agrega una glosa o motivo de la decisión..."
-                          value={expenseComment}
-                          onChange={(e) => setExpenseComment(e.target.value)}
-                          className="w-full bg-gray-950/80 border border-gray-800 rounded-xl py-2 px-3 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-amber-500 resize-none"
-                        />
-                      </div>
+                        {/* Comentario Admin */}
+                        <div className="space-y-2">
+                          <label className="block text-xs font-extrabold text-gray-300 uppercase tracking-wide">Comentario Administrativo</label>
+                          <textarea
+                            rows="3"
+                            placeholder="Agrega una glosa o motivo de la decisión..."
+                            value={expenseComment}
+                            onChange={(e) => setExpenseComment(e.target.value)}
+                            className="w-full bg-gray-950/80 border border-gray-800 rounded-xl py-2 px-3 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-amber-500 resize-none"
+                          />
+                        </div>
 
-                      {/* Acciones */}
-                      <div className="space-y-2 pt-2">
-                        <div className="grid grid-cols-2 gap-2">
+                        {/* Acciones */}
+                        <div className="space-y-2 pt-2">
+                          <div className="grid grid-cols-2 gap-2">
+                            <button
+                              onClick={() => handleUpdateExpenseStatus(selectedExpense.id, "Aprobado")}
+                              disabled={submittingExpenseAction}
+                              className="bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-black text-xs font-black py-2.5 rounded-xl transition-all shadow-md flex items-center justify-center gap-1 cursor-pointer"
+                            >
+                              <CheckCircle className="w-3.5 h-3.5" />
+                              Aprobar
+                            </button>
+                            <button
+                              onClick={() => handleUpdateExpenseStatus(selectedExpense.id, "Rechazado")}
+                              disabled={submittingExpenseAction}
+                              className="bg-red-500 hover:bg-red-600 disabled:opacity-50 text-white text-xs font-black py-2.5 rounded-xl transition-all shadow-md flex items-center justify-center gap-1 cursor-pointer"
+                            >
+                              <XCircle className="w-3.5 h-3.5" />
+                              Rechazar
+                            </button>
+                          </div>
                           <button
-                            onClick={() => handleUpdateExpenseStatus(selectedExpense.id, "Aprobado")}
+                            onClick={() => handleUpdateExpenseStatus(selectedExpense.id, "En revisión")}
                             disabled={submittingExpenseAction}
-                            className="bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-black text-xs font-black py-2.5 rounded-xl transition-all shadow-md flex items-center justify-center gap-1 cursor-pointer"
+                            className="w-full bg-blue-500/20 hover:bg-blue-500/30 disabled:opacity-50 text-blue-300 text-xs font-bold py-2.5 rounded-xl transition-all border border-blue-500/20 flex items-center justify-center gap-1 cursor-pointer"
                           >
-                            <CheckCircle className="w-3.5 h-3.5" />
-                            Aprobar
-                          </button>
-                          <button
-                            onClick={() => handleUpdateExpenseStatus(selectedExpense.id, "Rechazado")}
-                            disabled={submittingExpenseAction}
-                            className="bg-red-500 hover:bg-red-600 disabled:opacity-50 text-white text-xs font-black py-2.5 rounded-xl transition-all shadow-md flex items-center justify-center gap-1 cursor-pointer"
-                          >
-                            <XCircle className="w-3.5 h-3.5" />
-                            Rechazar
+                            <FileText className="w-3.5 h-3.5" />
+                            Poner en revisión
                           </button>
                         </div>
-                        <button
-                          onClick={() => handleUpdateExpenseStatus(selectedExpense.id, "En revisión")}
-                          disabled={submittingExpenseAction}
-                          className="w-full bg-blue-500/20 hover:bg-blue-500/30 disabled:opacity-50 text-blue-300 text-xs font-bold py-2.5 rounded-xl transition-all border border-blue-500/20 flex items-center justify-center gap-1 cursor-pointer"
-                        >
-                          <FileText className="w-3.5 h-3.5" />
-                          Poner en revisión
-                        </button>
                       </div>
-                    </div>
-                  </GlassCard>
+                    </GlassCard>
+                  </div>
                 ) : (
-                  <GlassCard className="p-6 text-center border-dashed border-gray-700/60 py-16">
-                    <Sliders className="w-8 h-8 text-gray-600 mx-auto mb-2" />
-                    <p className="text-gray-400 text-xs font-bold">Selecciona una solicitud</p>
-                    <p className="text-[10px] text-gray-500 mt-1">Haz clic en cualquier viático de la lista para revisarlo aquí.</p>
-                  </GlassCard>
+                  /* Hidden on mobile, only shown on desktop */
+                  <div className="hidden lg:block">
+                    <GlassCard className="p-6 text-center border-dashed border-gray-700/60 py-16">
+                      <Sliders className="w-8 h-8 text-gray-600 mx-auto mb-2" />
+                      <p className="text-gray-400 text-xs font-bold">Selecciona una solicitud</p>
+                      <p className="text-[10px] text-gray-500 mt-1">Haz clic en cualquier viático de la lista para revisarlo aquí.</p>
+                    </GlassCard>
+                  </div>
                 )}
               </div>
             </div>
