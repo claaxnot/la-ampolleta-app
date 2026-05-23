@@ -866,25 +866,27 @@ export default function Finanzas() {
       </motion.header>
 
       {/* Tabs Administrador de Finanzas */}
-      <motion.div variants={itemVariants} className="flex items-center gap-2 bg-gray-900/60 p-1.5 rounded-xl border border-white/5 max-w-sm mb-6">
-        <button
+      <motion.div variants={itemVariants} className="flex items-center gap-2 bg-gray-900/60 p-1.5 rounded-xl border border-white/5 w-full max-w-sm sm:max-w-md mb-6 select-none">
+        <motion.button
+          whileTap={{ scale: 0.96 }}
           onClick={() => setAdminTab("nominas")}
-          className={`flex-1 py-2 px-3 rounded-lg text-xs font-extrabold transition-all flex items-center justify-center gap-1.5 ${
-            adminTab === "nominas" ? "bg-amber-500/20 text-amber-300 border border-amber-500/20 shadow-[0_0_12px_rgba(245,158,11,0.1)]" : "text-gray-400 hover:text-gray-200"
+          className={`flex-1 py-3 px-4 rounded-lg text-xs sm:text-sm font-extrabold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+            adminTab === "nominas" ? "bg-amber-500/20 text-amber-300 border border-amber-500/20 shadow-[0_0_12px_rgba(245,158,11,0.15)]" : "text-gray-400 hover:text-gray-200"
           }`}
         >
-          <DollarSign className="w-3.5 h-3.5" />
+          <DollarSign className="w-4 h-4 sm:w-3.5 sm:h-3.5 text-amber-400" />
           Nóminas y Pagos
-        </button>
-        <button
+        </motion.button>
+        <motion.button
+          whileTap={{ scale: 0.96 }}
           onClick={() => setAdminTab("viaticos")}
-          className={`flex-1 py-2 px-3 rounded-lg text-xs font-extrabold transition-all flex items-center justify-center gap-1.5 ${
-            adminTab === "viaticos" ? "bg-amber-500/20 text-amber-300 border border-amber-500/20 shadow-[0_0_12px_rgba(245,158,11,0.1)]" : "text-gray-400 hover:text-gray-200"
+          className={`flex-1 py-3 px-4 rounded-lg text-xs sm:text-sm font-extrabold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+            adminTab === "viaticos" ? "bg-amber-500/20 text-amber-300 border border-amber-500/20 shadow-[0_0_12px_rgba(245,158,11,0.15)]" : "text-gray-400 hover:text-gray-200"
           }`}
         >
-          <FileText className="w-3.5 h-3.5" />
+          <FileText className="w-4 h-4 sm:w-3.5 sm:h-3.5 text-amber-400" />
           Aprobación Viáticos
-        </button>
+        </motion.button>
       </motion.div>
 
       {dbErrorWarning && (
@@ -985,25 +987,28 @@ export default function Finanzas() {
                 </div>
               </div>
 
-              <div className="flex items-center bg-gray-800/40 border border-gray-700/60 rounded-xl p-1 gap-1">
-                <button
+              <div className="flex items-center bg-gray-800/40 border border-gray-700/60 rounded-xl p-1 gap-1 select-none">
+                <motion.button
+                  whileTap={{ scale: 0.95 }}
                   onClick={() => setStatusFilter("all")}
-                  className={`px-3 py-1 text-xs font-semibold rounded-lg transition-all duration-200 ${statusFilter === "all" ? "bg-amber-500/20 text-amber-300 border border-amber-500/20" : "text-gray-400 hover:text-gray-200"}`}
+                  className={`px-4 py-2 text-xs font-semibold rounded-lg transition-all duration-200 cursor-pointer ${statusFilter === "all" ? "bg-amber-500/20 text-amber-300 border border-amber-500/20" : "text-gray-400 hover:text-gray-200"}`}
                 >
                   Todos
-                </button>
-                <button
+                </motion.button>
+                <motion.button
+                  whileTap={{ scale: 0.95 }}
                   onClick={() => setStatusFilter("pending")}
-                  className={`px-3 py-1 text-xs font-semibold rounded-lg transition-all duration-200 ${statusFilter === "pending" ? "bg-red-500/20 text-red-300 border border-red-500/20" : "text-gray-400 hover:text-gray-200"}`}
+                  className={`px-4 py-2 text-xs font-semibold rounded-lg transition-all duration-200 cursor-pointer ${statusFilter === "pending" ? "bg-red-500/20 text-red-300 border border-red-500/20" : "text-gray-400 hover:text-gray-200"}`}
                 >
                   Pendientes
-                </button>
-                <button
+                </motion.button>
+                <motion.button
+                  whileTap={{ scale: 0.95 }}
                   onClick={() => setStatusFilter("paid")}
-                  className={`px-3 py-1 text-xs font-semibold rounded-lg transition-all duration-200 ${statusFilter === "paid" ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/20" : "text-gray-400 hover:text-gray-200"}`}
+                  className={`px-4 py-2 text-xs font-semibold rounded-lg transition-all duration-200 cursor-pointer ${statusFilter === "paid" ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/20" : "text-gray-400 hover:text-gray-200"}`}
                 >
                   Pagados
-                </button>
+                </motion.button>
               </div>
 
               <label className="flex items-center gap-2 cursor-pointer bg-gray-800/40 border border-gray-700/60 rounded-xl px-3.5 py-1.5 text-xs font-semibold text-gray-300 hover:text-white hover:border-amber-500/30 transition-all select-none h-[38px]">
@@ -1056,7 +1061,7 @@ export default function Finanzas() {
           {/* Tabla de Finanzas */}
           <motion.div variants={itemVariants}>
             <GlassCard className="overflow-hidden">
-              <div className="overflow-x-auto">
+              <div className="hidden md:block overflow-x-auto">
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr className="border-b border-gray-800 text-gray-400 text-xs font-semibold uppercase bg-gray-800/20">
@@ -1190,6 +1195,128 @@ export default function Finanzas() {
                   </tbody>
                 </table>
               </div>
+
+              {/* Vista Móvil: Tarjetas Touch-Friendly (Visible en pantallas < md) */}
+              <div className="md:hidden space-y-4 p-4">
+                {loading ? (
+                  <div className="py-12 text-center text-gray-500 font-medium">
+                    Cargando registros financieros...
+                  </div>
+                ) : filteredPayments.length === 0 ? (
+                  <div className="py-12 text-center text-gray-500 font-medium">
+                    No se encontraron transferencias que coincidan con la búsqueda.
+                  </div>
+                ) : (
+                  filteredPayments.map(p => {
+                    const isSelected = selectedIds.includes(p.id);
+                    const missingBank = !p.cuenta_destino || !p.codigo_banco_destino;
+
+                    return (
+                      <GlassCard
+                        key={p.id}
+                        onClick={() => p.status !== "Pagado" && handleSelectOne(p.id)}
+                        className={`p-5 transition-all duration-200 flex flex-col gap-4 border select-none ${
+                          isSelected ? "border-amber-500/50 bg-amber-500/[0.03]" : "border-white/5 bg-gray-900/30"
+                        } ${p.status === "Pagado" ? "opacity-70" : "active:bg-white/5"}`}
+                      >
+                        {/* Fila Superior: Checkbox / Nombre / RUT / Estado */}
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex items-center gap-3">
+                            {p.status === "Pagado" ? (
+                              <CheckSquare className="w-6 h-6 text-gray-600/50 shrink-0" />
+                            ) : (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleSelectOne(p.id);
+                                }}
+                                className="text-gray-400 hover:text-white transition-colors shrink-0 p-1"
+                              >
+                                {isSelected ? (
+                                  <CheckSquare className="w-6 h-6 text-amber-500" />
+                                ) : (
+                                  <Square className="w-6 h-6" />
+                                )}
+                              </button>
+                            )}
+                            <div className="flex flex-col">
+                              <span className="font-extrabold text-white text-sm flex items-center gap-1.5 flex-wrap">
+                                {p.staff_name}
+                                {p.is_expense && (
+                                  <span className="px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/20 text-amber-400 text-[9px] font-extrabold uppercase">
+                                    {p.expense_type || "Viático"}
+                                  </span>
+                                )}
+                              </span>
+                              <span className="text-[11px] text-gray-400 font-mono mt-0.5">{p.staff_rut}</span>
+                            </div>
+                          </div>
+
+                          <span className={`px-2.5 py-1 rounded-full text-[10px] font-extrabold shadow-sm border shrink-0 ${
+                            p.status === "Pagado"
+                              ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                              : 'bg-red-500/10 border-red-500/30 text-red-400'
+                          }`}>
+                            {p.status}
+                          </span>
+                        </div>
+
+                        {/* Fila Media: Información de Evento / Datos Bancarios */}
+                        <div className="grid grid-cols-1 gap-4 pt-3 border-t border-white/5 text-xs text-gray-300">
+                          <div className="flex flex-col gap-1">
+                            <span className="text-[9px] text-gray-500 uppercase font-extrabold tracking-wider">Evento / Fecha</span>
+                            <span className="font-semibold text-gray-200">{p.event_name}</span>
+                            <span className="text-gray-400 text-[10px]">{p.event_date}</span>
+                          </div>
+
+                          <div className="flex flex-col gap-1 pt-1">
+                            <span className="text-[9px] text-gray-500 uppercase font-extrabold tracking-wider">Datos de Transferencia</span>
+                            {missingBank ? (
+                              <span className="text-[10px] px-2 py-1 bg-red-500/10 text-red-400 border border-red-500/20 rounded font-semibold inline-flex items-center gap-1 w-max mt-1">
+                                ⚠️ Sin Datos Bancarios
+                              </span>
+                            ) : (
+                              <div className="flex flex-col gap-1 bg-black/20 p-2.5 rounded-xl border border-white/5">
+                                <span className="font-bold flex items-center gap-1 text-[11px] text-gray-200">
+                                  🏦 {p.banco_name}
+                                </span>
+                                <span className="text-gray-400 text-[10px] flex items-center gap-1.5">
+                                  Cuenta:{" "}
+                                  <span className="font-mono text-white font-semibold">
+                                    {revealedAccounts[p.id] ? p.cuenta_destino : maskAccountNumber(p.cuenta_destino)}
+                                  </span>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      toggleRevealAccount(p.id);
+                                    }}
+                                    className="text-gray-400 hover:text-amber-400 transition-colors p-1"
+                                    title={revealedAccounts[p.id] ? "Ocultar número de cuenta" : "Mostrar número de cuenta"}
+                                  >
+                                    {revealedAccounts[p.id] ? (
+                                      <EyeOff className="w-3.5 h-3.5 text-amber-500" />
+                                    ) : (
+                                      <Eye className="w-3.5 h-3.5" />
+                                    )}
+                                  </button>
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Fila Inferior: Monto de Honorario */}
+                        <div className="flex items-center justify-between pt-3 border-t border-white/5 mt-1">
+                          <span className="text-[10px] text-gray-500 uppercase font-bold tracking-wider">Monto a Transferir</span>
+                          <span className="font-black text-amber-400 text-base">
+                            ${p.monto.toLocaleString("es-CL")}
+                          </span>
+                        </div>
+                      </GlassCard>
+                    );
+                  })
+                )}
+              </div>
             </GlassCard>
           </motion.div>
         </>
@@ -1202,25 +1329,26 @@ export default function Finanzas() {
         >
           {/* Barra de Filtros de Gastos */}
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-gray-900/40 p-4 rounded-2xl border border-white/5 backdrop-blur-md">
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2 select-none">
               {["all", "Pendiente", "En revisión", "Aprobado", "Rechazado", "Pagado"].map((status) => {
                 const label = status === "all" ? "Todos" : status;
                 const count = expenses.filter(e => status === "all" || e.status === status).length;
                 return (
-                  <button
+                  <motion.button
                     key={status}
+                    whileTap={{ scale: 0.95 }}
                     onClick={() => {
                       setExpenseStatusFilter(status);
                       setSelectedExpense(null);
                     }}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                       expenseStatusFilter === status
                         ? "bg-amber-500 text-black shadow-lg shadow-amber-500/20"
                         : "bg-gray-800/60 text-gray-400 hover:text-white"
                     }`}
                   >
                     {label} ({count})
-                  </button>
+                  </motion.button>
                 );
               })}
             </div>

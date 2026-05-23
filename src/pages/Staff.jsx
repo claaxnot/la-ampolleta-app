@@ -78,10 +78,26 @@ export default function Staff() {
 
   React.useEffect(() => {
     fetchStaff();
+
+    // Suscribir a cambios en tiempo real de la tabla profiles
+    const channel = supabase
+      .channel("profiles-realtime")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "profiles" },
+        () => {
+          fetchStaff(true); // silent update
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
-  const fetchStaff = async () => {
-    setIsLoading(true);
+  const fetchStaff = async (silent = false) => {
+    if (!silent) setIsLoading(true);
     // Filtrar para que no aparezcan el administrador
     const { data, error } = await supabase
       .from('profiles')
@@ -92,7 +108,7 @@ export default function Staff() {
     if (data) {
       setStaff(data);
     }
-    setIsLoading(false);
+    if (!silent) setIsLoading(false);
   };
 
   const rolePermissions = permissions[user?.systemRole] || permissions.viewer;
@@ -384,7 +400,7 @@ export default function Staff() {
                 </thead>
                 <tbody className="divide-y divide-gray-700">
                   {filteredStaff.map((member) => {
-                    const isConfirmed = !!(member.avatar_url || member.cuenta_destino);
+                    const isConfirmed = !!member.email_confirmed;
                     return (
                       <tr key={member.id} className="hover:bg-gray-800/30 transition-colors">
                         <td className="px-4 py-2 flex items-center space-x-3 text-gray-100">
