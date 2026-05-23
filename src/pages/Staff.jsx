@@ -10,6 +10,41 @@ import { useAuth } from "../hooks/useAuth.js";
 import { permissions } from "../lib/permissions.js";
 import { toast } from "react-hot-toast";
 
+const translateAuthError = (message) => {
+  if (!message) return "Error desconocido";
+  let cleanMsg = String(message);
+  if (cleanMsg.startsWith("Error en autenticación: ")) {
+    cleanMsg = cleanMsg.replace("Error en autenticación: ", "");
+  }
+  const msg = cleanMsg.toLowerCase();
+  
+  if (msg.includes("only request this after")) {
+    const secondsMatch = msg.match(/\d+/);
+    const seconds = secondsMatch ? secondsMatch[0] : "60";
+    return `Por seguridad, debes esperar ${seconds} segundos antes de solicitar otro reenvío de correo.`;
+  }
+  if (msg.includes("email rate limit exceeded")) {
+    return "Límite de envío de correos excedido. Por favor, intenta de nuevo más tarde.";
+  }
+  if (msg.includes("already registered") || msg.includes("already exists")) {
+    return "Este correo electrónico ya está registrado.";
+  }
+  if (msg.includes("invalid login credentials")) {
+    return "Credenciales de inicio de sesión no válidas.";
+  }
+  if (msg.includes("database error saving new user")) {
+    return "Error al registrar el staff. Revisa que el RUT no esté duplicado.";
+  }
+  if (msg.includes("error sending confirmation email")) {
+    return "Error al enviar el correo de confirmación. Por favor, revisa la configuración SMTP en tu panel de Supabase.";
+  }
+  if (msg.includes("rate limit exceeded")) {
+    return "Límite de velocidad superado. Por favor, espera un momento.";
+  }
+  
+  return cleanMsg;
+};
+
 export default function Staff() {
   const { user } = useAuth();
   const [staff, setStaff] = useState([]);
@@ -31,7 +66,7 @@ export default function Staff() {
       toast.success("Correo de activación reenviado correctamente.", { id: loadingToast });
     } catch (err) {
       console.error("Resend error:", err);
-      toast.error(err.message || "Error al reenviar el correo de activación.", { id: loadingToast });
+      toast.error(translateAuthError(err.message || "Error al reenviar el correo de activación."), { id: loadingToast });
     } finally {
       setResendingEmails(prev => ({ ...prev, [email]: false }));
     }
@@ -191,7 +226,7 @@ export default function Staff() {
       }
     } catch (err) {
       console.error(err);
-      toast.error(err.message || "Error al procesar la operación", { id: loadingToast });
+      toast.error(translateAuthError(err.message || "Error al procesar la operación"), { id: loadingToast });
     } finally {
       setIsSaving(false);
     }
