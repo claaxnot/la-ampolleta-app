@@ -338,32 +338,32 @@ export default function EventDetails({ event, isOpen, onClose }) {
                                 </div>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                   <div className="flex flex-col gap-1">
-                                    <label className="text-[10px] text-gray-400 font-bold uppercase">Hora de Entrada (Chile)</label>
+                                    <label className="text-[10px] text-gray-400 font-extrabold uppercase tracking-wider">Hora de Entrada (Chile)</label>
                                     <input
                                       type="datetime-local"
                                       value={editCheckIn}
                                       onChange={(e) => setEditCheckIn(e.target.value)}
-                                      className="bg-gray-800/80 border border-gray-700 rounded-lg p-2 text-xs text-white focus:outline-none focus:border-amber-500/50"
+                                      className="bg-black/40 border border-white/10 rounded-xl p-2.5 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50 transition-all font-medium [&::-webkit-calendar-picker-indicator]:invert [&::-webkit-calendar-picker-indicator]:opacity-70 [&::-webkit-calendar-picker-indicator]:hover:opacity-100 [&::-webkit-calendar-picker-indicator]:cursor-pointer"
                                     />
                                   </div>
                                   <div className="flex flex-col gap-1">
-                                    <label className="text-[10px] text-gray-400 font-bold uppercase">Hora de Salida (Chile)</label>
+                                    <label className="text-[10px] text-gray-400 font-extrabold uppercase tracking-wider">Hora de Salida (Chile)</label>
                                     <input
                                       type="datetime-local"
                                       value={editCheckOut}
                                       onChange={(e) => setEditCheckOut(e.target.value)}
-                                      className="bg-gray-800/80 border border-gray-700 rounded-lg p-2 text-xs text-white focus:outline-none focus:border-amber-500/50"
+                                      className="bg-black/40 border border-white/10 rounded-xl p-2.5 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50 transition-all font-medium [&::-webkit-calendar-picker-indicator]:invert [&::-webkit-calendar-picker-indicator]:opacity-70 [&::-webkit-calendar-picker-indicator]:hover:opacity-100 [&::-webkit-calendar-picker-indicator]:cursor-pointer"
                                     />
                                   </div>
                                 </div>
                                 <div className="flex flex-col gap-1">
-                                  <label className="text-[10px] text-gray-400 font-bold uppercase">Motivo del Ajuste (Obligatorio)</label>
+                                  <label className="text-[10px] text-gray-400 font-extrabold uppercase tracking-wider">Motivo del Ajuste (Obligatorio)</label>
                                   <input
                                     type="text"
                                     placeholder="Ej: Olvidó marcar salida al finalizar el evento"
                                     value={editNotes}
                                     onChange={(e) => setEditNotes(e.target.value)}
-                                    className="bg-gray-800/80 border border-gray-700 rounded-lg p-2 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-amber-500/50 w-full"
+                                    className="bg-black/40 border border-white/10 rounded-xl p-2.5 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50 transition-all font-medium w-full"
                                   />
                                 </div>
                                 <div className="flex justify-end gap-2 pt-1">
