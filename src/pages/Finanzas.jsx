@@ -876,7 +876,7 @@ export default function Finanzas() {
       <motion.div variants={itemVariants} className="flex items-center gap-2 bg-gray-900/60 p-1.5 rounded-xl border border-white/5 w-full max-w-sm sm:max-w-md mb-6">
         <button
           onClick={() => setAdminTab("nominas")}
-          className={`flex-1 py-3 px-4 rounded-lg text-xs sm:text-sm font-extrabold transition-all duration-150 flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 ${
+          className={`flex-1 py-3 px-4 rounded-lg text-xs sm:text-sm font-extrabold transition-all duration-150 flex items-center justify-center gap-1.5 cursor-pointer touch-manipulation active:bg-amber-500/30 active:opacity-90 ${
             adminTab === "nominas" ? "bg-amber-500/20 text-amber-300 border border-amber-500/20 shadow-[0_0_12px_rgba(245,158,11,0.15)]" : "text-gray-400 hover:text-gray-200"
           }`}
         >
@@ -885,7 +885,7 @@ export default function Finanzas() {
         </button>
         <button
           onClick={() => setAdminTab("viaticos")}
-          className={`flex-1 py-3 px-4 rounded-lg text-xs sm:text-sm font-extrabold transition-all duration-150 flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 ${
+          className={`flex-1 py-3 px-4 rounded-lg text-xs sm:text-sm font-extrabold transition-all duration-150 flex items-center justify-center gap-1.5 cursor-pointer touch-manipulation active:bg-amber-500/30 active:opacity-90 ${
             adminTab === "viaticos" ? "bg-amber-500/20 text-amber-300 border border-amber-500/20 shadow-[0_0_12px_rgba(245,158,11,0.15)]" : "text-gray-400 hover:text-gray-200"
           }`}
         >
@@ -995,19 +995,19 @@ export default function Finanzas() {
               <div className="flex items-center bg-gray-800/40 border border-gray-700/60 rounded-xl p-1 gap-1">
                 <button
                   onClick={() => setStatusFilter("all")}
-                  className={`px-4 py-2 text-xs font-semibold rounded-lg transition-all duration-150 cursor-pointer active:scale-95 ${statusFilter === "all" ? "bg-amber-500/20 text-amber-300 border border-amber-500/20" : "text-gray-400 hover:text-gray-200"}`}
+                  className={`px-4 py-2 text-xs font-semibold rounded-lg transition-all duration-150 cursor-pointer touch-manipulation active:bg-white/10 active:opacity-90 ${statusFilter === "all" ? "bg-amber-500/20 text-amber-300 border border-amber-500/20" : "text-gray-400 hover:text-gray-200"}`}
                 >
                   Todos
                 </button>
                 <button
                   onClick={() => setStatusFilter("pending")}
-                  className={`px-4 py-2 text-xs font-semibold rounded-lg transition-all duration-150 cursor-pointer active:scale-95 ${statusFilter === "pending" ? "bg-red-500/20 text-red-300 border border-red-500/20" : "text-gray-400 hover:text-gray-200"}`}
+                  className={`px-4 py-2 text-xs font-semibold rounded-lg transition-all duration-150 cursor-pointer touch-manipulation active:bg-white/10 active:opacity-90 ${statusFilter === "pending" ? "bg-red-500/20 text-red-300 border border-red-500/20" : "text-gray-400 hover:text-gray-200"}`}
                 >
                   Pendientes
                 </button>
                 <button
                   onClick={() => setStatusFilter("paid")}
-                  className={`px-4 py-2 text-xs font-semibold rounded-lg transition-all duration-150 cursor-pointer active:scale-95 ${statusFilter === "paid" ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/20" : "text-gray-400 hover:text-gray-200"}`}
+                  className={`px-4 py-2 text-xs font-semibold rounded-lg transition-all duration-150 cursor-pointer touch-manipulation active:bg-white/10 active:opacity-90 ${statusFilter === "paid" ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/20" : "text-gray-400 hover:text-gray-200"}`}
                 >
                   Pagados
                 </button>
@@ -1342,7 +1342,7 @@ export default function Finanzas() {
                       setExpenseStatusFilter(status);
                       setSelectedExpense(null);
                     }}
-                    className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all duration-150 cursor-pointer active:scale-95 ${
+                    className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all duration-150 cursor-pointer touch-manipulation active:opacity-85 ${
                       expenseStatusFilter === status
                         ? "bg-amber-500 text-black shadow-lg shadow-amber-500/20"
                         : "bg-gray-800/60 text-gray-400 hover:text-white"
