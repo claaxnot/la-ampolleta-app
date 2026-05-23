@@ -65,12 +65,20 @@
 - [x] **Corrección de Tiempos en Notificaciones (TopBar):** Corregir la consulta de asignaciones para usar `updated_at` en lugar de `created_at` al renderizar la confirmación de asistencia y la notificación de pago realizado, mostrando la fecha y hora correctas en la campana en tiempo real.
 - [x] **Seguridad de Base de Datos y Hardening SQL (Supabase):** Resolver la advertencia de seguridad `0011_function_search_path_mutable` y `0029_authenticated_security_definer_function_executable` en `public.handle_new_user`, `public.sync_user_confirmation`, `public.handle_updated_at` y `public.update_updated_at_column` aplicando `search_path = ''`, `SECURITY INVOKER` y revocación explícita de privilegios RPC.
 
-## 8. Pendientes y Tareas Futuras
+## 8. Módulo de Control de Asistencia y Reloj de Personal (Anfitrionas)
+- [x] **Esquema de Base de Datos Seguro (Supabase):** Crear la tabla `event_attendance_logs` y funciones RPC seguras (`mark_event_check_in` / `mark_event_check_out`) con políticas RLS e inmutabilidad garantizada por la hora del servidor (`NOW()`) en el huso chileno.
+- [x] **Configuración Administrativa Flexible:** Agregar toggles glassmorphic en `EventModal.jsx` para habilitar asistencia y/o flexibilizar la exigencia de asignación confirmada por evento.
+- [x] **Worker Clock-In/Clock-Out Dashboard:** Widget responsive de asistencia con timer activo en tiempo real e indicador de jornada finalizada.
+- [x] **Auditoría Horaria y Suscripción Real-Time:** Integrar grilla en `EventDetails.jsx` con suscripción WebSocket y panel de corrección manual para el administrador.
+- [x] **Trazabilidad y Auditoría de Ajustes:** Forzar obligatoriedad del ingreso del motivo de corrección y resguardar marcas originales.
+- [x] **Integración de Nóminas y Finanzas:** Consultar y renderizar horas reales trabajadas en los pagos de Finanzas (`Finanzas.jsx`) con badges `⏱️ Xh Ym` e indicadores de pulso de jornadas incompletas.
+- [x] **Inputs Premium y Selectores Cohesivos:** Reemplazar selectores nativos por componentes personalizados `DatePicker` y `ClockPicker` con iconografía WebKit invertida de alta fidelidad.
+
+## 9. Pendientes y Tareas Futuras
 - [ ] **Módulo de Subida de Boletas de Honorarios (Worker):** Subida de PDFs de boletas para eventos finalizados, con flujo de revisión y aprobación del administrador antes de liberar el pago.
 - [ ] **Reportes Visuales y Gráficos de Finanzas (Admin):** Gráficos interactivos de barra/línea sobre egresos mensuales y exportación de informes analíticos en PDF.
 - [ ] **Bitácora de Auditoría Operacional (Logs):** Registro e historial detallado de acciones administrativas críticas (ej: creación de eventos, cambios de estados de pago).
 - [ ] Escribir archivo README.md completo con instrucciones de configuración local y variables de entorno.
-- [ ] Control de ingreso-salida para anfitrionas.
 - [ ] Control de pagos con boleta (si hay boleta se paga, sin boleta no se paga, verificar boleta antes de pagar).
 - [ ] Agregar validación que no se puede pagar un evento si hay boleta pendiente.
 
