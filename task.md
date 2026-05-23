@@ -62,6 +62,7 @@
   - `EventModal.jsx` (tarifas personalizadas por turno de staff).
   - `WorkerDashboard.jsx` (monto solicitado del gasto).
   - `Finanzas.jsx` (monto final aprobado por el administrador).
+- [x] **Corrección de Tiempos en Notificaciones (TopBar):** Corregir la consulta de asignaciones para usar `updated_at` en lugar de `created_at` al renderizar la confirmación de asistencia y la notificación de pago realizado, mostrando la fecha y hora correctas en la campana en tiempo real.
 
 ## 8. Pendientes y Tareas Futuras
 - [ ] **Módulo de Subida de Boletas de Honorarios (Worker):** Subida de PDFs de boletas para eventos finalizados, con flujo de revisión y aprobación del administrador antes de liberar el pago.

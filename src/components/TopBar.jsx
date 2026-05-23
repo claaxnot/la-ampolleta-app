@@ -173,7 +173,7 @@ export default function TopBar({ user, onToggleMenu }) {
       // Worker
       const { data: assignments } = await supabase
         .from('event_assignments')
-        .select('id, status, payment_status, created_at, events(name)')
+        .select('id, status, payment_status, created_at, updated_at, events(name)')
         .eq('staff_id', user.id)
         .order('created_at', { ascending: false })
         .limit(5);
@@ -181,24 +181,31 @@ export default function TopBar({ user, onToggleMenu }) {
       if (assignments) {
         assignments.forEach(a => {
           let statusPrefix = "🔔 Has sido asignado a";
-          if (a.status === 'Confirmado') statusPrefix = "✅ Confirmaste tu asistencia a";
-          if (a.status === 'Rechazado') statusPrefix = "❌ Rechazaste la asignación a";
+          let notifTime = a.created_at;
+
+          if (a.status === 'Confirmado') {
+            statusPrefix = "✅ Confirmaste tu asistencia a";
+            notifTime = a.updated_at || a.created_at;
+          } else if (a.status === 'Rechazado') {
+            statusPrefix = "❌ Rechazaste la asignación a";
+            notifTime = a.updated_at || a.created_at;
+          }
 
           combinedNotifs.push({
             id: `a-${a.id}-${a.status}`,
             message: `${statusPrefix}: ${a.events?.name || 'Un evento'}`,
-            time: getTimeAgo(a.created_at),
-            date: new Date(a.created_at),
+            time: getTimeAgo(notifTime),
+            date: new Date(notifTime),
             read: readIds.includes(`a-${a.id}-${a.status}`)
           });
 
-          // Si el pago ya fue realizado, agregamos la notificación de pago
+          // Si el pago ya fue realizado, agregamos la notificación de pago con la fecha de la última actualización (momento del pago)
           if (a.payment_status === "Pagado") {
             combinedNotifs.push({
               id: `p-${a.id}-paid`,
               message: `💰 Pago de Honorarios Realizado: Se liquidó tu pago para "${a.events?.name || 'Un evento'}"`,
-              time: getTimeAgo(a.created_at),
-              date: new Date(a.created_at),
+              time: getTimeAgo(a.updated_at || a.created_at),
+              date: new Date(a.updated_at || a.created_at),
               read: readIds.includes(`p-${a.id}-paid`)
             });
           }
