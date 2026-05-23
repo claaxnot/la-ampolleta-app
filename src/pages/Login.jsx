@@ -119,9 +119,7 @@ export default function Login({ onLogin }) {
 
     setIsLoading(true);
     try {
-      const redirectToUrl = window.location.origin.includes("localhost")
-        ? window.location.origin + "/reset-password"
-        : "https://la-ampolleta-app.vercel.app/reset-password";
+      const redirectToUrl = `${window.location.origin}/reset-password`;
 
       const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: redirectToUrl,
