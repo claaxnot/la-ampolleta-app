@@ -1323,12 +1323,7 @@ export default function Finanzas() {
           </motion.div>
         </>
       ) : (
-        <motion.div
-          variants={containerVariants}
-          initial="hidden"
-          animate="show"
-          className="space-y-6"
-        >
+        <div className="space-y-6">
           {/* Barra de Filtros de Gastos */}
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-gray-900/40 p-4 rounded-2xl border border-white/5 backdrop-blur-md">
             <div className="flex flex-wrap gap-2">
@@ -1577,7 +1572,7 @@ export default function Finanzas() {
               </div>
             </div>
           </div>
-        </motion.div>
+        </div>
       )}
     </motion.div>
   );
