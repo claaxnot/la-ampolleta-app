@@ -23,6 +23,9 @@ export default function EventCard({ event, onEdit, onDelete, onView }) {
       case "completed":
       case "finalizado":
         return "bg-gray-500/10 text-gray-400 border-gray-500/20";
+      case "cancelado":
+      case "cancelled":
+        return "bg-red-500/10 text-red-400 border-red-500/20";
       case "planned":
       case "planificado":
       case "pendiente":

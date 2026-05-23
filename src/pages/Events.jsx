@@ -168,15 +168,18 @@ export default function Events({ user }) {
         
         // Crear notificaciones físicas para los trabajadores asignados
         try {
+          const isCancelled = eventData.status?.toLowerCase() === "cancelado" || eventData.status?.toLowerCase() === "cancelled";
           const notificationsPayload = staffIds.map(id => ({
             user_id: id,
-            title: "📅 Nueva Asignación de Evento",
-            description: `Has sido asignado para el evento "${eventData.name || 'Producción'}" el ${eventData.date || ''}.`,
-            type: "info"
+            title: isCancelled ? "🚨 Evento Cancelado" : "📅 Nueva Asignación de Evento",
+            description: isCancelled 
+              ? `El evento "${eventData.name || 'Producción'}" programado para el ${eventData.date || ''} ha sido CANCELADO.`
+              : `Has sido asignado para el evento "${eventData.name || 'Producción'}" el ${eventData.date || ''}.`,
+            type: isCancelled ? "danger" : "info"
           }));
           await supabase.from('notifications').insert(notificationsPayload);
         } catch (err) {
-          console.warn("⚠️ [NOTIFICATIONS TABLE]: La tabla notifications no existe aún en BD.");
+          console.warn("⚠️ [NOTIFICATIONS TABLE]: Error al insertar notificaciones en BD.");
         }
       }
 
@@ -260,7 +263,12 @@ export default function Events({ user }) {
       case "activo":
         return "bg-emerald-500/20 text-emerald-300 border-emerald-500/30";
       case "completado":
+      case "finalizado":
+      case "completed":
         return "bg-gray-500/20 text-gray-400 border-gray-500/30";
+      case "cancelado":
+      case "cancelled":
+        return "bg-red-500/20 text-red-300 border-red-500/30";
       case "planned":
       case "planificado":
       case "pendiente":

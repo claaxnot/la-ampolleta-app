@@ -729,6 +729,11 @@ export default function WorkerDashboard({ user }) {
         payment_status,
         custom_rate,
         event_id,
+        invoice_required,
+        invoice_received,
+        invoice_number,
+        invoice_received_at,
+        invoice_amount,
         events (
           id, name, date, time, location, client, status, description,
           call_time, setup_time, end_time, priority, operational_notes,
@@ -742,13 +747,21 @@ export default function WorkerDashboard({ user }) {
       .eq('staff_id', workerId);
 
     if (data) {
-      const formattedEvents = data.map(assignment => ({
-        assignment_id: assignment.id,
-        assignment_status: assignment.status,
-        payment_status: assignment.payment_status,
-        custom_rate: assignment.custom_rate,
-        ...assignment.events
-      }));
+      const formattedEvents = data
+        .map(assignment => ({
+          assignment_id: assignment.id,
+          assignment_status: assignment.status,
+          payment_status: assignment.payment_status,
+          custom_rate: assignment.custom_rate,
+          invoice_required: assignment.invoice_required !== undefined ? assignment.invoice_required : true,
+          invoice_received: assignment.invoice_received !== undefined ? assignment.invoice_received : false,
+          invoice_number: assignment.invoice_number || null,
+          invoice_received_at: assignment.invoice_received_at || null,
+          invoice_amount: assignment.invoice_amount ? parseFloat(assignment.invoice_amount) : null,
+          ...assignment.events
+        }))
+        .filter(e => e.status?.toLowerCase() !== "cancelado" && e.status?.toLowerCase() !== "cancelled");
+        
       setAssignedEvents(formattedEvents);
       fetchMyDbNotifications(workerId, formattedEvents);
       await fetchAttendanceLogs(workerId);
@@ -1983,13 +1996,14 @@ export default function WorkerDashboard({ user }) {
                               <th className="py-3 px-4">Evento</th>
                               <th className="py-3 px-4">Fecha</th>
                               <th className="py-3 px-4">Honorario</th>
+                              <th className="py-3 px-4 text-center">Boleta (DTE)</th>
                               <th className="py-3 px-4 text-center">Estado Pago</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-white/5">
                             {filteredCompletedEvents.length === 0 ? (
                               <tr>
-                                <td colSpan="4" className="py-8 text-center text-gray-500 italic">
+                                <td colSpan="5" className="py-8 text-center text-gray-500 italic">
                                   No tienes eventos completados registrados para este período.
                                 </td>
                               </tr>
@@ -2003,6 +2017,28 @@ export default function WorkerDashboard({ user }) {
                                     <td className="py-3.5 px-4 font-bold text-gray-200">{event.name}</td>
                                     <td className="py-3.5 px-4 text-gray-400">{event.date}</td>
                                     <td className="py-3.5 px-4 font-extrabold text-amber-400">${rate.toLocaleString("es-CL")}</td>
+                                    <td className="py-3.5 px-4 text-center">
+                                      {event.invoice_required ? (
+                                        event.invoice_received ? (
+                                          <span className="px-2.5 py-1 rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-2xs font-extrabold" title={event.invoice_received_at ? `Validada el ${new Date(event.invoice_received_at).toLocaleDateString("es-CL")}` : ""}>
+                                            🟢 Nº {event.invoice_number}
+                                          </span>
+                                        ) : (
+                                          <div className="flex flex-col items-center gap-0.5 justify-center">
+                                            <span className="px-2.5 py-1 rounded bg-amber-500/10 border border-amber-500/30 text-amber-400 text-2xs font-extrabold animate-pulse">
+                                              🔴 Falta Boleta
+                                            </span>
+                                            <span className="text-[10px] text-gray-500">
+                                              enviar a contacto@laampolleta.tv
+                                            </span>
+                                          </div>
+                                        )
+                                      ) : (
+                                        <span className="px-2.5 py-1 rounded bg-gray-800 border border-white/10 text-gray-400 text-2xs font-extrabold">
+                                          ⚪ No requiere
+                                        </span>
+                                      )}
+                                    </td>
                                     <td className="py-3.5 px-4 text-center">
                                       <span className={`px-2.5 py-1 rounded-full text-2xs font-extrabold border ${isPaid
                                           ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'

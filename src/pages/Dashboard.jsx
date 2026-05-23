@@ -195,8 +195,10 @@ export default function Dashboard() {
                     let statusColor = "bg-amber-500/20 text-amber-300 border-amber-500/30";
                     if (e.status.toLowerCase() === 'confirmado' || e.status.toLowerCase() === 'active') {
                       statusColor = "bg-emerald-500/20 text-emerald-300 border-emerald-500/30";
-                    } else if (e.status.toLowerCase() === 'completado') {
+                    } else if (e.status.toLowerCase() === 'completado' || e.status.toLowerCase() === 'finalizado' || e.status.toLowerCase() === 'completed') {
                       statusColor = "bg-gray-500/20 text-gray-400 border-gray-500/30";
+                    } else if (e.status.toLowerCase() === 'cancelado' || e.status.toLowerCase() === 'cancelled') {
+                      statusColor = "bg-red-500/20 text-red-300 border-red-500/30";
                     }
 
                     return (

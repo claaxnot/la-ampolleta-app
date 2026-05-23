@@ -85,8 +85,158 @@ export default function Finanzas() {
   const [submittingExpenseAction, setSubmittingExpenseAction] = useState(false);
   const [approvedAmountInput, setApprovedAmountInput] = useState("");
 
+  // Estados de Gestión de Boletas de Honorarios (Módulo Administrativo)
+  const [showInvoiceModal, setShowInvoiceModal] = useState(false);
+  const [selectedInvoicePayment, setSelectedInvoicePayment] = useState(null);
+  const [invoiceFormNum, setInvoiceFormNum] = useState("");
+  const [invoiceFormDate, setInvoiceFormDate] = useState(new Date().toISOString().split("T")[0]);
+  const [invoiceFormAmount, setInvoiceFormAmount] = useState("");
+  const [invoiceFormNotes, setInvoiceFormNotes] = useState("");
+  const [invoiceFormConfirmEmail, setInvoiceFormConfirmEmail] = useState(false);
+  const [isSubmittingInvoice, setIsSubmittingInvoice] = useState(false);
+  const [invoiceFormConfirmDifference, setInvoiceFormConfirmDifference] = useState(false);
+
+  // Estados de Configuración de Retención y Tolerancia (SII V2)
+  const [retentionRateSetting, setRetentionRateSetting] = useState(15.25);
+  const [toleranceSetting, setToleranceSetting] = useState(10);
+  const [isEditingSettings, setIsEditingSettings] = useState(false);
+  const [inputRate, setInputRate] = useState("15.25");
+  const [inputTolerance, setInputTolerance] = useState("10");
+  const [isSavingSettings, setIsSavingSettings] = useState(false);
+
   const toggleRevealAccount = (id) => {
     setRevealedAccounts(prev => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const handleToggleInvoiceRequired = async (assignmentId, currentValue) => {
+    const loadingToast = toast.loading("Actualizando requerimiento de boleta...");
+    try {
+      const { error } = await supabase
+        .from("event_assignments")
+        .update({ invoice_required: !currentValue })
+        .eq("id", assignmentId);
+
+      if (error) throw error;
+      toast.success("Requerimiento de boleta actualizado con éxito.", { id: loadingToast });
+      fetchPayments();
+    } catch (err) {
+      console.error("Error updating invoice_required:", err);
+      toast.error("Error al actualizar el requerimiento de boleta.", { id: loadingToast });
+    }
+  };
+
+  const handleOpenInvoiceModal = (payment) => {
+    setSelectedInvoicePayment(payment);
+    setInvoiceFormNum(payment.invoice_number || "");
+    setInvoiceFormDate(payment.invoice_received_at ? new Date(payment.invoice_received_at).toISOString().split("T")[0] : new Date().toISOString().split("T")[0]);
+    
+    // Calcular bruto sugerido basado en la tasa de retención cargada
+    const rate = parseFloat(retentionRateSetting || 15.25) / 100;
+    const brutoSugerido = Math.round(payment.monto / (1 - rate));
+
+    // Rellenar con monto de boleta existente o sugerir el bruto esperado
+    setInvoiceFormAmount(payment.invoice_amount ? String(payment.invoice_amount) : String(brutoSugerido));
+    setInvoiceFormNotes(payment.invoice_notes || "");
+    setInvoiceFormConfirmEmail(false);
+    setInvoiceFormConfirmDifference(false);
+    setShowInvoiceModal(true);
+  };
+
+  const handleSaveInvoice = async (e) => {
+    e.preventDefault();
+    if (!selectedInvoicePayment) return;
+
+    if (!invoiceFormNum.trim()) {
+      toast.error("Por favor ingresa el número de la boleta.");
+      return;
+    }
+    const cleanAmount = parseFloat(String(invoiceFormAmount).replace(/\D/g, ""));
+    if (isNaN(cleanAmount) || cleanAmount <= 0) {
+      toast.error("El monto de la boleta debe ser un número válido mayor a 0.");
+      return;
+    }
+    if (!invoiceFormDate) {
+      toast.error("Por favor selecciona la fecha de recepción.");
+      return;
+    }
+    if (!invoiceFormConfirmEmail) {
+      toast.error("Debes confirmar que recibiste la boleta en contacto@laampolleta.tv.");
+      return;
+    }
+
+    // Failsafe V2: Validar diferencia contra tolerancia
+    const rateVal = parseFloat(retentionRateSetting || 15.25);
+    const liquidoVal = parseFloat(selectedInvoicePayment.monto) || 0;
+    const brutoEsperado = Math.round(liquidoVal / (1 - (rateVal / 100)));
+    const difference = Math.abs(cleanAmount - brutoEsperado);
+    const hasDifference = difference > toleranceSetting;
+
+    if (hasDifference) {
+      if (!invoiceFormNotes.trim()) {
+        toast.error("El monto de la boleta tiene una diferencia de redondeo. Debes ingresar obligatoriamente una nota justificando la diferencia.");
+        return;
+      }
+      if (!invoiceFormConfirmDifference) {
+        toast.error("Debes marcar la casilla para autorizar el registro de la boleta con diferencias.");
+        return;
+      }
+    }
+
+    setIsSubmittingInvoice(true);
+    const loadingToast = toast.loading("Verificando boleta...");
+    try {
+      // Obtener el ID del administrador actual de la sesión
+      const { data: { user } } = await supabase.auth.getUser();
+
+      const { error } = await supabase
+        .from("event_assignments")
+        .update({
+          invoice_received: true,
+          invoice_number: invoiceFormNum.trim(),
+          invoice_received_at: new Date(invoiceFormDate + "T12:00:00").toISOString(),
+          invoice_amount: cleanAmount,
+          invoice_verified_by: user?.id || null,
+          invoice_notes: invoiceFormNotes.trim()
+        })
+        .eq("id", selectedInvoicePayment.id);
+
+      if (error) throw error;
+
+      toast.success("¡Boleta verificada con éxito! Pago desbloqueado.", { id: loadingToast });
+      setShowInvoiceModal(false);
+      setSelectedInvoicePayment(null);
+      fetchPayments();
+    } catch (err) {
+      console.error("Error verifying invoice:", err);
+      toast.error("Error al registrar la boleta.", { id: loadingToast });
+    } finally {
+      setIsSubmittingInvoice(false);
+    }
+  };
+
+  const handleRevertInvoice = async (assignmentId) => {
+    if (!window.confirm("¿Estás seguro de que deseas deshacer la verificación de esta boleta? Esto volverá a bloquear el pago.")) return;
+    const loadingToast = toast.loading("Deshaciendo verificación...");
+    try {
+      const { error } = await supabase
+        .from("event_assignments")
+        .update({
+          invoice_received: false,
+          invoice_number: null,
+          invoice_received_at: null,
+          invoice_amount: null,
+          invoice_verified_by: null,
+          invoice_notes: null
+        })
+        .eq("id", assignmentId);
+
+      if (error) throw error;
+      toast.success("Verificación deshecha. El pago ha sido bloqueado nuevamente.", { id: loadingToast });
+      fetchPayments();
+    } catch (err) {
+      console.error("Error undoing invoice verification:", err);
+      toast.error("Error al deshacer la verificación.", { id: loadingToast });
+    }
   };
 
   const maskAccountNumber = (accountNumber) => {
@@ -96,9 +246,134 @@ export default function Finanzas() {
     return "•••• " + str.slice(-4);
   };
 
+  const renderInvoiceBadge = (p) => {
+    if (!p.invoice_required) {
+      return (
+        <span className="px-2.5 py-0.5 rounded-full text-2xs font-extrabold bg-gray-800 border border-white/10 text-gray-400">
+          ⚪ No requiere
+        </span>
+      );
+    }
+
+    if (!p.invoice_received) {
+      return (
+        <span className="px-2.5 py-0.5 rounded-full text-2xs font-extrabold bg-amber-500/10 border border-amber-500/30 text-amber-400 animate-pulse">
+          🔴 Falta Boleta
+        </span>
+      );
+    }
+
+    const rate = parseFloat(retentionRateSetting || 15.25);
+    const brutoEsperado = Math.round(p.monto / (1 - (rate / 100)));
+    const retencionEstimada = brutoEsperado - p.monto;
+    const montoRecibido = p.invoice_amount || 0;
+    const diferencia = montoRecibido - brutoEsperado;
+    const diffText = diferencia === 0 ? "Sin diferencia" : `${diferencia > 0 ? "+" : ""}$${diferencia.toLocaleString("es-CL")} CLP`;
+    const verificadoPor = p.invoice_verified_by_name || 'Admin';
+    const fechaVal = p.invoice_received_at ? new Date(p.invoice_received_at).toLocaleDateString("es-CL") : 'No registrada';
+    
+    const tooltipText = `Detalles Tributarios:\n` +
+      `- Líquido Pactado: $${p.monto.toLocaleString("es-CL")} CLP\n` +
+      `- Retención SII (${rate}%): $${retencionEstimada.toLocaleString("es-CL")} CLP\n` +
+      `- Bruto Esperado: $${brutoEsperado.toLocaleString("es-CL")} CLP\n` +
+      `- Monto Recibido: $${montoRecibido.toLocaleString("es-CL")} CLP\n` +
+      `- Diferencia: ${diffText}\n` +
+      `---------------------------------\n` +
+      `- Verificado por: ${verificadoPor}\n` +
+      `- Fecha de validación: ${fechaVal}` +
+      `${p.invoice_notes ? '\n- Notas: ' + p.invoice_notes : ''}`;
+
+    return (
+      <span 
+        className="px-2.5 py-1 rounded-full text-2xs font-extrabold bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 cursor-help flex items-center gap-1"
+        title={tooltipText}
+      >
+        🟢 Nº {p.invoice_number}
+      </span>
+    );
+  };
+
+  const handleSaveSettings = async (e) => {
+    e.preventDefault();
+    const rateVal = parseFloat(inputRate);
+    const toleranceVal = parseInt(inputTolerance);
+
+    if (isNaN(rateVal) || rateVal < 0 || rateVal > 100) {
+      toast.error("Por favor ingresa una tasa de retención válida entre 0 y 100.");
+      return;
+    }
+    if (isNaN(toleranceVal) || toleranceVal < 0) {
+      toast.error("Por favor ingresa un monto de tolerancia válido.");
+      return;
+    }
+
+    setIsSavingSettings(true);
+    const loadingToast = toast.loading("Guardando ajustes...");
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+
+      // Guardar tasa
+      const { error: errorRate } = await supabase
+        .from("app_settings")
+        .upsert({
+          key: "honorarios_retention_rate",
+          value: { rate: rateVal },
+          updated_at: new Date().toISOString(),
+          updated_by: user?.id || null
+        });
+
+      if (errorRate) throw errorRate;
+
+      // Guardar tolerancia
+      const { error: errorTolerance } = await supabase
+        .from("app_settings")
+        .upsert({
+          key: "honorarios_invoice_tolerance",
+          value: { tolerance: toleranceVal },
+          updated_at: new Date().toISOString(),
+          updated_by: user?.id || null
+        });
+
+      if (errorTolerance) throw errorTolerance;
+
+      setRetentionRateSetting(rateVal);
+      setToleranceSetting(toleranceVal);
+      toast.success("¡Ajustes financieros actualizados con éxito!", { id: loadingToast });
+      setIsEditingSettings(false);
+      fetchPayments();
+    } catch (err) {
+      console.error("Error saving settings:", err);
+      toast.error(`Error al guardar: ${err.message || "Operación fallida"}`, { id: loadingToast });
+    } finally {
+      setIsSavingSettings(false);
+    }
+  };
+
   const fetchPayments = async () => {
     setLoading(true);
     try {
+      // Cargar configuraciones de retención y tolerancia del SII
+      try {
+        const { data: settingsData } = await supabase
+          .from("app_settings")
+          .select("*");
+        
+        if (settingsData) {
+          const rateRow = settingsData.find(s => s.key === "honorarios_retention_rate");
+          if (rateRow && rateRow.value && rateRow.value.rate !== undefined) {
+            setRetentionRateSetting(parseFloat(rateRow.value.rate));
+            setInputRate(String(rateRow.value.rate));
+          }
+          const toleranceRow = settingsData.find(s => s.key === "honorarios_invoice_tolerance");
+          if (toleranceRow && toleranceRow.value && toleranceRow.value.tolerance !== undefined) {
+            setToleranceSetting(parseInt(toleranceRow.value.tolerance));
+            setInputTolerance(String(toleranceRow.value.tolerance));
+          }
+        }
+      } catch (errSettings) {
+        console.warn("⚠️ [APP_SETTINGS]: No se pudieron cargar las configuraciones de BD, usando fallbacks.", errSettings);
+      }
+
       // Intentamos traer las asignaciones con los datos del perfil y del evento
       const { data: assignments, error } = await supabase
         .from("event_assignments")
@@ -107,6 +382,16 @@ export default function Finanzas() {
           status,
           payment_status,
           custom_rate,
+          invoice_required,
+          invoice_received,
+          invoice_number,
+          invoice_received_at,
+          invoice_amount,
+          invoice_verified_by,
+          invoice_notes,
+          verifier:invoice_verified_by (
+            name
+          ),
           events:event_id (
             id,
             name,
@@ -199,7 +484,15 @@ export default function Finanzas() {
               banco_name: BANCOS_CHILE[e.profiles?.codigo_banco_destino] || "Banco No Registrado",
               monto: approvedAmt,
               status: e.status === "Pagado" ? "Pagado" : "Pendiente",
-              assignment_status: "Confirmado"
+              assignment_status: "Confirmado",
+              invoice_required: false,
+              invoice_received: false,
+              invoice_number: null,
+              invoice_received_at: null,
+              invoice_amount: null,
+              invoice_verified_by: null,
+              invoice_verified_by_name: null,
+              invoice_notes: null
             };
           });
       }
@@ -213,26 +506,34 @@ export default function Finanzas() {
           const attLog = attMap[`${a.events?.id}-${a.profiles?.id}`];
 
           return {
-            id: a.id,
-            event_name: a.events?.name || "Sin Nombre",
-            event_date: a.events?.date || "",
-            is_finished: isFinished,
-            staff_id: a.profiles?.id || "",
-            staff_name: a.profiles?.name || "Personal Desconocido",
-            staff_rut: a.profiles?.rut || "",
-            staff_email: a.profiles?.email || "",
-            staff_role: a.profiles?.role || "",
-            cuenta_origen: a.profiles?.cuenta_origen || "",
-            cuenta_destino: a.profiles?.cuenta_destino || "",
-            codigo_banco_destino: a.profiles?.codigo_banco_destino || "",
-            glosa_transferencia: a.profiles?.glosa_transferencia || "",
-            mensaje_beneficiario: a.profiles?.mensaje_beneficiario || "",
-            banco_name: BANCOS_CHILE[a.profiles?.codigo_banco_destino] || "Banco No Registrado",
-            monto: rate,
-            status: a.payment_status || "Pendiente",
-            assignment_status: a.status,
-            attendance_log: attLog
-          };
+              id: a.id,
+              event_name: a.events?.name || "Sin Nombre",
+              event_date: a.events?.date || "",
+              is_finished: isFinished,
+              staff_id: a.profiles?.id || "",
+              staff_name: a.profiles?.name || "Personal Desconocido",
+              staff_rut: a.profiles?.rut || "",
+              staff_email: a.profiles?.email || "",
+              staff_role: a.profiles?.role || "",
+              cuenta_origen: a.profiles?.cuenta_origen || "",
+              cuenta_destino: a.profiles?.cuenta_destino || "",
+              codigo_banco_destino: a.profiles?.codigo_banco_destino || "",
+              glosa_transferencia: a.profiles?.glosa_transferencia || "",
+              mensaje_beneficiario: a.profiles?.mensaje_beneficiario || "",
+              banco_name: BANCOS_CHILE[a.profiles?.codigo_banco_destino] || "Banco No Registrado",
+              monto: rate,
+              status: a.payment_status || "Pendiente",
+              assignment_status: a.status,
+              attendance_log: attLog,
+              invoice_required: a.invoice_required !== undefined ? a.invoice_required : true,
+              invoice_received: a.invoice_received !== undefined ? a.invoice_received : false,
+              invoice_number: a.invoice_number || null,
+              invoice_received_at: a.invoice_received_at || null,
+              invoice_amount: a.invoice_amount ? parseFloat(a.invoice_amount) : null,
+              invoice_verified_by: a.invoice_verified_by || null,
+              invoice_verified_by_name: a.verifier?.name || null,
+              invoice_notes: a.invoice_notes || null
+            };
         }).filter(a => a.assignment_status === "Confirmado" || a.assignment_status === "Aceptado");
 
         // Consolidación transparente
@@ -296,7 +597,15 @@ export default function Finanzas() {
             banco_name: BANCOS_CHILE[a.profiles?.codigo_banco_destino] || "Banco No Registrado",
             monto: defaultRate,
             status: "Pendiente", // Fallback por defecto
-            assignment_status: a.status
+            assignment_status: a.status,
+            invoice_required: true,
+            invoice_received: false,
+            invoice_number: null,
+            invoice_received_at: null,
+            invoice_amount: null,
+            invoice_verified_by: null,
+            invoice_verified_by_name: null,
+            invoice_notes: null
           };
         }).filter(a => a.assignment_status === "Confirmado" || a.assignment_status === "Aceptado");
 
@@ -413,7 +722,11 @@ export default function Finanzas() {
   }, []);
 
   const handleSelectAll = () => {
-    const pendingPayments = filteredPayments.filter(p => p.status !== "Pagado");
+    // Only select pending payments that do not have a missing invoice
+    const pendingPayments = filteredPayments.filter(p => 
+      p.status !== "Pagado" && 
+      !(p.invoice_required && !p.invoice_received)
+    );
     if (selectedIds.length === pendingPayments.length) {
       setSelectedIds([]);
     } else {
@@ -423,7 +736,12 @@ export default function Finanzas() {
 
   const handleSelectOne = (id) => {
     const payment = payments.find(p => p.id === id);
-    if (payment && payment.status === "Pagado") return; // Impedir selección individual si ya está pagado
+    if (!payment) return;
+    if (payment.status === "Pagado") return; // Impedir selección individual si ya está pagado
+    if (payment.invoice_required && !payment.invoice_received) {
+      toast.error("Este pago requiere boleta de honorarios verificada antes de poder seleccionarlo.");
+      return;
+    }
 
     setSelectedIds(prev =>
       prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
@@ -440,6 +758,17 @@ export default function Finanzas() {
 
     if (pendingSelectedIds.length === 0) {
       toast.error("Ninguno de los registros seleccionados está pendiente de pago.");
+      return;
+    }
+
+    // Verificar doble protección: que ninguno de los pendientes requiera boleta y le falte
+    const blockedCount = pendingSelectedIds.filter(id => {
+      const p = payments.find(item => item.id === id);
+      return p && p.invoice_required && !p.invoice_received;
+    }).length;
+
+    if (blockedCount > 0) {
+      toast.error(`No se pueden pagar los registros seleccionados porque ${blockedCount} de ellos aún no tienen boleta verificada.`);
       return;
     }
 
@@ -632,6 +961,47 @@ export default function Finanzas() {
       worksheetViaticos["!cols"] = maxColWidthsViaticos.map(w => ({ wch: w }));
       XLSX.utils.book_append_sheet(workbook, worksheetViaticos, "Detalle Viáticos");
 
+      // 4. HOJA 4: AUDITORÍA BOLETAS
+      const dataAuditoriaBoletas = selectedEventPayments.map(p => {
+        const rate = parseFloat(retentionRateSetting || 15.25);
+        const brutoEsperado = Math.round(p.monto / (1 - (rate / 100)));
+        const retencionEstimada = brutoEsperado - p.monto;
+        const montoRecibido = p.invoice_amount || 0;
+        const diferencia = p.invoice_received ? (montoRecibido - brutoEsperado) : 0;
+
+        return {
+          "Trabajador": p.staff_name,
+          "RUT": p.staff_rut,
+          "Correo": p.staff_email,
+          "Evento Relacionado": p.event_name,
+          "Fecha Evento": p.event_date,
+          "Honorario Líquido (CLP)": parseFloat(p.monto || 0),
+          "Requiere Boleta": p.invoice_required ? "Sí" : "No",
+          "Estado Boleta": p.invoice_required ? (p.invoice_received ? "Recibida" : "Falta Boleta") : "Exento",
+          "% Retención SII": p.invoice_required ? `${rate}%` : "N/A",
+          "Monto Bruto Esperado": p.invoice_required ? brutoEsperado : "N/A",
+          "Retención Estimada": p.invoice_required ? retencionEstimada : "N/A",
+          "Monto Boleta Recibido": p.invoice_required && p.invoice_received ? montoRecibido : "N/A",
+          "Diferencia": p.invoice_required && p.invoice_received ? diferencia : "N/A",
+          "Número Boleta": p.invoice_number || "N/A",
+          "Fecha Recepción": p.invoice_received_at ? new Date(p.invoice_received_at).toLocaleDateString("es-CL") : "N/A",
+          "Verificado Por": p.invoice_verified_by_name || "N/A",
+          "Observación / Justificación": p.invoice_notes || ""
+        };
+      });
+
+      const worksheetAuditoria = XLSX.utils.json_to_sheet(dataAuditoriaBoletas);
+      const maxColWidthsAuditoria = [];
+      dataAuditoriaBoletas.forEach(row => {
+        Object.keys(row).forEach((key, colIndex) => {
+          const value = row[key] ? String(row[key]) : "";
+          const length = Math.max(value.length, key.length) + 3;
+          maxColWidthsAuditoria[colIndex] = Math.max(maxColWidthsAuditoria[colIndex] || 10, length);
+        });
+      });
+      worksheetAuditoria["!cols"] = maxColWidthsAuditoria.map(w => ({ wch: w }));
+      XLSX.utils.book_append_sheet(workbook, worksheetAuditoria, "Auditoría Boletas");
+
       const excelBuffer = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
       const blob = new Blob([excelBuffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
 
@@ -645,7 +1015,7 @@ export default function Finanzas() {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
 
-      toast.success("¡Nómina de Excel de Pagos (3 Hojas) descargada con éxito!", { id: loadingToast });
+      toast.success("¡Nómina de Excel de Pagos (4 Hojas) descargada con éxito!", { id: loadingToast });
     } catch (error) {
       console.error("Error al exportar Excel:", error);
       toast.error(`Error al generar Excel: ${error.message || "Error desconocido"}`, { id: loadingToast });
@@ -803,6 +1173,47 @@ export default function Finanzas() {
       worksheetViaticos["!cols"] = maxColWidthsViaticos.map(w => ({ wch: w }));
       XLSX.utils.book_append_sheet(workbook, worksheetViaticos, "Detalle Viáticos");
 
+      // 4. HOJA 4: AUDITORÍA BOLETAS
+      const dataAuditoriaBoletas = selectedEventPayments.map(p => {
+        const rate = parseFloat(retentionRateSetting || 15.25);
+        const brutoEsperado = Math.round(p.monto / (1 - (rate / 100)));
+        const retencionEstimada = brutoEsperado - p.monto;
+        const montoRecibido = p.invoice_amount || 0;
+        const diferencia = p.invoice_received ? (montoRecibido - brutoEsperado) : 0;
+
+        return {
+          "Trabajador": p.staff_name,
+          "RUT": p.staff_rut,
+          "Correo": p.staff_email,
+          "Evento Relacionado": p.event_name,
+          "Fecha Evento": p.event_date,
+          "Honorario Líquido (CLP)": parseFloat(p.monto || 0),
+          "Requiere Boleta": p.invoice_required ? "Sí" : "No",
+          "Estado Boleta": p.invoice_required ? (p.invoice_received ? "Recibida" : "Falta Boleta") : "Exento",
+          "% Retención SII": p.invoice_required ? `${rate}%` : "N/A",
+          "Monto Bruto Esperado": p.invoice_required ? brutoEsperado : "N/A",
+          "Retención Estimada": p.invoice_required ? retencionEstimada : "N/A",
+          "Monto Boleta Recibido": p.invoice_required && p.invoice_received ? montoRecibido : "N/A",
+          "Diferencia": p.invoice_required && p.invoice_received ? diferencia : "N/A",
+          "Número Boleta": p.invoice_number || "N/A",
+          "Fecha Recepción": p.invoice_received_at ? new Date(p.invoice_received_at).toLocaleDateString("es-CL") : "N/A",
+          "Verificado Por": p.invoice_verified_by_name || "N/A",
+          "Observación / Justificación": p.invoice_notes || ""
+        };
+      });
+
+      const worksheetAuditoria = XLSX.utils.json_to_sheet(dataAuditoriaBoletas);
+      const maxColWidthsAuditoria = [];
+      dataAuditoriaBoletas.forEach(row => {
+        Object.keys(row).forEach((key, colIndex) => {
+          const value = row[key] ? String(row[key]) : "";
+          const length = Math.max(value.length, key.length) + 3;
+          maxColWidthsAuditoria[colIndex] = Math.max(maxColWidthsAuditoria[colIndex] || 10, length);
+        });
+      });
+      worksheetAuditoria["!cols"] = maxColWidthsAuditoria.map(w => ({ wch: w }));
+      XLSX.utils.book_append_sheet(workbook, worksheetAuditoria, "Auditoría Boletas");
+
       const excelBuffer = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
       const blob = new Blob([excelBuffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
 
@@ -818,7 +1229,7 @@ export default function Finanzas() {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
 
-      toast.success("¡Reporte financiero filtrado (3 Hojas) descargado con éxito!", { id: loadingToast });
+      toast.success("¡Reporte financiero filtrado (4 Hojas) descargado con éxito!", { id: loadingToast });
     } catch (error) {
       console.error("Error al exportar reporte filtrado:", error);
       toast.error(`Error al generar reporte: ${error.message || "Error desconocido"}`, { id: loadingToast });
@@ -914,6 +1325,32 @@ export default function Finanzas() {
             Módulo de Finanzas
           </h1>
           <p className="text-gray-400 mt-1">Monitorea cobros, liquida eventos y genera nóminas de pago.</p>
+        </div>
+
+        {/* Panel Glassmorphic de Configuración de Retención y Tolerancia (SII V2) */}
+        <div className="flex items-center gap-3">
+          <div className="bg-gray-900/60 backdrop-blur-md border border-white/5 rounded-2xl px-4 py-2.5 flex items-center gap-5 text-sm shadow-[0_4px_30px_rgba(0,0,0,0.2)]">
+            <div className="flex flex-col text-left">
+              <span className="text-[10px] text-gray-500 uppercase tracking-wider font-extrabold">Retención SII</span>
+              <span className="text-amber-300 font-extrabold text-sm sm:text-base">{retentionRateSetting}%</span>
+            </div>
+            <div className="w-[1px] h-8 bg-white/10" />
+            <div className="flex flex-col text-left">
+              <span className="text-[10px] text-gray-500 uppercase tracking-wider font-extrabold">Tolerancia Boleta</span>
+              <span className="text-amber-300 font-extrabold text-sm sm:text-base">${toleranceSetting.toLocaleString("es-CL")} CLP</span>
+            </div>
+            <button
+              onClick={() => {
+                setInputRate(String(retentionRateSetting));
+                setInputTolerance(String(toleranceSetting));
+                setIsEditingSettings(true);
+              }}
+              className="ml-2 px-3 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 rounded-xl border border-amber-500/20 text-2xs font-extrabold uppercase transition-all duration-200 cursor-pointer flex items-center gap-1.5 hover:scale-[1.03] active:scale-95 shadow-inner"
+            >
+              <Sliders className="w-3.5 h-3.5 text-amber-400" />
+              Ajustar
+            </button>
+          </div>
         </div>
       </motion.header>
 
@@ -1131,19 +1568,20 @@ export default function Finanzas() {
                       <th className="py-4 px-6 text-left">Evento / Fecha</th>
                       <th className="py-4 px-6 text-left">Monto Honorario / Gasto</th>
                       <th className="py-4 px-6 text-left">Datos de Transferencia</th>
+                      <th className="py-4 px-6 text-center">Boleta (DTE)</th>
                       <th className="py-4 px-6 text-center">Estado Pago</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-800 text-sm">
                     {loading ? (
                       <tr>
-                        <td colSpan="6" className="py-12 text-center text-gray-500 font-medium">
+                        <td colSpan="7" className="py-12 text-center text-gray-500 font-medium">
                           Cargando registros financieros...
                         </td>
                       </tr>
                     ) : filteredPayments.length === 0 ? (
                       <tr>
-                        <td colSpan="6" className="py-12 text-center text-gray-500 font-medium">
+                        <td colSpan="7" className="py-12 text-center text-gray-500 font-medium">
                           No se encontraron transferencias que coincidan con la búsqueda.
                         </td>
                       </tr>
@@ -1160,6 +1598,11 @@ export default function Finanzas() {
                             <td className="py-4 px-6">
                               {p.status === "Pagado" ? (
                                 <CheckSquare className="w-5 h-5 text-gray-600/50 cursor-not-allowed" title="Ya está pagado" />
+                              ) : p.invoice_required && !p.invoice_received ? (
+                                <Square 
+                                  className="w-5 h-5 text-red-500/30 cursor-not-allowed" 
+                                  title="Falta boleta de honorarios. No se puede seleccionar para pago." 
+                                />
                               ) : (
                                 <button
                                   onClick={() => handleSelectOne(p.id)}
@@ -1240,6 +1683,49 @@ export default function Finanzas() {
                               )}
                             </td>
                             <td className="py-4 px-6 text-center">
+                              <div className="flex flex-col items-center gap-1.5 justify-center">
+                                {renderInvoiceBadge(p)}
+                                
+                                {p.invoice_required && !p.invoice_received && p.status !== "Pagado" && (
+                                  <button
+                                    onClick={() => handleOpenInvoiceModal(p)}
+                                    className="px-2 py-0.5 bg-amber-500/10 border border-amber-500/30 text-amber-400 hover:bg-amber-500 hover:text-gray-900 rounded-md text-[10px] font-extrabold uppercase transition-all duration-300 active:scale-95 cursor-pointer mt-1"
+                                  >
+                                    Confirmar Boleta
+                                  </button>
+                                )}
+
+                                {p.invoice_required && p.invoice_received && p.status !== "Pagado" && (
+                                  <div className="flex gap-2 mt-1">
+                                    <button
+                                      onClick={() => handleOpenInvoiceModal(p)}
+                                      className="text-[10px] text-gray-400 hover:text-white underline transition-colors"
+                                      title="Editar boleta"
+                                    >
+                                      Editar
+                                    </button>
+                                    <button
+                                      onClick={() => handleRevertInvoice(p.id)}
+                                      className="text-[10px] text-red-400 hover:text-red-300 underline transition-colors"
+                                      title="Deshacer boleta"
+                                    >
+                                      Deshacer
+                                    </button>
+                                  </div>
+                                )}
+
+                                {p.status !== "Pagado" && !p.is_expense && (
+                                  <button
+                                    onClick={() => handleToggleInvoiceRequired(p.id, p.invoice_required)}
+                                    className="text-[10px] text-gray-500 hover:text-amber-400 transition-colors mt-1 underline cursor-pointer"
+                                    title={p.invoice_required ? "Eximir del requisito de boleta" : "Exigir boleta para pagar"}
+                                  >
+                                    {p.invoice_required ? "Eximir boleta" : "Exigir boleta"}
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                            <td className="py-4 px-6 text-center">
                               <span className={`px-3 py-1.5 rounded-full text-xs font-extrabold shadow-sm border ${p.status === "Pagado"
                                   ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
                                   : 'bg-red-500/10 border-red-500/30 text-red-400'
@@ -1273,7 +1759,14 @@ export default function Finanzas() {
                     return (
                       <GlassCard
                         key={p.id}
-                        onClick={() => p.status !== "Pagado" && handleSelectOne(p.id)}
+                        onClick={() => {
+                          if (p.status === "Pagado") return;
+                          if (p.invoice_required && !p.invoice_received) {
+                            toast.error("Este pago requiere boleta de honorarios verificada antes de poder seleccionarlo.");
+                            return;
+                          }
+                          handleSelectOne(p.id);
+                        }}
                         className={`p-5 transition-all duration-200 flex flex-col gap-4 border select-none ${
                           isSelected ? "border-amber-500/50 bg-amber-500/[0.03]" : "border-white/5 bg-gray-900/30"
                         } ${p.status === "Pagado" ? "opacity-70" : "active:bg-white/5"}`}
@@ -1283,6 +1776,11 @@ export default function Finanzas() {
                           <div className="flex items-center gap-3">
                             {p.status === "Pagado" ? (
                               <CheckSquare className="w-6 h-6 text-gray-600/50 shrink-0" />
+                            ) : p.invoice_required && !p.invoice_received ? (
+                              <Square 
+                                className="w-6 h-6 text-red-500/30 shrink-0 cursor-not-allowed" 
+                                title="Falta boleta de honorarios. No se puede seleccionar."
+                              />
                             ) : (
                               <button
                                 onClick={(e) => {
@@ -1362,6 +1860,75 @@ export default function Finanzas() {
                               </div>
                             )}
                           </div>
+                        </div>
+
+                        {/* Fila Boleta Mobile */}
+                        <div className="flex flex-col gap-2 pt-3 border-t border-white/5">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[9px] text-gray-500 uppercase font-extrabold tracking-wider">Boleta de Honorarios</span>
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              {renderInvoiceBadge(p)}
+                            </div>
+                          </div>
+
+                          {/* Acciones de Boleta para Mobile */}
+                          {p.status !== "Pagado" && (
+                            <div className="flex flex-wrap gap-2.5 items-center justify-between bg-black/20 p-2 rounded-xl mt-1">
+                              {!p.is_expense && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleToggleInvoiceRequired(p.id, p.invoice_required);
+                                  }}
+                                  className="text-[10px] text-gray-400 hover:text-amber-400 transition-colors underline cursor-pointer p-1"
+                                >
+                                  {p.invoice_required ? "Eximir boleta" : "Exigir boleta"}
+                                </button>
+                              )}
+
+                              {p.invoice_required && (
+                                p.invoice_received ? (
+                                  <div className="flex gap-2">
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleOpenInvoiceModal(p);
+                                      }}
+                                      className="text-[10px] text-gray-300 hover:text-white underline cursor-pointer p-1"
+                                    >
+                                      Editar
+                                    </button>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleRevertInvoice(p.id);
+                                      }}
+                                      className="text-[10px] text-red-400 hover:text-red-300 underline cursor-pointer p-1"
+                                    >
+                                      Deshacer
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleOpenInvoiceModal(p);
+                                    }}
+                                    className="px-3 py-1 bg-amber-500 text-black font-extrabold rounded-lg text-[9px] uppercase transition-all active:scale-95 cursor-pointer ml-auto"
+                                  >
+                                    Confirmar Boleta
+                                  </button>
+                                )
+                              )}
+                            </div>
+                          )}
+
+                          {p.invoice_received && (
+                            <p className="text-[10px] text-gray-400 font-medium italic">
+                              Verificado por {p.invoice_verified_by_name || 'Admin'} el {p.invoice_received_at ? new Date(p.invoice_received_at).toLocaleDateString("es-CL") : ''}
+                              {p.invoice_notes && ` (Nota: "${p.invoice_notes}")`}
+                            </p>
+                          )}
                         </div>
 
                         {/* Fila Inferior: Monto de Honorario */}
@@ -1641,6 +2208,295 @@ export default function Finanzas() {
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Modal de Validación de Boleta de Honorarios */}
+      {showInvoiceModal && selectedInvoicePayment && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[100] flex items-center justify-center p-4">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="w-full max-w-md bg-gray-900/80 border border-white/10 backdrop-blur-xl rounded-2xl p-6 shadow-2xl space-y-5"
+          >
+            <div className="flex items-start justify-between">
+              <div className="text-left">
+                <h3 className="text-lg font-black text-transparent bg-clip-text bg-gradient-to-r from-amber-200 to-amber-400 flex items-center gap-2">
+                  🧾 Validar Boleta de Honorarios
+                </h3>
+                <p className="text-xs text-gray-400 mt-1">
+                  Ingresa los datos para liberar el pago de <strong>{selectedInvoicePayment.staff_name}</strong>
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowInvoiceModal(false);
+                  setSelectedInvoicePayment(null);
+                }}
+                className="text-gray-400 hover:text-white bg-white/5 p-1.5 rounded-full transition-colors cursor-pointer"
+              >
+                <XCircle className="w-5 h-5 text-red-400" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveInvoice} className="space-y-4 text-left">
+              {(() => {
+                const rate = parseFloat(retentionRateSetting || 15.25);
+                const liquido = parseFloat(selectedInvoicePayment.monto) || 0;
+                const brutoEsperado = Math.round(liquido / (1 - (rate / 100)));
+                const retencionEstimada = brutoEsperado - liquido;
+                
+                const cleanFormAmount = parseFloat(String(invoiceFormAmount).replace(/\D/g, "")) || 0;
+                const difference = Math.abs(cleanFormAmount - brutoEsperado);
+                const hasDifference = difference > toleranceSetting;
+                const isSubmitDisabled = isSubmittingInvoice || (hasDifference && (!invoiceFormNotes.trim() || !invoiceFormConfirmDifference));
+
+                return (
+                  <>
+                    <div className="bg-black/30 p-3.5 rounded-xl border border-white/5 space-y-1.5 text-xs">
+                      <span className="text-gray-500 font-bold uppercase tracking-wider block text-3xs">Resumen Tributario del Servicio</span>
+                      <p className="text-gray-200 font-medium text-2xs">{selectedInvoicePayment.event_name}</p>
+                      <p className="text-gray-500 text-3xs">{selectedInvoicePayment.event_date}</p>
+                      
+                      <div className="grid grid-cols-2 gap-3 pt-2 border-t border-white/5 mt-1.5 text-2xs">
+                        <div>
+                          <span className="text-gray-400 block font-semibold">Monto Líquido:</span>
+                          <p className="text-amber-400 font-extrabold text-xs">${liquido.toLocaleString("es-CL")} CLP</p>
+                        </div>
+                        <div>
+                          <span className="text-gray-400 block font-semibold">Retención Estimada ({rate}%):</span>
+                          <p className="text-gray-300 font-bold text-xs">${retencionEstimada.toLocaleString("es-CL")} CLP</p>
+                        </div>
+                        <div className="col-span-2 pt-2 border-t border-white/5 mt-0.5">
+                          <span className="text-emerald-400/90 block font-extrabold text-[10px] uppercase tracking-wider">Monto Bruto Sugerido (SII):</span>
+                          <p className="text-emerald-400 font-extrabold text-sm">${brutoEsperado.toLocaleString("es-CL")} CLP</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Número de Boleta */}
+                    <div className="space-y-1">
+                      <label className="block text-2xs font-extrabold text-gray-300 uppercase tracking-wide">
+                        Número de Boleta *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="Ej: 1245"
+                        value={invoiceFormNum}
+                        onChange={(e) => setInvoiceFormNum(e.target.value.replace(/\D/g, ""))}
+                        className="w-full bg-gray-950/80 border border-gray-800 rounded-xl py-2 px-3 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-amber-500 font-mono"
+                      />
+                    </div>
+
+                    {/* Monto de la Boleta */}
+                    <div className="space-y-1">
+                      <CurrencyInputCLP
+                        label="Monto de la Boleta Recibida (CLP) *"
+                        id="invoice_amount_input"
+                        value={invoiceFormAmount}
+                        onChange={(val) => setInvoiceFormAmount(val)}
+                        placeholder="Monto bruto exacto emitido"
+                      />
+                      <p className="text-[10px] text-gray-500 mt-0.5">
+                        Debe aproximarse al Monto Bruto Sugerido (${brutoEsperado.toLocaleString("es-CL")} CLP).
+                      </p>
+                    </div>
+
+                    {/* Failsafe V2: Fuerte Advertencia por Diferencia de Redondeo */}
+                    {hasDifference && (
+                      <motion.div
+                        initial={{ opacity: 0, y: -5 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl space-y-2 text-left"
+                      >
+                        <div className="flex items-start gap-1.5 text-xs text-amber-400 font-bold">
+                          <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-amber-500" />
+                          <span>Monto difiere del bruto esperado</span>
+                        </div>
+                        <p className="text-[10px] text-gray-300 leading-relaxed">
+                          La diferencia de <strong>${difference.toLocaleString("es-CL")} CLP</strong> supera la tolerancia máxima permitida (${toleranceSetting} CLP). 
+                          <strong> Es obligatorio escribir una justificación en las Notas/Observaciones</strong> y marcar la casilla de confirmación para habilitar la liberación del pago.
+                        </p>
+                        
+                        <label className="flex items-start gap-2 bg-amber-500/5 p-2 rounded-lg border border-amber-500/10 cursor-pointer select-none">
+                          <input
+                            type="checkbox"
+                            required
+                            checked={invoiceFormConfirmDifference}
+                            onChange={(e) => setInvoiceFormConfirmDifference(e.target.checked)}
+                            className="accent-amber-500 rounded cursor-pointer w-3.5 h-3.5 mt-0.5 shrink-0"
+                          />
+                          <span className="text-[10px] text-amber-200 font-bold leading-snug">
+                            Autorizo registrar esta boleta con diferencia y confirmo justificación.
+                          </span>
+                        </label>
+                      </motion.div>
+                    )}
+
+                    {/* Fecha de Recepción */}
+                    <div className="space-y-1">
+                      <label className="block text-2xs font-extrabold text-gray-300 uppercase tracking-wide">
+                        Fecha de Recepción *
+                      </label>
+                      <input
+                        type="date"
+                        required
+                        value={invoiceFormDate}
+                        onChange={(e) => setInvoiceFormDate(e.target.value)}
+                        className="w-full bg-gray-950/80 border border-gray-800 rounded-xl py-2 px-3 text-xs text-white focus:outline-none focus:border-amber-500 font-mono"
+                      />
+                    </div>
+
+                    {/* Notas/Comentarios */}
+                    <div className="space-y-1">
+                      <label className="block text-2xs font-extrabold text-gray-300 uppercase tracking-wide">
+                        Notas / Observaciones {hasDifference && <span className="text-red-400 font-black">* (Obligatorio)</span>}
+                      </label>
+                      <textarea
+                        rows="2"
+                        placeholder={hasDifference ? "Ingresa obligatoriamente el motivo de la diferencia..." : "Opcional: glosa del correo, emisor, retención, etc..."}
+                        value={invoiceFormNotes}
+                        onChange={(e) => setInvoiceFormNotes(e.target.value)}
+                        required={hasDifference}
+                        className={`w-full bg-gray-950/80 border rounded-xl py-2 px-3 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-amber-500 resize-none text-left ${hasDifference ? 'border-amber-500/50' : 'border-gray-800'}`}
+                      />
+                    </div>
+
+                    {/* Declaración Jurada / Checkbox */}
+                    <label className="flex items-start gap-2.5 bg-amber-500/5 p-3 rounded-xl border border-amber-500/10 cursor-pointer hover:bg-amber-500/10 transition-all select-none">
+                      <input
+                        type="checkbox"
+                        required
+                        checked={invoiceFormConfirmEmail}
+                        onChange={(e) => setInvoiceFormConfirmEmail(e.target.checked)}
+                        className="accent-amber-500 rounded cursor-pointer w-4 h-4 shrink-0 mt-0.5"
+                      />
+                      <span className="text-[10.5px] text-amber-200/90 font-medium leading-relaxed">
+                        Confirmo que he recibido y validado esta boleta en el correo tributario <strong>contacto@laampolleta.tv</strong>
+                      </span>
+                    </label>
+
+                    {/* Botones de acción */}
+                    <div className="flex gap-3 pt-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowInvoiceModal(false);
+                          setSelectedInvoicePayment(null);
+                        }}
+                        className="flex-1 bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs font-bold py-2.5 rounded-xl transition-all border border-white/5 text-center cursor-pointer"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={isSubmitDisabled}
+                        className="flex-1 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-40 disabled:cursor-not-allowed text-black text-xs font-black py-2.5 rounded-xl transition-all shadow-md flex items-center justify-center gap-1 cursor-pointer"
+                      >
+                        {isSubmittingInvoice ? (
+                          <span>Guardando...</span>
+                        ) : (
+                          <>
+                            <CheckCircle className="w-3.5 h-3.5" />
+                            <span>Validar y Liberar</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </>
+                );
+              })()}
+            </form>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Modal de Ajustes Financieros (Retención y Tolerancia V2) */}
+      {isEditingSettings && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[100] flex items-center justify-center p-4">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="w-full max-w-sm bg-gray-900/80 border border-white/10 backdrop-blur-xl rounded-2xl p-6 shadow-2xl space-y-5"
+          >
+            <div className="flex items-start justify-between">
+              <div className="text-left">
+                <h3 className="text-lg font-black text-transparent bg-clip-text bg-gradient-to-r from-amber-200 to-amber-400 flex items-center gap-2">
+                  ⚙️ Ajustes Financieros
+                </h3>
+                <p className="text-xs text-gray-400 mt-1">
+                  Configura los valores globales de cálculo de boletas del SII
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsEditingSettings(false)}
+                className="text-gray-400 hover:text-white bg-white/5 p-1 rounded-full transition-colors cursor-pointer"
+              >
+                <XCircle className="w-5 h-5 text-red-400" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveSettings} className="space-y-4 text-left">
+              <div>
+                <label className="block text-2xs font-extrabold text-gray-300 uppercase tracking-wide mb-1.5">
+                  Porcentaje de Retención SII (%) *
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  max="100"
+                  value={inputRate}
+                  onChange={(e) => setInputRate(e.target.value)}
+                  className="w-full bg-gray-950/80 border border-gray-800 rounded-xl py-2 px-3 text-xs text-white focus:outline-none focus:border-amber-500 font-mono"
+                  placeholder="Ej: 15.25"
+                  required
+                />
+                <span className="text-[10px] text-gray-400 mt-1 block leading-normal">
+                  Fórmula: Bruto = Líquido / (1 - tasa).
+                </span>
+              </div>
+
+              <div>
+                <label className="block text-2xs font-extrabold text-gray-300 uppercase tracking-wide mb-1.5">
+                  Tolerancia de Redondeo ($ CLP) *
+                </label>
+                <input
+                  type="number"
+                  step="1"
+                  min="0"
+                  value={inputTolerance}
+                  onChange={(e) => setInputTolerance(e.target.value)}
+                  className="w-full bg-gray-950/80 border border-gray-800 rounded-xl py-2 px-3 text-xs text-white focus:outline-none focus:border-amber-500 font-mono"
+                  placeholder="Ej: 10"
+                  required
+                />
+                <span className="text-[10px] text-gray-400 mt-1 block leading-normal">
+                  Diferencia máxima antes de exigir justificación y observaciones obligatorias.
+                </span>
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsEditingSettings(false)}
+                  className="flex-1 bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs font-bold py-2.5 rounded-xl transition-all border border-white/5 text-center cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingSettings}
+                  className="flex-1 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-black text-xs font-black py-2.5 rounded-xl transition-all shadow-md flex items-center justify-center cursor-pointer"
+                >
+                  {isSavingSettings ? "Guardando..." : "Guardar Ajustes"}
+                </button>
+              </div>
+            </form>
+          </motion.div>
         </div>
       )}
     </motion.div>

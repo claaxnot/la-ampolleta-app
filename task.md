@@ -37,10 +37,8 @@
 - [x] Paleta de colores premium (Amber/Red/Dark).
 - [x] Tarjetas Glassmorphism (`GlassCard`) y animaciones fluidas con Framer Motion.
 - [x] Adaptación completa para dispositivos móviles (Menú Hamburguesa, Sidebar tipo Drawer, grillas responsivas).
-
 - [x] **Filtrado Inteligente de Staff:** Mostrar quién está disponible (según su calendario) al momento de asignarlo a un evento en el EventModal, con alertas operacionales preventivas ante doble asignación o no disponibilidad.
 - [x] **Persistencia de Notificaciones:** Tabla física `notifications` en Supabase para conservar el historial de mensajes de los trabajadores (completamente funcional con tiempo real y tolerancia a fallos).
-
 - [x] **Módulo de Finanzas y Pagos (Admin/Worker):** Visualización de transferencias y estados por mes, generación de nóminas masivas de pagos en Excel agrupadas por persona para bancos, registro obligatorio de datos de cuenta del trabajador, e implementación de la compatibilidad con el formato bancario de Transferencias Masivas.
   - [x] **Exportación bancaria compatible con Transferencias Masivas:** reordenamiento de columnas en la hoja “Resumen Transferencias”, RUT sin puntos, montos numéricos reales, columnas bancarias opcionales vacías y preservación de la hoja “Detalle de Eventos”.
 - [x] **Seguridad y Auditoría del Sistema:**
@@ -48,6 +46,26 @@
   - [x] Exención blindada (failsafe) para el SuperAdmin (`admin@laampolleta.tv`).
   - [x] Actualización de contraseña real integrada directamente con Supabase Auth en Mi Perfil.
   - [x] Control estricto de token activo y protección de interfaz en la pantalla de Restablecer Contraseña.
+- [x] **Fase 1: Preparación y Base de Datos (Supabase)**
+  - [x] Crear script de migración SQL `supabase_invoice_migration.sql` en la raíz del proyecto.
+  - [x] Ejecutar alteración de tabla `event_assignments` para agregar las 7 nuevas columnas.
+- [x] **Fase 2: Interfaz Administrativa (Finanzas.jsx)**
+  - [x] Extender consulta Supabase `fetchPayments` para traer los 7 nuevos campos de boleta de `event_assignments`.
+  - [x] Agregar selector toggle en grilla de pagos para activar/desactivar `invoice_required` en tiempo real.
+  - [x] Implementar badges visuales tricolores (`Falta boleta`, `Boleta verificada`, `No requiere boleta`).
+  - [x] Deshabilitar botón individual "Marcar pagado" si falta boleta.
+  - [x] Deshabilitar checkbox de fila y omitir del botón de nómina múltiple si falta boleta.
+  - [x] Crear el modal esmerilado (`GlassCard`) "Confirmar Boleta" con los inputs requeridos, validación de montos CLP y confirmación de correo.
+  - [x] Programar el guardado e integración de metadata en Supabase para validar la boleta.
+- [x] **Fase 3: Transparencia para Trabajadores (WorkerDashboard.jsx)**
+  - [x] Modificar consulta de asignaciones `fetchMyEvents` para obtener `invoice_required` e `invoice_received`.
+  - [x] Mostrar badge de estado de boleta en la grilla de pagos históricos del trabajador para evitar consultas a soporte.
+- [x] **Fase 4: Exportación Bancaria y Tributaria (Excel)**
+  - [x] Mantener la hoja `"Resumen Transferencias"` intacta para conservar compatibilidad bancaria de 13 columnas.
+  - [x] Agregar una hoja nueva `"Auditoría Boletas"` con todo el detalle tributario requerido.
+- [x] **Fase 5: Verificación Local y Compilación**
+  - [x] Realizar pruebas locales de flujo completo (crear pago, validar bloqueo, verificar, liberar pago).
+  - [x] Ejecutar `npm run build` para asegurar la correcta compilación en producción.
 
 ## 6. Módulo de Viáticos e Integración de Nóminas
 - [x] **Esquema de Base de Datos y RLS:** Crear la tabla `expense_requests` con RLS, políticas seguras y configuración para Signed URLs.
