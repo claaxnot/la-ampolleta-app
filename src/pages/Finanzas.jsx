@@ -806,21 +806,27 @@ export default function Finanzas() {
   };
 
   const filteredPayments = payments.filter(p => {
+    const sName = p?.staff_name || "";
+    const eName = p?.event_name || "";
+    const sRut = p?.staff_rut || "";
+    const sStatus = p?.status || "";
+    const eDate = p?.event_date || "";
+
     const matchesSearch =
-      p.staff_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      p.event_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      p.staff_rut.includes(searchTerm);
+      sName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      eName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      sRut.includes(searchTerm);
 
     const matchesStatus =
       statusFilter === "all" ||
-      (statusFilter === "pending" && p.status === "Pendiente") ||
-      (statusFilter === "paid" && p.status === "Pagado");
+      (statusFilter === "pending" && sStatus === "Pendiente") ||
+      (statusFilter === "paid" && sStatus === "Pagado");
 
     const matchesMonth =
       monthFilter === "all" ||
-      (p.event_date && p.event_date.startsWith(monthFilter));
+      (eDate && eDate.startsWith(monthFilter));
 
-    const matchesFinished = includeFuture || p.is_finished;
+    const matchesFinished = includeFuture || p?.is_finished;
 
     return matchesSearch && matchesStatus && matchesMonth && matchesFinished;
   });
@@ -832,11 +838,12 @@ export default function Finanzas() {
     let paidCount = 0;
 
     filteredPayments.forEach(p => {
-      if (p.status === "Pagado") {
-        paidSum += p.monto;
+      const montoVal = parseFloat(p?.monto) || 0;
+      if (p?.status === "Pagado") {
+        paidSum += montoVal;
         paidCount++;
       } else {
-        pendingSum += p.monto;
+        pendingSum += montoVal;
         pendingCount++;
       }
     });
@@ -1142,7 +1149,7 @@ export default function Finanzas() {
                             </td>
                             <td className="py-4 px-6 text-left">
                               <span className="font-extrabold text-amber-400">
-                                ${p.monto.toLocaleString("es-CL")}
+                                ${(parseFloat(p?.monto) || 0).toLocaleString("es-CL")}
                               </span>
                             </td>
                             <td className="py-4 px-6 text-left">
@@ -1304,7 +1311,7 @@ export default function Finanzas() {
                         <div className="flex items-center justify-between pt-3 border-t border-white/5 mt-1">
                           <span className="text-[10px] text-gray-500 uppercase font-bold tracking-wider">Monto a Transferir</span>
                           <span className="font-black text-amber-400 text-base">
-                            ${p.monto.toLocaleString("es-CL")}
+                            ${(parseFloat(p?.monto) || 0).toLocaleString("es-CL")}
                           </span>
                         </div>
                       </GlassCard>
