@@ -5,6 +5,8 @@ import Button from "../components/Button.jsx";
 import { X, Clock, Edit, Save, AlertTriangle } from "lucide-react";
 import { supabase } from "../lib/supabase.js";
 import { toast } from "react-hot-toast";
+import DatePicker from "./DatePicker.jsx";
+import ClockPicker from "./ClockPicker.jsx";
 
 /**
  * EventDetails – shows full information for a selected event.
@@ -18,8 +20,10 @@ export default function EventDetails({ event, isOpen, onClose }) {
   const [attendance, setAttendance] = React.useState({});
   const [editingStaffId, setEditingStaffId] = React.useState(null);
   const [editNotes, setEditNotes] = React.useState("");
-  const [editCheckIn, setEditCheckIn] = React.useState("");
-  const [editCheckOut, setEditCheckOut] = React.useState("");
+  const [editCheckInDate, setEditCheckInDate] = React.useState("");
+  const [editCheckInTime, setEditCheckInTime] = React.useState("09:00");
+  const [editCheckOutDate, setEditCheckOutDate] = React.useState("");
+  const [editCheckOutTime, setEditCheckOutTime] = React.useState("18:00");
   const [isSavingCorrection, setIsSavingCorrection] = React.useState(false);
 
   const formatChileDateTime = (isoString) => {
@@ -149,13 +153,34 @@ export default function EventDetails({ event, isOpen, onClose }) {
     const log = attendance[staffId];
     setEditingStaffId(staffId);
     if (log) {
-      setEditCheckIn(toDatetimeLocalString(log.check_in_at));
-      setEditCheckOut(toDatetimeLocalString(log.check_out_at));
+      const checkInFormatted = toDatetimeLocalString(log.check_in_at);
+      if (checkInFormatted) {
+        const [d, t] = checkInFormatted.split("T");
+        setEditCheckInDate(d);
+        setEditCheckInTime(t);
+      } else {
+        const evDate = event.date || new Date().toISOString().split("T")[0];
+        setEditCheckInDate(evDate);
+        setEditCheckInTime("09:00");
+      }
+
+      if (log.check_out_at) {
+        const checkOutFormatted = toDatetimeLocalString(log.check_out_at);
+        const [d, t] = checkOutFormatted.split("T");
+        setEditCheckOutDate(d);
+        setEditCheckOutTime(t);
+      } else {
+        const evDate = event.date || new Date().toISOString().split("T")[0];
+        setEditCheckOutDate(evDate);
+        setEditCheckOutTime("");
+      }
       setEditNotes(log.admin_adjustment_notes || "");
     } else {
       const evDate = event.date || new Date().toISOString().split("T")[0];
-      setEditCheckIn(`${evDate}T09:00`);
-      setEditCheckOut(`${evDate}T18:00`);
+      setEditCheckInDate(evDate);
+      setEditCheckInTime("09:00");
+      setEditCheckOutDate(evDate);
+      setEditCheckOutTime("");
       setEditNotes("");
     }
   };
@@ -166,8 +191,8 @@ export default function EventDetails({ event, isOpen, onClose }) {
       return;
     }
 
-    if (!editCheckIn) {
-      toast.error("La hora de entrada es obligatoria.");
+    if (!editCheckInDate || !editCheckInTime) {
+      toast.error("La fecha y hora de entrada son obligatorias.");
       return;
     }
 
@@ -180,8 +205,12 @@ export default function EventDetails({ event, isOpen, onClose }) {
         return;
       }
 
-      const checkInISO = new Date(editCheckIn).toISOString();
-      const checkOutISO = editCheckOut ? new Date(editCheckOut).toISOString() : null;
+      // Convert local date/time in Chile to ISO string
+      const checkInISO = new Date(`${editCheckInDate}T${editCheckInTime}`).toISOString();
+      
+      const checkOutISO = (editCheckOutDate && editCheckOutTime && editCheckOutTime !== "")
+        ? new Date(`${editCheckOutDate}T${editCheckOutTime}`).toISOString()
+        : null;
 
       let durationMins = 0;
       if (checkOutISO) {
@@ -234,8 +263,10 @@ export default function EventDetails({ event, isOpen, onClose }) {
 
       setEditingStaffId(null);
       setEditNotes("");
-      setEditCheckIn("");
-      setEditCheckOut("");
+      setEditCheckInDate("");
+      setEditCheckInTime("09:00");
+      setEditCheckOutDate("");
+      setEditCheckOutTime("18:00");
       
       await fetchAssignedStaff();
     } catch (err) {
@@ -336,24 +367,39 @@ export default function EventDetails({ event, isOpen, onClose }) {
                                 <div className="text-[10px] font-extrabold text-amber-400 flex items-center gap-1 uppercase tracking-wider">
                                   <AlertTriangle className="w-3.5 h-3.5 text-amber-400" /> Corrección Administrativa
                                 </div>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                  <div className="flex flex-col gap-1">
-                                    <label className="text-[10px] text-gray-400 font-extrabold uppercase tracking-wider">Hora de Entrada (Chile)</label>
-                                    <input
-                                      type="datetime-local"
-                                      value={editCheckIn}
-                                      onChange={(e) => setEditCheckIn(e.target.value)}
-                                      className="bg-black/40 border border-white/10 rounded-xl p-2.5 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50 transition-all font-medium [&::-webkit-calendar-picker-indicator]:invert [&::-webkit-calendar-picker-indicator]:opacity-70 [&::-webkit-calendar-picker-indicator]:hover:opacity-100 [&::-webkit-calendar-picker-indicator]:cursor-pointer"
-                                    />
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                  {/* Entrada Column */}
+                                  <div className="flex flex-col gap-2 bg-black/20 p-3 rounded-2xl border border-white/5">
+                                    <span className="text-[10px] text-amber-400 font-extrabold uppercase tracking-wider block mb-1">⏰ Entrada (Chile)</span>
+                                    <div className="grid grid-cols-2 gap-2">
+                                      <DatePicker
+                                        value={editCheckInDate}
+                                        onChange={(val) => setEditCheckInDate(val)}
+                                        label="Fecha"
+                                      />
+                                      <ClockPicker
+                                        value={editCheckInTime}
+                                        onChange={(val) => setEditCheckInTime(val)}
+                                        label="Hora"
+                                      />
+                                    </div>
                                   </div>
-                                  <div className="flex flex-col gap-1">
-                                    <label className="text-[10px] text-gray-400 font-extrabold uppercase tracking-wider">Hora de Salida (Chile)</label>
-                                    <input
-                                      type="datetime-local"
-                                      value={editCheckOut}
-                                      onChange={(e) => setEditCheckOut(e.target.value)}
-                                      className="bg-black/40 border border-white/10 rounded-xl p-2.5 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50 transition-all font-medium [&::-webkit-calendar-picker-indicator]:invert [&::-webkit-calendar-picker-indicator]:opacity-70 [&::-webkit-calendar-picker-indicator]:hover:opacity-100 [&::-webkit-calendar-picker-indicator]:cursor-pointer"
-                                    />
+
+                                  {/* Salida Column */}
+                                  <div className="flex flex-col gap-2 bg-black/20 p-3 rounded-2xl border border-white/5">
+                                    <span className="text-[10px] text-amber-400 font-extrabold uppercase tracking-wider block mb-1">🚪 Salida (Chile)</span>
+                                    <div className="grid grid-cols-2 gap-2">
+                                      <DatePicker
+                                        value={editCheckOutDate}
+                                        onChange={(val) => setEditCheckOutDate(val)}
+                                        label="Fecha"
+                                      />
+                                      <ClockPicker
+                                        value={editCheckOutTime}
+                                        onChange={(val) => setEditCheckOutTime(val)}
+                                        label="Hora"
+                                      />
+                                    </div>
                                   </div>
                                 </div>
                                 <div className="flex flex-col gap-1">
