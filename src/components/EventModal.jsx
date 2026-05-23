@@ -14,6 +14,7 @@ import { supabase } from "../lib/supabase.js";
 import { toast } from "react-hot-toast";
 import ClockPicker from "./ClockPicker.jsx";
 import DatePicker from "./DatePicker.jsx";
+import CurrencyInputCLP from "./CurrencyInputCLP.jsx";
 
 // Zod Schema tolerante y flexible para evitar bloqueos silenciosos
 const eventSchema = z.object({
@@ -808,20 +809,17 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
                                   <span className="text-[9px] text-gray-400 font-medium">Tarifa base: ${baseline.toLocaleString('es-CL')}</span>
                                 </div>
                               </div>
-                              <div className="flex items-center gap-1 shrink-0">
-                                <span className="text-xs text-gray-500 font-bold">$</span>
-                                <input
-                                  type="number"
+                              <div className="flex items-center shrink-0">
+                                <CurrencyInputCLP
+                                  compact
                                   placeholder={String(baseline)}
                                   value={customRates[id] || ""}
-                                  onChange={(e) => {
-                                    const val = e.target.value;
+                                  onChange={(val) => {
                                     setCustomRates(prev => ({
                                       ...prev,
                                       [id]: val
                                     }));
                                   }}
-                                  className="w-24 bg-gray-800/80 border border-gray-700 rounded px-2 py-1 text-xs text-white text-right placeholder-gray-500 focus:outline-none focus:border-amber-500/50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                 />
                               </div>
                             </div>

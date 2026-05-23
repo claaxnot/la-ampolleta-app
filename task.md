@@ -56,7 +56,14 @@
 - [x] **Cálculo de Nómina y Failsafe:** Consolidar montos de viáticos aprobados en la tabla general de Finanzas y hoja `Resumen Transferencias`, previniendo duplicaciones con `included_in_payroll` y `payroll_batch_id`.
 - [x] **Exportación Excel Completa:** Agregar la hoja `Detalle Viáticos` manteniendo intactas las de `Resumen Transferencias` y `Detalle de Eventos`.
 
-## 7. Pendientes y Tareas Futuras
+## 7. Mejoras de UX Financiera e Inputs Premium
+- [x] **Integración de DatePicker en Viáticos:** Reemplazar el input de fecha nativo en el formulario de creación de viáticos por el selector premium `DatePicker.jsx` coherente con toda la aplicación.
+- [x] **Campos Monetarios CLP en Tiempo Real:** Crear e integrar el componente reusable `<CurrencyInputCLP />` para formatear visualmente montos con separadores de miles y signo peso (`$`) mientras se conservan enteros puros en el estado para inputs editables en:
+  - `EventModal.jsx` (tarifas personalizadas por turno de staff).
+  - `WorkerDashboard.jsx` (monto solicitado del gasto).
+  - `Finanzas.jsx` (monto final aprobado por el administrador).
+
+## 8. Pendientes y Tareas Futuras
 - [ ] **Módulo de Subida de Boletas de Honorarios (Worker):** Subida de PDFs de boletas para eventos finalizados, con flujo de revisión y aprobación del administrador antes de liberar el pago.
 - [ ] **Reportes Visuales y Gráficos de Finanzas (Admin):** Gráficos interactivos de barra/línea sobre egresos mensuales y exportación de informes analíticos en PDF.
 - [ ] **Bitácora de Auditoría Operacional (Logs):** Registro e historial detallado de acciones administrativas críticas (ej: creación de eventos, cambios de estados de pago).
@@ -64,4 +71,5 @@
 - [ ] Control de ingreso-salida para anfitrionas.
 - [ ] Control de pagos con boleta (si hay boleta se paga, sin boleta no se paga, verificar boleta antes de pagar).
 - [ ] Agregar validación que no se puede pagar un evento si hay boleta pendiente.
+
 

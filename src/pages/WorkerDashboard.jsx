@@ -38,6 +38,7 @@ import GlassCard from "../components/GlassCard.jsx";
 import { supabase } from "../lib/supabase.js";
 import { toast } from "react-hot-toast";
 import DatePicker from "../components/DatePicker.jsx";
+import CurrencyInputCLP from "../components/CurrencyInputCLP.jsx";
 
 
 // Helper functions for mini calendar
@@ -2021,18 +2022,14 @@ export default function WorkerDashboard({ user }) {
                             </select>
                           </div>
 
-                          <div className="flex flex-col">
-                            <label className="text-gray-300 mb-1 text-xs font-bold uppercase tracking-wider">Monto Solicitado (CLP)</label>
-                            <input
-                              type="number"
-                              value={expenseForm.requested_amount}
-                              onChange={(e) => setExpenseForm({ ...expenseForm, requested_amount: e.target.value })}
-                              placeholder="Ej: 15000"
-                              className="w-full bg-gray-950/60 border border-white/10 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-amber-500 transition-all font-mono"
-                              min="1"
-                              required
-                            />
-                          </div>
+                          <CurrencyInputCLP
+                            label="Monto Solicitado (CLP)"
+                            id="requested_amount"
+                            value={expenseForm.requested_amount}
+                            onChange={(val) => setExpenseForm({ ...expenseForm, requested_amount: val })}
+                            placeholder="Ej: 15.000"
+                            required
+                          />
 
                           <div className="flex flex-col">
                             <DatePicker

@@ -25,6 +25,7 @@ import Button from "../components/Button.jsx";
 import { supabase } from "../lib/supabase.js";
 import toast from "react-hot-toast";
 import * as XLSX from "xlsx";
+import CurrencyInputCLP from "../components/CurrencyInputCLP.jsx";
 
 // Lista de bancos chilenos
 const BANCOS_CHILE = {
@@ -1364,13 +1365,12 @@ export default function Finanzas() {
 
                       {/* Monto Aprobado Input */}
                       <div className="space-y-2">
-                        <label className="block text-xs font-extrabold text-gray-300 uppercase tracking-wide">Monto Aprobado (CLP)</label>
-                        <input
-                          type="number"
-                          placeholder="Monto final aprobado"
+                        <CurrencyInputCLP
+                          label="Monto Aprobado (CLP)"
+                          id="approved_amount"
                           value={approvedAmountInput}
-                          onChange={(e) => setApprovedAmountInput(e.target.value)}
-                          className="w-full bg-gray-950/80 border border-gray-800 rounded-xl py-2 px-3 text-sm text-white font-bold placeholder-gray-600 focus:outline-none focus:border-amber-500"
+                          onChange={(val) => setApprovedAmountInput(val)}
+                          placeholder="Monto final aprobado"
                         />
                         <p className="text-[10px] text-gray-500">
                           Monto solicitado original: <strong className="text-gray-400">${parseFloat(selectedExpense.requested_amount).toLocaleString("es-CL")}</strong>
