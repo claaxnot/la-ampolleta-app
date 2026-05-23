@@ -963,7 +963,7 @@ export default function WorkerDashboard({ user }) {
             }`}
         >
           <CalendarDays className="w-4 h-4" />
-          Menu Principal
+          Menú Principal
         </button>
         <button
           onClick={() => setActiveSubTab("finanzas")}

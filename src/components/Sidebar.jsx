@@ -7,7 +7,7 @@ export default function Sidebar({ user, onLogout, isOpen, setIsOpen }) {
   const [logoError, setLogoError] = React.useState(false);
 
   const adminLinks = [
-    { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+    { to: "/dashboard", label: "Menú", icon: LayoutDashboard },
     { to: "/events", label: "Eventos", icon: CalendarDays },
     { to: "/staff", label: "Personal", icon: Users },
     { to: "/calendar", label: "Calendario", icon: Calendar },
