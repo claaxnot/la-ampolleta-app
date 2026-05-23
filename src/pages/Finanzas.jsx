@@ -867,26 +867,24 @@ export default function Finanzas() {
 
       {/* Tabs Administrador de Finanzas */}
       <motion.div variants={itemVariants} className="flex items-center gap-2 bg-gray-900/60 p-1.5 rounded-xl border border-white/5 w-full max-w-sm sm:max-w-md mb-6 select-none">
-        <motion.button
-          whileTap={{ scale: 0.96 }}
+        <button
           onClick={() => setAdminTab("nominas")}
-          className={`flex-1 py-3 px-4 rounded-lg text-xs sm:text-sm font-extrabold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+          className={`flex-1 py-3 px-4 rounded-lg text-xs sm:text-sm font-extrabold transition-all duration-150 flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 ${
             adminTab === "nominas" ? "bg-amber-500/20 text-amber-300 border border-amber-500/20 shadow-[0_0_12px_rgba(245,158,11,0.15)]" : "text-gray-400 hover:text-gray-200"
           }`}
         >
           <DollarSign className="w-4 h-4 sm:w-3.5 sm:h-3.5 text-amber-400" />
           Nóminas y Pagos
-        </motion.button>
-        <motion.button
-          whileTap={{ scale: 0.96 }}
+        </button>
+        <button
           onClick={() => setAdminTab("viaticos")}
-          className={`flex-1 py-3 px-4 rounded-lg text-xs sm:text-sm font-extrabold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+          className={`flex-1 py-3 px-4 rounded-lg text-xs sm:text-sm font-extrabold transition-all duration-150 flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 ${
             adminTab === "viaticos" ? "bg-amber-500/20 text-amber-300 border border-amber-500/20 shadow-[0_0_12px_rgba(245,158,11,0.15)]" : "text-gray-400 hover:text-gray-200"
           }`}
         >
           <FileText className="w-4 h-4 sm:w-3.5 sm:h-3.5 text-amber-400" />
           Aprobación Viáticos
-        </motion.button>
+        </button>
       </motion.div>
 
       {dbErrorWarning && (
@@ -988,27 +986,24 @@ export default function Finanzas() {
               </div>
 
               <div className="flex items-center bg-gray-800/40 border border-gray-700/60 rounded-xl p-1 gap-1 select-none">
-                <motion.button
-                  whileTap={{ scale: 0.95 }}
+                <button
                   onClick={() => setStatusFilter("all")}
-                  className={`px-4 py-2 text-xs font-semibold rounded-lg transition-all duration-200 cursor-pointer ${statusFilter === "all" ? "bg-amber-500/20 text-amber-300 border border-amber-500/20" : "text-gray-400 hover:text-gray-200"}`}
+                  className={`px-4 py-2 text-xs font-semibold rounded-lg transition-all duration-150 cursor-pointer active:scale-95 ${statusFilter === "all" ? "bg-amber-500/20 text-amber-300 border border-amber-500/20" : "text-gray-400 hover:text-gray-200"}`}
                 >
                   Todos
-                </motion.button>
-                <motion.button
-                  whileTap={{ scale: 0.95 }}
+                </button>
+                <button
                   onClick={() => setStatusFilter("pending")}
-                  className={`px-4 py-2 text-xs font-semibold rounded-lg transition-all duration-200 cursor-pointer ${statusFilter === "pending" ? "bg-red-500/20 text-red-300 border border-red-500/20" : "text-gray-400 hover:text-gray-200"}`}
+                  className={`px-4 py-2 text-xs font-semibold rounded-lg transition-all duration-150 cursor-pointer active:scale-95 ${statusFilter === "pending" ? "bg-red-500/20 text-red-300 border border-red-500/20" : "text-gray-400 hover:text-gray-200"}`}
                 >
                   Pendientes
-                </motion.button>
-                <motion.button
-                  whileTap={{ scale: 0.95 }}
+                </button>
+                <button
                   onClick={() => setStatusFilter("paid")}
-                  className={`px-4 py-2 text-xs font-semibold rounded-lg transition-all duration-200 cursor-pointer ${statusFilter === "paid" ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/20" : "text-gray-400 hover:text-gray-200"}`}
+                  className={`px-4 py-2 text-xs font-semibold rounded-lg transition-all duration-150 cursor-pointer active:scale-95 ${statusFilter === "paid" ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/20" : "text-gray-400 hover:text-gray-200"}`}
                 >
                   Pagados
-                </motion.button>
+                </button>
               </div>
 
               <label className="flex items-center gap-2 cursor-pointer bg-gray-800/40 border border-gray-700/60 rounded-xl px-3.5 py-1.5 text-xs font-semibold text-gray-300 hover:text-white hover:border-amber-500/30 transition-all select-none h-[38px]">
@@ -1334,21 +1329,20 @@ export default function Finanzas() {
                 const label = status === "all" ? "Todos" : status;
                 const count = expenses.filter(e => status === "all" || e.status === status).length;
                 return (
-                  <motion.button
+                  <button
                     key={status}
-                    whileTap={{ scale: 0.95 }}
                     onClick={() => {
                       setExpenseStatusFilter(status);
                       setSelectedExpense(null);
                     }}
-                    className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all duration-150 cursor-pointer active:scale-95 ${
                       expenseStatusFilter === status
                         ? "bg-amber-500 text-black shadow-lg shadow-amber-500/20"
                         : "bg-gray-800/60 text-gray-400 hover:text-white"
                     }`}
                   >
                     {label} ({count})
-                  </motion.button>
+                  </button>
                 );
               })}
             </div>
