@@ -257,7 +257,7 @@ export default function TopBar({ user, onToggleMenu }) {
       {/* Mobile Menu Button */}
       <button 
         onClick={onToggleMenu}
-        className="md:hidden p-2 text-gray-400 hover:text-white hover:bg-white/5 rounded-lg transition-colors focus:outline-none"
+        className="lg:hidden p-2 text-gray-400 hover:text-white hover:bg-white/5 rounded-lg transition-colors focus:outline-none"
       >
         <Menu className="w-6 h-6" />
       </button>

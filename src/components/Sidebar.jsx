@@ -38,28 +38,28 @@ export default function Sidebar({ user, onLogout, isOpen, setIsOpen }) {
       {/* Mobile Overlay */}
       {isOpen && (
         <div 
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 md:hidden"
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 lg:hidden"
           onClick={() => setIsOpen(false)}
         />
       )}
       
       <nav className={`
-        fixed md:relative inset-y-0 left-0 z-50 w-64 h-screen bg-black/80 md:bg-black/40 backdrop-blur-3xl border-r border-white/10 text-gray-100 flex flex-col shadow-2xl transition-transform duration-300 ease-in-out
-        ${isOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}
+        fixed lg:relative inset-y-0 left-0 z-50 w-64 h-screen bg-black/80 lg:bg-black/40 backdrop-blur-3xl border-r border-white/10 text-gray-100 flex flex-col shadow-2xl transition-transform duration-300 ease-in-out
+        ${isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}
       `}>
         {/* Subtle background glow */}
         <div className="absolute top-0 left-0 w-full h-32 bg-accent/10 blur-3xl rounded-full -translate-y-1/2"></div>
         
         <div className="p-6 relative z-10">
-          <div className="flex items-center justify-between md:justify-center mb-8">
+          <div className="flex items-center justify-between lg:justify-center mb-8">
             <div className="flex items-center gap-3">
               <div className="p-1.5 bg-white/5 backdrop-blur-md rounded-xl border border-white/10 hover:border-accent/30 transition-all duration-300">
                 {!logoError ? (
                   <img 
-                    src="/isotipo.png" 
-                    alt="Logo" 
-                    onError={() => setLogoError(true)}
-                    className="w-8 h-8 object-contain drop-shadow-[0_0_8px_rgba(245,158,11,0.4)]" 
+                     src="/isotipo.png" 
+                     alt="Logo" 
+                     onError={() => setLogoError(true)}
+                     className="w-8 h-8 object-contain drop-shadow-[0_0_8px_rgba(245,158,11,0.4)]" 
                   />
                 ) : (
                   <Lightbulb className="w-8 h-8 text-accent" />
@@ -72,7 +72,7 @@ export default function Sidebar({ user, onLogout, isOpen, setIsOpen }) {
             </div>
             {/* Close button for mobile */}
             <button 
-              className="md:hidden text-gray-400 hover:text-white"
+              className="lg:hidden text-gray-400 hover:text-white"
               onClick={() => setIsOpen(false)}
             >
               <X className="w-6 h-6" />
