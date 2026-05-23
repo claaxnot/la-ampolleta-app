@@ -873,7 +873,7 @@ export default function Finanzas() {
       </motion.header>
 
       {/* Tabs Administrador de Finanzas */}
-      <motion.div variants={itemVariants} className="flex items-center gap-2 bg-gray-900/60 p-1.5 rounded-xl border border-white/5 w-full max-w-sm sm:max-w-md mb-6">
+      <div className="relative z-10 flex items-center gap-2 bg-gray-900/60 p-1.5 rounded-xl border border-white/5 w-full max-w-sm sm:max-w-md mb-6">
         <button
           onClick={() => setAdminTab("nominas")}
           className={`flex-1 py-3 px-4 rounded-lg text-xs sm:text-sm font-extrabold transition-all duration-150 flex items-center justify-center gap-1.5 cursor-pointer touch-manipulation active:bg-amber-500/30 active:opacity-90 ${
@@ -892,7 +892,7 @@ export default function Finanzas() {
           <FileText className="w-4 h-4 sm:w-3.5 sm:h-3.5 text-amber-400" />
           Aprobación Viáticos
         </button>
-      </motion.div>
+      </div>
 
       {dbErrorWarning && (
         <motion.div
