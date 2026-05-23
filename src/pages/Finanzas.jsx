@@ -170,7 +170,8 @@ export default function Finanzas() {
               id: `expense_${e.id}`, // Prefijo para evitar colisiones
               expense_id: e.id,
               is_expense: true,
-              event_name: e.events?.name ? `[Viático] ${e.events.name}` : `[Gasto] ${e.expense_type}`,
+              event_name: e.events?.name ? `[${e.expense_type}] ${e.events.name}` : `[Gasto] ${e.expense_type}`,
+              expense_type: e.expense_type,
               event_date: e.expense_date || "",
               is_finished: true,
               staff_id: e.profiles?.id || "",
@@ -1126,7 +1127,7 @@ export default function Finanzas() {
                                   {p.staff_name}
                                   {p.is_expense && (
                                     <span className="px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/20 text-amber-400 text-[10px] font-extrabold uppercase font-sans">
-                                      Viático
+                                      {p.expense_type || "Viático"}
                                     </span>
                                   )}
                                 </span>
