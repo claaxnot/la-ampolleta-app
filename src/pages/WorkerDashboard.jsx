@@ -28,11 +28,16 @@ import {
   Landmark,
   Coins,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  FileText,
+  Upload,
+  Plus,
+  Eye
 } from "lucide-react";
 import GlassCard from "../components/GlassCard.jsx";
 import { supabase } from "../lib/supabase.js";
 import { toast } from "react-hot-toast";
+
 
 // Helper functions for mini calendar
 const getDaysInMonth = (year, month) => new Date(year, month + 1, 0).getDate();
@@ -64,6 +69,21 @@ export default function WorkerDashboard({ user }) {
   // Perfil del trabajador para consultar su rol real
   const [workerProfile, setWorkerProfile] = useState(null);
   const [financeMonthFilter, setFinanceMonthFilter] = useState("all");
+
+  // Estados de Viáticos y Reembolsos (Worker)
+  const [expenses, setExpenses] = useState([]);
+  const [loadingExpenses, setLoadingExpenses] = useState(false);
+  const [financeSection, setFinanceSection] = useState("events"); // "events" o "expenses"
+  const [expenseForm, setExpenseForm] = useState({
+    requested_amount: "",
+    expense_type: "Viático",
+    expense_date: new Date().toISOString().split("T")[0],
+    event_id: "",
+    description: ""
+  });
+  const [receiptFile, setReceiptFile] = useState(null);
+  const [isSubmittingExpense, setIsSubmittingExpense] = useState(false);
+
 
   // Estado del Clima en tiempo real por Geolocalización IP / Open-Meteo
   const [weatherData, setWeatherData] = useState({ temp: 18, city: "Santiago", icon: "sun" });
@@ -375,6 +395,7 @@ export default function WorkerDashboard({ user }) {
     if (user?.id) {
       fetchMyEvents(user.id);
       fetchMyAvailability(user.id);
+      fetchExpenses();
 
       // Cargar perfil real del trabajador
       supabase.from('profiles').select('*').eq('id', user.id).single().then(({ data }) => {
@@ -606,6 +627,120 @@ export default function WorkerDashboard({ user }) {
       fetchMyDbNotifications(workerId, formattedEvents);
     }
     setIsLoading(false);
+  };
+
+  const fetchExpenses = async () => {
+    if (!user?.id) return;
+    setLoadingExpenses(true);
+    try {
+      const { data, error } = await supabase
+        .from("expense_requests")
+        .select(`
+          *,
+          events:event_id (
+            id,
+            name,
+            date
+          )
+        `)
+        .eq("worker_id", user.id)
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      setExpenses(data || []);
+    } catch (err) {
+      console.error("Error fetching expenses:", err);
+    } finally {
+      setLoadingExpenses(false);
+    }
+  };
+
+  const handleViewReceipt = async (filePath) => {
+    if (!filePath) return;
+    try {
+      const { data, error } = await supabase.storage
+        .from("receipts")
+        .createSignedUrl(filePath, 900); // 15 minutos de vigencia
+
+      if (error) throw error;
+      if (data?.signedUrl) {
+        window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+      } else {
+        toast.error("No se pudo generar el enlace temporal para el comprobante.");
+      }
+    } catch (err) {
+      console.error("Error generating signed URL:", err);
+      toast.error("Error al abrir el comprobante.");
+    }
+  };
+
+  const handleCreateExpense = async (e) => {
+    e.preventDefault();
+    if (!expenseForm.requested_amount || !expenseForm.description) {
+      toast.error("Por favor completa los campos obligatorios.");
+      return;
+    }
+
+    setIsSubmittingExpense(true);
+    const loadingToast = toast.loading("Enviando solicitud de gasto...");
+    try {
+      let receiptPath = null;
+
+      // 1. Subir el comprobante si existe
+      if (receiptFile) {
+        const fileExt = receiptFile.name.split(".").pop();
+        const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+        const filePath = `${user.id}/${fileName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from("receipts")
+          .upload(filePath, receiptFile);
+
+        if (uploadError) throw uploadError;
+        receiptPath = filePath;
+      }
+
+      // 2. Insertar la solicitud de gasto
+      const { error: insertError } = await supabase
+        .from("expense_requests")
+        .insert({
+          worker_id: user.id,
+          event_id: expenseForm.event_id || null,
+          expense_type: expenseForm.expense_type,
+          requested_amount: parseFloat(expenseForm.requested_amount),
+          approved_amount: null, // Inicialmente nulo hasta que el admin apruebe
+          expense_date: expenseForm.expense_date,
+          description: expenseForm.description,
+          receipt_url: receiptPath,
+          status: "Pendiente",
+          included_in_payroll: false,
+          payroll_batch_id: null
+        });
+
+      if (insertError) throw insertError;
+
+      toast.success("¡Solicitud de gasto enviada con éxito!", { id: loadingToast });
+      
+      // Reiniciar formulario
+      setExpenseForm({
+        requested_amount: "",
+        expense_type: "Viático",
+        expense_date: new Date().toISOString().split("T")[0],
+        event_id: "",
+        description: ""
+      });
+      setReceiptFile(null);
+      
+      // Recargar lista y registrar actividad
+      fetchExpenses();
+      addActivity(`Registraste una solicitud de ${expenseForm.expense_type} por $${parseFloat(expenseForm.requested_amount).toLocaleString("es-CL")}`, "info");
+
+    } catch (err) {
+      console.error("Error creating expense:", err);
+      toast.error(`Error al enviar solicitud: ${err.message || "Error de conexión"}`, { id: loadingToast });
+    } finally {
+      setIsSubmittingExpense(false);
+    }
   };
 
   // Mini calendar state
@@ -1492,197 +1627,496 @@ export default function WorkerDashboard({ user }) {
 
         return (
           <div className="space-y-6 relative z-10">
-            {/* Filtro Mensual de Finanzas */}
-            <motion.div variants={itemVariants} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white/5 p-4 rounded-2xl border border-white/5">
-              <div>
-                <h4 className="text-sm font-bold text-white">Filtro por Período Mensual</h4>
-                <p className="text-[11px] text-gray-400">Filtra tus cobros y honorarios según el mes de ejecución.</p>
-              </div>
-              <div className="relative">
-                <select
-                  value={financeMonthFilter}
-                  onChange={(e) => setFinanceMonthFilter(e.target.value)}
-                  className="bg-gray-800/80 border border-gray-700 rounded-xl px-4 py-2 text-xs font-bold text-white focus:outline-none focus:border-amber-500/50 appearance-none pr-10 cursor-pointer"
-                >
-                  <option value="all">Todos los meses</option>
-                  {uniqueFinanceMonths.map(p => (
-                    <option key={p} value={p}>{formatPeriod(p)}</option>
-                  ))}
-                </select>
-                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-gray-400">
-                  <Sliders className="w-3.5 h-3.5" />
-                </div>
-              </div>
+            {/* Selector de sub-sección: Honorarios vs Viáticos */}
+            <motion.div variants={itemVariants} className="flex items-center gap-2 bg-gray-900/60 p-1.5 rounded-xl border border-white/5 max-w-sm mb-4">
+              <button
+                onClick={() => setFinanceSection("events")}
+                className={`flex-1 py-2 px-3 rounded-lg text-xs font-extrabold transition-all flex items-center justify-center gap-1.5 ${
+                  financeSection === "events" ? "bg-amber-500/20 text-amber-300 border border-amber-500/20 shadow-[0_0_12px_rgba(245,158,11,0.1)]" : "text-gray-400 hover:text-gray-200"
+                }`}
+              >
+                <DollarSign className="w-3.5 h-3.5" />
+                Honorarios Eventos
+              </button>
+              <button
+                onClick={() => setFinanceSection("expenses")}
+                className={`flex-1 py-2 px-3 rounded-lg text-xs font-extrabold transition-all flex items-center justify-center gap-1.5 ${
+                  financeSection === "expenses" ? "bg-amber-500/20 text-amber-300 border border-amber-500/20 shadow-[0_0_12px_rgba(245,158,11,0.1)]" : "text-gray-400 hover:text-gray-200"
+                }`}
+              >
+                <FileText className="w-3.5 h-3.5" />
+                Viáticos y Gastos
+              </button>
             </motion.div>
 
-            {/* Stats Cards */}
-            <motion.div variants={itemVariants} className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <GlassCard className="p-6 relative overflow-hidden">
-                <div className="absolute top-0 right-0 p-4 opacity-10">
-                  <CheckCircle className="w-20 h-20 text-emerald-500" />
-                </div>
-                <p className="text-xs text-gray-400 font-semibold uppercase tracking-wider">Total Cobrado (Liquidado)</p>
-                <h3 className="text-3xl font-extrabold text-emerald-400 mt-2">
-                  ${totalEarnedPaid.toLocaleString("es-CL")}
-                </h3>
-                <p className="text-xs text-gray-500 mt-2 font-medium">Eventos finalizados y pagados por la productora</p>
-              </GlassCard>
+            {financeSection === "events" ? (
+              <>
+                {/* Filtro Mensual de Finanzas */}
+                <motion.div variants={itemVariants} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white/5 p-4 rounded-2xl border border-white/5">
+                  <div>
+                    <h4 className="text-sm font-bold text-white">Filtro por Período Mensual</h4>
+                    <p className="text-[11px] text-gray-400">Filtra tus cobros y honorarios según el mes de ejecución.</p>
+                  </div>
+                  <div className="relative">
+                    <select
+                      value={financeMonthFilter}
+                      onChange={(e) => setFinanceMonthFilter(e.target.value)}
+                      className="bg-gray-800/80 border border-gray-700 rounded-xl px-4 py-2 text-xs font-bold text-white focus:outline-none focus:border-amber-500/50 appearance-none pr-10 cursor-pointer"
+                    >
+                      <option value="all">Todos los meses</option>
+                      {uniqueFinanceMonths.map(p => (
+                        <option key={p} value={p}>{formatPeriod(p)}</option>
+                      ))}
+                    </select>
+                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-gray-400">
+                      <Sliders className="w-3.5 h-3.5" />
+                    </div>
+                  </div>
+                </motion.div>
 
-              <GlassCard className="p-6 relative overflow-hidden">
-                <div className="absolute top-0 right-0 p-4 opacity-10">
-                  <Clock className="w-20 h-20 text-amber-500" />
-                </div>
-                <p className="text-xs text-gray-400 font-semibold uppercase tracking-wider">Pendiente de Pago</p>
-                <h3 className="text-3xl font-extrabold text-amber-400 mt-2">
-                  ${totalEarnedPending.toLocaleString("es-CL")}
-                </h3>
-                <p className="text-xs text-gray-500 mt-2 font-medium">Eventos realizados pendientes de transferencia</p>
-              </GlassCard>
+                {/* Stats Cards */}
+                <motion.div variants={itemVariants} className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <GlassCard className="p-6 relative overflow-hidden">
+                    <div className="absolute top-0 right-0 p-4 opacity-10">
+                      <CheckCircle className="w-20 h-20 text-emerald-500" />
+                    </div>
+                    <p className="text-xs text-gray-400 font-semibold uppercase tracking-wider">Total Cobrado (Liquidado)</p>
+                    <h3 className="text-3xl font-extrabold text-emerald-400 mt-2">
+                      ${totalEarnedPaid.toLocaleString("es-CL")}
+                    </h3>
+                    <p className="text-xs text-gray-500 mt-2 font-medium">Eventos finalizados y pagados por la productora</p>
+                  </GlassCard>
 
-              <GlassCard className="p-6 relative overflow-hidden">
-                <div className="absolute top-0 right-0 p-4 opacity-10">
-                  <Wallet className="w-20 h-20 text-amber-500" />
-                </div>
-                <p className="text-xs text-gray-400 font-semibold uppercase tracking-wider">Monto Base de Cobro</p>
-                <h3 className="text-3xl font-extrabold text-amber-300 mt-2">
-                  ${baselineRate.toLocaleString("es-CL")}
-                </h3>
-                <p className="text-xs text-gray-500 mt-2 font-medium">Tu tarifa estándar registrada por turno / día</p>
-              </GlassCard>
-            </motion.div>
+                  <GlassCard className="p-6 relative overflow-hidden">
+                    <div className="absolute top-0 right-0 p-4 opacity-10">
+                      <Clock className="w-20 h-20 text-amber-500" />
+                    </div>
+                    <p className="text-xs text-gray-400 font-semibold uppercase tracking-wider">Pendiente de Pago</p>
+                    <h3 className="text-3xl font-extrabold text-amber-400 mt-2">
+                      ${totalEarnedPending.toLocaleString("es-CL")}
+                    </h3>
+                    <p className="text-xs text-gray-500 mt-2 font-medium">Eventos realizados pendientes de transferencia</p>
+                  </GlassCard>
 
-            {/* Layout Dos Columnas */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Columna Izquierda: Historial de Pagos */}
-              <motion.section variants={itemVariants} className="lg:col-span-2 space-y-4">
-                <GlassCard className="p-6 border border-white/5">
-                  <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                    <Coins className="w-5 h-5 text-amber-400" />
-                    Historial de Pagos de Producciones
-                  </h3>
+                  <GlassCard className="p-6 relative overflow-hidden">
+                    <div className="absolute top-0 right-0 p-4 opacity-10">
+                      <Wallet className="w-20 h-20 text-amber-500" />
+                    </div>
+                    <p className="text-xs text-gray-400 font-semibold uppercase tracking-wider">Monto Base de Cobro</p>
+                    <h3 className="text-3xl font-extrabold text-amber-300 mt-2">
+                      ${baselineRate.toLocaleString("es-CL")}
+                    </h3>
+                    <p className="text-xs text-gray-500 mt-2 font-medium">Tu tarifa estándar registrada por turno / día</p>
+                  </GlassCard>
+                </motion.div>
 
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse text-sm">
-                      <thead>
-                        <tr className="border-b border-white/10 text-gray-400 text-xs font-semibold uppercase bg-white/5">
-                          <th className="py-3 px-4">Evento</th>
-                          <th className="py-3 px-4">Fecha</th>
-                          <th className="py-3 px-4">Honorario</th>
-                          <th className="py-3 px-4 text-center">Estado Pago</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-white/5">
-                        {filteredCompletedEvents.length === 0 ? (
-                          <tr>
-                            <td colSpan="4" className="py-8 text-center text-gray-500 italic">
-                              No tienes eventos completados registrados para este período.
-                            </td>
-                          </tr>
-                        ) : (
-                          filteredCompletedEvents.map(event => {
-                            const rate = event.custom_rate ? parseFloat(event.custom_rate) : baselineRate;
-                            const isPaid = event.payment_status === "Pagado";
+                {/* Layout Dos Columnas */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  {/* Columna Izquierda: Historial de Pagos */}
+                  <motion.section variants={itemVariants} className="lg:col-span-2 space-y-4">
+                    <GlassCard className="p-6 border border-white/5">
+                      <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                        <Coins className="w-5 h-5 text-amber-400" />
+                        Historial de Pagos de Eventos
+                      </h3>
 
-                            return (
-                              <tr key={event.id} className="hover:bg-white/5 transition-colors">
-                                <td className="py-3.5 px-4 font-bold text-gray-200">{event.name}</td>
-                                <td className="py-3.5 px-4 text-gray-400">{event.date}</td>
-                                <td className="py-3.5 px-4 font-extrabold text-amber-400">${rate.toLocaleString("es-CL")}</td>
-                                <td className="py-3.5 px-4 text-center">
-                                  <span className={`px-2.5 py-1 rounded-full text-2xs font-extrabold border ${isPaid
-                                      ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
-                                      : 'bg-red-500/10 border-red-500/30 text-red-400'
-                                    }`}>
-                                    {isPaid ? "Pagado" : "Pendiente"}
-                                  </span>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left border-collapse text-sm">
+                          <thead>
+                            <tr className="border-b border-white/10 text-gray-400 text-xs font-semibold uppercase bg-white/5">
+                              <th className="py-3 px-4">Evento</th>
+                              <th className="py-3 px-4">Fecha</th>
+                              <th className="py-3 px-4">Honorario</th>
+                              <th className="py-3 px-4 text-center">Estado Pago</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-white/5">
+                            {filteredCompletedEvents.length === 0 ? (
+                              <tr>
+                                <td colSpan="4" className="py-8 text-center text-gray-500 italic">
+                                  No tienes eventos completados registrados para este período.
                                 </td>
                               </tr>
-                            );
-                          })
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </GlassCard>
-              </motion.section>
+                            ) : (
+                              filteredCompletedEvents.map(event => {
+                                const rate = event.custom_rate ? parseFloat(event.custom_rate) : baselineRate;
+                                const isPaid = event.payment_status === "Pagado";
 
-              {/* Columna Derecha: Datos de Transferencia */}
-              <motion.section variants={itemVariants} className="lg:col-span-1 space-y-4">
-                <GlassCard className="p-6 border border-white/5 relative overflow-hidden">
-                  <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-full blur-2xl pointer-events-none" />
+                                return (
+                                  <tr key={event.id} className="hover:bg-white/5 transition-colors">
+                                    <td className="py-3.5 px-4 font-bold text-gray-200">{event.name}</td>
+                                    <td className="py-3.5 px-4 text-gray-400">{event.date}</td>
+                                    <td className="py-3.5 px-4 font-extrabold text-amber-400">${rate.toLocaleString("es-CL")}</td>
+                                    <td className="py-3.5 px-4 text-center">
+                                      <span className={`px-2.5 py-1 rounded-full text-2xs font-extrabold border ${isPaid
+                                          ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                                          : 'bg-red-500/10 border-red-500/30 text-red-400'
+                                        }`}>
+                                        {isPaid ? "Pagado" : "Pendiente"}
+                                      </span>
+                                    </td>
+                                  </tr>
+                                );
+                              })
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </GlassCard>
+                  </motion.section>
 
-                  <h3 className="text-lg font-bold text-white mb-1 flex items-center gap-2">
-                    <Landmark className="w-5 h-5 text-amber-400" />
-                    Mis Datos de Transferencia
-                  </h3>
-                  <p className="text-xs text-gray-400 mb-6">
-                    Mantén tus datos actualizados para recibir tus pagos masivos sin demoras.
-                  </p>
+                  {/* Columna Derecha: Datos de Transferencia */}
+                  <motion.section variants={itemVariants} className="lg:col-span-1 space-y-4">
+                    <GlassCard className="p-6 border border-white/5 relative overflow-hidden">
+                      <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-full blur-2xl pointer-events-none" />
 
-                  {showBankWarning && (
-                    <motion.div
-                      initial={{ opacity: 0, scale: 0.95 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      className="mb-4 p-3 rounded-xl text-xs font-semibold border bg-red-500/10 text-red-400 border-red-500/20 leading-relaxed animate-pulse"
-                    >
-                      ⚠️ <span className="font-extrabold uppercase">Obligatorio:</span> Por políticas de la productora, debes ingresar tus datos de transferencia bancaria para activar tu portal de eventos.
-                    </motion.div>
-                  )}
+                      <h3 className="text-lg font-bold text-white mb-1 flex items-center gap-2">
+                        <Landmark className="w-5 h-5 text-amber-400" />
+                        Mis Datos de Transferencia
+                      </h3>
+                      <p className="text-xs text-gray-400 mb-6">
+                        Mantén tus datos actualizados para recibir tus pagos masivos sin demoras.
+                      </p>
 
-                  <form onSubmit={handleUpdateBankDetails} className="space-y-4">
-                    <div className="flex flex-col">
-                      <label htmlFor="w_banco" className="text-gray-300 mb-1 text-xs font-bold uppercase tracking-wider">Banco Destino</label>
-                      <select
-                        id="w_banco"
-                        value={bankForm.codigo_banco_destino}
-                        onChange={(e) => setBankForm({ ...bankForm, codigo_banco_destino: e.target.value })}
-                        className="w-full bg-gray-950/60 border border-white/10 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-amber-500 transition-all font-semibold"
-                        required
-                      >
-                        <option value="" disabled className="bg-gray-900 text-gray-500">Selecciona tu banco...</option>
-                        {BANCOS_CHILE.map(b => (
-                          <option key={b.code} value={b.code} className="bg-gray-900 text-white font-medium">{b.name}</option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div className="flex flex-col">
-                      <label htmlFor="w_cuenta" className="text-gray-300 mb-1 text-xs font-bold uppercase tracking-wider">Número de Cuenta</label>
-                      <input
-                        type="text"
-                        id="w_cuenta"
-                        value={bankForm.cuenta_destino}
-                        onChange={(e) => setBankForm({ ...bankForm, cuenta_destino: e.target.value })}
-                        placeholder="Ej: 123456789"
-                        className="w-full bg-gray-950/60 border border-white/10 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-amber-500 transition-all font-mono"
-                        required
-                      />
-                    </div>
-
-                    <div className="bg-amber-500/10 border border-amber-500/20 p-3 rounded-xl text-2xs text-amber-400 leading-relaxed">
-                      ⚠️ <span className="font-bold">Nota de Obligatoriedad:</span> Tus datos de transferencia son de carácter obligatorio para poder ver tu panel de eventos asignados. Cualquier cambio afectará tus próximos depósitos de honorarios.
-                    </div>
-
-                    <motion.button
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                      type="submit"
-                      disabled={isUpdatingBank}
-                      className="w-full flex items-center justify-center gap-2 py-3 bg-amber-500 text-gray-900 font-extrabold rounded-xl hover:bg-amber-400 disabled:opacity-50 transition-all duration-300 text-sm shadow-lg shadow-amber-500/10 mt-2"
-                    >
-                      {isUpdatingBank ? (
-                        <span>Guardando...</span>
-                      ) : (
-                        <>
-                          <Check className="w-4 h-4" />
-                          Actualizar Datos Bancarios
-                        </>
+                      {showBankWarning && (
+                        <motion.div
+                          initial={{ opacity: 0, scale: 0.95 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          className="mb-4 p-3 rounded-xl text-xs font-semibold border bg-red-500/10 text-red-400 border-red-500/20 leading-relaxed animate-pulse"
+                        >
+                          ⚠️ <span className="font-extrabold uppercase">Obligatorio:</span> Por políticas de la productora, debes ingresar tus datos de transferencia bancaria para activar tu portal de eventos.
+                        </motion.div>
                       )}
-                    </motion.button>
-                  </form>
-                </GlassCard>
-              </motion.section>
-            </div>
+
+                      <form onSubmit={handleUpdateBankDetails} className="space-y-4">
+                        <div className="flex flex-col">
+                          <label htmlFor="w_banco" className="text-gray-300 mb-1 text-xs font-bold uppercase tracking-wider">Banco Destino</label>
+                          <select
+                            id="w_banco"
+                            value={bankForm.codigo_banco_destino}
+                            onChange={(e) => setBankForm({ ...bankForm, codigo_banco_destino: e.target.value })}
+                            className="w-full bg-gray-950/60 border border-white/10 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-amber-500 transition-all font-semibold"
+                            required
+                          >
+                            <option value="" disabled className="bg-gray-900 text-gray-500">Selecciona tu banco...</option>
+                            {BANCOS_CHILE.map(b => (
+                              <option key={b.code} value={b.code} className="bg-gray-900 text-white font-medium">{b.name}</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div className="flex flex-col">
+                          <label htmlFor="w_cuenta" className="text-gray-300 mb-1 text-xs font-bold uppercase tracking-wider">Número de Cuenta</label>
+                          <input
+                            type="text"
+                            id="w_cuenta"
+                            value={bankForm.cuenta_destino}
+                            onChange={(e) => setBankForm({ ...bankForm, cuenta_destino: e.target.value })}
+                            placeholder="Ej: 123456789"
+                            className="w-full bg-gray-950/60 border border-white/10 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-amber-500 transition-all font-mono"
+                            required
+                          />
+                        </div>
+
+                        <div className="bg-amber-500/10 border border-amber-500/20 p-3 rounded-xl text-2xs text-amber-400 leading-relaxed">
+                          ⚠️ <span className="font-bold">Nota de Obligatoriedad:</span> Tus datos de transferencia son de carácter obligatorio para poder ver tu portal de eventos.
+                        </div>
+
+                        <motion.button
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                          type="submit"
+                          disabled={isUpdatingBank}
+                          className="w-full flex items-center justify-center gap-2 py-3 bg-amber-500 text-gray-900 font-extrabold rounded-xl hover:bg-amber-400 disabled:opacity-50 transition-all duration-300 text-sm shadow-lg shadow-amber-500/10 mt-2"
+                        >
+                          {isUpdatingBank ? (
+                            <span>Guardando...</span>
+                          ) : (
+                            <>
+                              <Check className="w-4 h-4" />
+                              Actualizar Datos Bancarios
+                            </>
+                          )}
+                        </motion.button>
+                      </form>
+                    </GlassCard>
+                  </motion.section>
+                </div>
+              </>
+            ) : (() => {
+              // Cálculo de estadísticas de viáticos
+              let pendingSum = 0;
+              let approvedSum = 0;
+              let paidSum = 0;
+
+              expenses.forEach(e => {
+                const reqAmt = parseFloat(e.requested_amount) || 0;
+                const appAmt = parseFloat(e.approved_amount) || 0;
+
+                if (e.status === "Pagado") {
+                  paidSum += appAmt;
+                } else if (e.status === "Aprobado") {
+                  approvedSum += appAmt;
+                } else if (e.status === "Pendiente" || e.status === "En revisión") {
+                  pendingSum += reqAmt;
+                }
+              });
+
+              return (
+                <div className="space-y-6">
+                  {/* Tarjetas de Estadísticas de Viáticos */}
+                  <motion.div variants={itemVariants} className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <GlassCard className="p-6 relative overflow-hidden">
+                      <div className="absolute top-0 right-0 p-4 opacity-10">
+                        <Clock className="w-20 h-20 text-yellow-500" />
+                      </div>
+                      <p className="text-xs text-gray-400 font-semibold uppercase tracking-wider">Monto Solicitado (Pendiente)</p>
+                      <h3 className="text-3xl font-extrabold text-yellow-400 mt-2">
+                        ${pendingSum.toLocaleString("es-CL")}
+                      </h3>
+                      <p className="text-xs text-gray-500 mt-2 font-medium">Solicitudes en revisión o pendientes de aprobación</p>
+                    </GlassCard>
+
+                    <GlassCard className="p-6 relative overflow-hidden">
+                      <div className="absolute top-0 right-0 p-4 opacity-10">
+                        <CheckCircle className="w-20 h-20 text-emerald-500" />
+                      </div>
+                      <p className="text-xs text-gray-400 font-semibold uppercase tracking-wider">Monto Aprobado (Por Cobrar)</p>
+                      <h3 className="text-3xl font-extrabold text-emerald-400 mt-2">
+                        ${approvedSum.toLocaleString("es-CL")}
+                      </h3>
+                      <p className="text-xs text-gray-500 mt-2 font-medium">Aprobado por administración, listo para nómina masiva</p>
+                    </GlassCard>
+
+                    <GlassCard className="p-6 relative overflow-hidden">
+                      <div className="absolute top-0 right-0 p-4 opacity-10">
+                        <Coins className="w-20 h-20 text-amber-500" />
+                      </div>
+                      <p className="text-xs text-gray-400 font-semibold uppercase tracking-wider">Total Pagado Histórico</p>
+                      <h3 className="text-3xl font-extrabold text-amber-300 mt-2">
+                        ${paidSum.toLocaleString("es-CL")}
+                      </h3>
+                      <p className="text-xs text-gray-500 mt-2 font-medium">Viáticos y reembolsos transferidos exitosamente</p>
+                    </GlassCard>
+                  </motion.div>
+
+                  {/* Layout Dos Columnas para Solicitudes de Viáticos */}
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    {/* Columna Izquierda: Historial/Listado */}
+                    <motion.section variants={itemVariants} className="lg:col-span-2 space-y-4">
+                      <GlassCard className="p-6 border border-white/5">
+                        <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                          <Coins className="w-5 h-5 text-amber-400" />
+                          Mis Solicitudes de Gastos
+                        </h3>
+
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-left border-collapse text-sm">
+                            <thead>
+                              <tr className="border-b border-white/10 text-gray-400 text-xs font-semibold uppercase bg-white/5">
+                                <th className="py-3 px-4">Tipo & Descripción</th>
+                                <th className="py-3 px-4">Fecha & Evento</th>
+                                <th className="py-3 px-4 text-right">Monto</th>
+                                <th className="py-3 px-4 text-center">Estado</th>
+                                <th className="py-3 px-4 text-center">Comprobante</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-white/5">
+                              {expenses.length === 0 ? (
+                                <tr>
+                                  <td colSpan="5" className="py-8 text-center text-gray-500 italic">
+                                    No has registrado ninguna solicitud de viáticos o reembolsos.
+                                  </td>
+                                </tr>
+                              ) : (
+                                expenses.map(expense => {
+                                  const reqAmt = parseFloat(expense.requested_amount) || 0;
+                                  const appAmt = parseFloat(expense.approved_amount) || 0;
+                                  const eventName = expense.events?.name || "Gasto Operacional";
+
+                                  let statusClass = "bg-amber-500/10 border-amber-500/30 text-amber-400";
+                                  if (expense.status === "En revisión") statusClass = "bg-sky-500/10 border-sky-500/30 text-sky-400";
+                                  if (expense.status === "Aprobado") statusClass = "bg-emerald-500/10 border-emerald-500/30 text-emerald-400";
+                                  if (expense.status === "Rechazado") statusClass = "bg-red-500/10 border-red-500/30 text-red-400";
+                                  if (expense.status === "Pagado") statusClass = "bg-gray-500/20 border-white/10 text-gray-400";
+
+                                  return (
+                                    <tr key={expense.id} className="hover:bg-white/5 transition-colors">
+                                      <td className="py-3.5 px-4">
+                                        <div className="font-bold text-gray-200">{expense.expense_type}</div>
+                                        <div className="text-xs text-gray-400 truncate max-w-[200px]">{expense.description}</div>
+                                        {expense.admin_comment && (
+                                          <div className="text-[10px] text-amber-400 mt-1 italic leading-tight">
+                                            Obs: {expense.admin_comment}
+                                          </div>
+                                        )}
+                                      </td>
+                                      <td className="py-3.5 px-4 text-xs">
+                                        <div className="text-gray-300">{expense.expense_date}</div>
+                                        <div className="text-gray-500 font-medium truncate max-w-[150px]">{eventName}</div>
+                                      </td>
+                                      <td className="py-3.5 px-4 text-right">
+                                        <div className="font-extrabold text-amber-400">${reqAmt.toLocaleString("es-CL")}</div>
+                                        {expense.status === "Aprobado" && (
+                                          <div className="text-[10px] text-emerald-400 font-bold">Aprobado: ${appAmt.toLocaleString("es-CL")}</div>
+                                        )}
+                                        {expense.status === "Pagado" && (
+                                          <div className="text-[10px] text-gray-400 font-medium">Pagado: ${appAmt.toLocaleString("es-CL")}</div>
+                                        )}
+                                      </td>
+                                      <td className="py-3.5 px-4 text-center">
+                                        <span className={`px-2.5 py-1 rounded-full text-2xs font-extrabold border ${statusClass}`}>
+                                          {expense.status}
+                                        </span>
+                                      </td>
+                                      <td className="py-3.5 px-4 text-center">
+                                        {expense.receipt_url ? (
+                                          <button
+                                            onClick={() => handleViewReceipt(expense.receipt_url)}
+                                            className="p-1.5 rounded-lg bg-white/5 border border-white/10 hover:border-amber-500/50 hover:bg-amber-500/10 text-gray-300 hover:text-amber-400 transition-all inline-flex items-center gap-1 text-2xs font-bold"
+                                            title="Ver Comprobante Seguro"
+                                          >
+                                            <Eye className="w-3.5 h-3.5" />
+                                            Ver
+                                          </button>
+                                        ) : (
+                                          <span className="text-2xs text-gray-500 font-medium">Sin adjunto</span>
+                                        )}
+                                      </td>
+                                    </tr>
+                                  );
+                                })
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                      </GlassCard>
+                    </motion.section>
+
+                    {/* Columna Derecha: Formulario de Registro */}
+                    <motion.section variants={itemVariants} className="lg:col-span-1 space-y-4">
+                      <GlassCard className="p-6 border border-white/5 relative overflow-hidden">
+                        <h3 className="text-lg font-bold text-white mb-1 flex items-center gap-2">
+                          <Upload className="w-5 h-5 text-amber-400" />
+                          Nueva Solicitud
+                        </h3>
+                        <p className="text-xs text-gray-400 mb-6">
+                          Ingresa los datos para solicitar la aprobación de un viático o reembolso.
+                        </p>
+
+                        <form onSubmit={handleCreateExpense} className="space-y-4">
+                          <div className="flex flex-col">
+                            <label className="text-gray-300 mb-1 text-xs font-bold uppercase tracking-wider">Tipo de Gasto</label>
+                            <select
+                              value={expenseForm.expense_type}
+                              onChange={(e) => setExpenseForm({ ...expenseForm, expense_type: e.target.value })}
+                              className="w-full bg-gray-950/60 border border-white/10 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-amber-500 transition-all font-semibold cursor-pointer"
+                              required
+                            >
+                              <option value="Viático" className="bg-gray-900">Viático</option>
+                              <option value="Reembolso" className="bg-gray-900">Reembolso</option>
+                              <option value="Compra Operacional" className="bg-gray-900">Compra Operacional</option>
+                              <option value="Otro" className="bg-gray-900">Otro</option>
+                            </select>
+                          </div>
+
+                          <div className="flex flex-col">
+                            <label className="text-gray-300 mb-1 text-xs font-bold uppercase tracking-wider">Monto Solicitado (CLP)</label>
+                            <input
+                              type="number"
+                              value={expenseForm.requested_amount}
+                              onChange={(e) => setExpenseForm({ ...expenseForm, requested_amount: e.target.value })}
+                              placeholder="Ej: 15000"
+                              className="w-full bg-gray-950/60 border border-white/10 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-amber-500 transition-all font-mono"
+                              min="1"
+                              required
+                            />
+                          </div>
+
+                          <div className="flex flex-col">
+                            <label className="text-gray-300 mb-1 text-xs font-bold uppercase tracking-wider">Fecha del Gasto</label>
+                            <input
+                              type="date"
+                              value={expenseForm.expense_date}
+                              onChange={(e) => setExpenseForm({ ...expenseForm, expense_date: e.target.value })}
+                              className="w-full bg-gray-950/60 border border-white/10 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-amber-500 transition-all"
+                              required
+                            />
+                          </div>
+
+                          <div className="flex flex-col">
+                            <label className="text-gray-300 mb-1 text-xs font-bold uppercase tracking-wider">Evento Relacionado</label>
+                            <select
+                              value={expenseForm.event_id}
+                              onChange={(e) => setExpenseForm({ ...expenseForm, event_id: e.target.value })}
+                              className="w-full bg-gray-950/60 border border-white/10 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-amber-500 transition-all font-semibold cursor-pointer"
+                            >
+                              <option value="" className="bg-gray-900 text-gray-500">General / Ningún evento...</option>
+                              {assignedEvents
+                                .filter(ev => ev.assignment_status === "Confirmado")
+                                .map(ev => (
+                                  <option key={ev.id} value={ev.id} className="bg-gray-900">{ev.name} ({ev.date})</option>
+                                ))}
+                            </select>
+                          </div>
+
+                          <div className="flex flex-col">
+                            <label className="text-gray-300 mb-1 text-xs font-bold uppercase tracking-wider">Descripción / Motivo</label>
+                            <textarea
+                              value={expenseForm.description}
+                              onChange={(e) => setExpenseForm({ ...expenseForm, description: e.target.value })}
+                              placeholder="Ej: Pago de estacionamiento del evento o viático de alimentación de la jornada."
+                              className="w-full bg-gray-950/60 border border-white/10 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-amber-500 transition-all leading-relaxed resize-none h-20"
+                              required
+                            />
+                          </div>
+
+                          <div className="flex flex-col">
+                            <label className="text-gray-300 mb-1 text-xs font-bold uppercase tracking-wider flex items-center justify-between">
+                              <span>Comprobante (Opcional)</span>
+                              <span className="text-[10px] text-gray-500 font-semibold font-mono">Max 5MB</span>
+                            </label>
+                            <div className="relative group border border-dashed border-white/10 hover:border-amber-500/40 rounded-xl p-4 text-center cursor-pointer transition-all bg-black/20">
+                              <input
+                                type="file"
+                                id="receipt"
+                                onChange={(e) => setReceiptFile(e.target.files[0])}
+                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                accept="image/*,application/pdf"
+                              />
+                              <div className="space-y-1">
+                                <Upload className="w-6 h-6 text-gray-400 group-hover:text-amber-400 mx-auto transition-colors" />
+                                <div className="text-xs text-gray-300 font-bold group-hover:text-gray-200">
+                                  {receiptFile ? receiptFile.name : "Subir comprobante"}
+                                </div>
+                                <p className="text-[10px] text-gray-500">JPG, PNG o PDF permitidos</p>
+                              </div>
+                            </div>
+                          </div>
+
+                          <motion.button
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
+                            type="submit"
+                            disabled={isSubmittingExpense}
+                            className="w-full flex items-center justify-center gap-2 py-3 bg-amber-500 text-gray-900 font-extrabold rounded-xl hover:bg-amber-400 disabled:opacity-50 transition-all duration-300 text-sm shadow-lg shadow-amber-500/10 mt-4"
+                          >
+                            {isSubmittingExpense ? (
+                              <span>Enviando...</span>
+                            ) : (
+                              <>
+                                <Check className="w-4 h-4" />
+                                Enviar Solicitud Gasto
+                              </>
+                            )}
+                          </motion.button>
+                        </form>
+                      </GlassCard>
+                    </motion.section>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         );
       })()}

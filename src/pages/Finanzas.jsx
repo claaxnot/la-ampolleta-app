@@ -15,7 +15,10 @@ import {
   Square,
   Sliders,
   Eye,
-  EyeOff
+  EyeOff,
+  FileText,
+  XCircle,
+  MessageSquare
 } from "lucide-react";
 import GlassCard from "../components/GlassCard.jsx";
 import Button from "../components/Button.jsx";
@@ -71,6 +74,15 @@ export default function Finanzas() {
 
   // Enmascaramiento de Cuentas Bancarias (Shoulder-Surfing prevention)
   const [revealedAccounts, setRevealedAccounts] = useState({});
+  
+  // Estados de Gestión de Viáticos y Reembolsos (Módulo Administrativo)
+  const [expenses, setExpenses] = useState([]);
+  const [adminTab, setAdminTab] = useState("nominas"); // "nominas" | "viaticos"
+  const [expenseStatusFilter, setExpenseStatusFilter] = useState("all");
+  const [expenseComment, setExpenseComment] = useState("");
+  const [selectedExpense, setSelectedExpense] = useState(null);
+  const [submittingExpenseAction, setSubmittingExpenseAction] = useState(false);
+  const [approvedAmountInput, setApprovedAmountInput] = useState("");
 
   const toggleRevealAccount = (id) => {
     setRevealedAccounts(prev => ({ ...prev, [id]: !prev[id] }));
@@ -117,8 +129,69 @@ export default function Finanzas() {
 
       if (error) throw error;
 
+      // 2. Fetch Expense Requests (Viáticos y Reembolsos)
+      const { data: dbExpenses, error: expensesError } = await supabase
+        .from("expense_requests")
+        .select(`
+          *,
+          profiles:worker_id (
+            id,
+            name,
+            rut,
+            email,
+            role,
+            cuenta_origen,
+            cuenta_destino,
+            codigo_banco_destino,
+            monto_transferencia,
+            glosa_transferencia,
+            mensaje_beneficiario
+          ),
+          events:event_id (
+            id,
+            name,
+            date
+          )
+        `)
+        .order("created_at", { ascending: false });
+
+      if (expensesError) throw expensesError;
+      setExpenses(dbExpenses || []);
+
+      let formattedExpenses = [];
+      if (dbExpenses) {
+        // Solo inyectamos a la nómina general si está "Aprobado" (para pagar) o "Pagado" (historial)
+        formattedExpenses = dbExpenses
+          .filter(e => e.status === "Aprobado" || e.status === "Pagado")
+          .map(e => {
+            const approvedAmt = parseFloat(e.approved_amount) || parseFloat(e.requested_amount) || 0;
+            return {
+              id: `expense_${e.id}`, // Prefijo para evitar colisiones
+              expense_id: e.id,
+              is_expense: true,
+              event_name: e.events?.name ? `[Viático] ${e.events.name}` : `[Gasto] ${e.expense_type}`,
+              event_date: e.expense_date || "",
+              is_finished: true,
+              staff_id: e.profiles?.id || "",
+              staff_name: e.profiles?.name || "Personal Desconocido",
+              staff_rut: e.profiles?.rut || "",
+              staff_email: e.profiles?.email || "",
+              staff_role: e.profiles?.role || "",
+              cuenta_origen: e.profiles?.cuenta_origen || "",
+              cuenta_destino: e.profiles?.cuenta_destino || "",
+              codigo_banco_destino: e.profiles?.codigo_banco_destino || "",
+              glosa_transferencia: e.profiles?.glosa_transferencia || "",
+              mensaje_beneficiario: e.profiles?.mensaje_beneficiario || "",
+              banco_name: BANCOS_CHILE[e.profiles?.codigo_banco_destino] || "Banco No Registrado",
+              monto: approvedAmt,
+              status: e.status === "Pagado" ? "Pagado" : "Pendiente",
+              assignment_status: "Confirmado"
+            };
+          });
+      }
+
       if (assignments) {
-        // Formatear y calcular montos
+        // Formatear y calcular montos de eventos
         const formatted = assignments.map(a => {
           const defaultRate = a.profiles?.monto_transferencia ? parseFloat(a.profiles.monto_transferencia) : 25000;
           const rate = a.custom_rate ? parseFloat(a.custom_rate) : defaultRate;
@@ -144,9 +217,11 @@ export default function Finanzas() {
             status: a.payment_status || "Pendiente",
             assignment_status: a.status
           };
-        }).filter(a => a.assignment_status === "Confirmado" || a.assignment_status === "Aceptado"); // Todos los confirmados/aceptados (pasados y futuros)
+        }).filter(a => a.assignment_status === "Confirmado" || a.assignment_status === "Aceptado");
 
-        setPayments(formatted);
+        // Consolidación transparente
+        const consolidated = [...formatted, ...formattedExpenses];
+        setPayments(consolidated);
       }
     } catch (err) {
       console.warn("⚠️ [FINANZAS]: Columnas nuevas ausentes, usando fallback seguro.", err);
@@ -216,6 +291,74 @@ export default function Finanzas() {
     }
   };
 
+  // Helper for admin to view receipt securely
+  const handleAdminViewReceipt = async (receiptUrl) => {
+    if (!receiptUrl) {
+      toast.error("Esta solicitud no cuenta con un comprobante adjunto.");
+      return;
+    }
+    const loadingToast = toast.loading("Generando enlace seguro...");
+    try {
+      const { data, error } = await supabase.storage
+        .from("receipts")
+        .createSignedUrl(receiptUrl, 900); // 15 minutos de vigencia
+
+      if (error) throw error;
+
+      if (data?.signedUrl) {
+        toast.success("¡Enlace generado! Abriendo comprobante...", { id: loadingToast });
+        window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+      } else {
+        throw new Error("No se pudo obtener el enlace firmado.");
+      }
+    } catch (err) {
+      console.error("Error al obtener signed url:", err);
+      toast.error("Error al generar enlace seguro para el comprobante.", { id: loadingToast });
+    }
+  };
+
+  // Helper for admin to update expense status
+  const handleUpdateExpenseStatus = async (expenseId, newStatus) => {
+    if (!expenseId) return;
+    setSubmittingExpenseAction(true);
+    const loadingToast = toast.loading("Actualizando solicitud de gasto...");
+    try {
+      const updateData = {
+        status: newStatus,
+        admin_comment: expenseComment || null,
+        updated_at: new Date().toISOString()
+      };
+
+      if (newStatus === "Aprobado") {
+        const approvedAmount = parseFloat(approvedAmountInput);
+        if (isNaN(approvedAmount) || approvedAmount <= 0) {
+          toast.error("El monto aprobado debe ser un número válido mayor a 0.", { id: loadingToast });
+          setSubmittingExpenseAction(false);
+          return;
+        }
+        updateData.approved_amount = approvedAmount;
+      }
+
+      const { error } = await supabase
+        .from("expense_requests")
+        .update(updateData)
+        .eq("id", expenseId);
+
+      if (error) throw error;
+
+      toast.success(`Solicitud marcada como ${newStatus} con éxito.`, { id: loadingToast });
+      setSelectedExpense(null);
+      setExpenseComment("");
+      setApprovedAmountInput("");
+      fetchPayments(); // Recargar pagos y gastos
+    } catch (err) {
+      console.error("Error updating expense status:", err);
+      toast.error("Error al actualizar la solicitud de gasto.", { id: loadingToast });
+    } finally {
+      setSubmittingExpenseAction(false);
+    }
+  };
+
   useEffect(() => {
     fetchPayments();
   }, []);
@@ -253,37 +396,57 @@ export default function Finanzas() {
 
     const loadingToast = toast.loading("Actualizando estados de pago...");
     try {
-      // Intentamos actualizar la columna payment_status en Supabase
-      const { error } = await supabase
-        .from("event_assignments")
-        .update({ payment_status: "Pagado" })
-        .in("id", pendingSelectedIds);
+      // Separar los pagos de eventos de los pagos de viáticos
+      const eventIds = pendingSelectedIds.filter(id => !String(id).startsWith("expense_"));
+      const expenseIds = pendingSelectedIds
+        .filter(id => String(id).startsWith("expense_"))
+        .map(id => String(id).replace("expense_", ""));
 
-      if (error) throw error;
+      // 1. Actualizar event_assignments
+      if (eventIds.length > 0) {
+        const { error: eventError } = await supabase
+          .from("event_assignments")
+          .update({ payment_status: "Pagado" })
+          .in("id", eventIds);
+        if (eventError) throw eventError;
+      }
+
+      // 2. Actualizar expense_requests
+      if (expenseIds.length > 0) {
+        const { error: expenseError } = await supabase
+          .from("expense_requests")
+          .update({
+            status: "Pagado",
+            included_in_payroll: true
+          })
+          .in("id", expenseIds);
+        if (expenseError) throw expenseError;
+      }
 
       toast.success("¡Transacciones marcadas como Pagadas con éxito!", { id: loadingToast });
       setSelectedIds([]);
       fetchPayments();
     } catch (err) {
-      console.warn("⚠️ [FINANZAS UPDATE FAILED]: Se simuló la actualización en interfaz.", err);
-      // Fallback local en estado si no tiene la columna de base de datos
-      setPayments(prev => prev.map(p => pendingSelectedIds.includes(p.id) ? { ...p, status: "Pagado" } : p));
-      setSelectedIds([]);
-      toast.success("¡Transacciones marcadas como Pagadas localmente!", { id: loadingToast });
+      console.error("Error al actualizar estados de pago:", err);
+      toast.error("Error al guardar tus cambios de pago.", { id: loadingToast });
     }
   };
 
-  // Generador de nómina bancaria chilena en formato Excel (2 Hojas)
-  const handleDownloadNomina = () => {
+  // Generador de nómina bancaria chilena en formato Excel (3 Hojas)
+  const handleDownloadNomina = async () => {
     if (selectedIds.length === 0) {
       toast.error("Selecciona al menos un pago para generar la nómina.");
       return;
     }
 
+    const loadingToast = toast.loading("Generando archivo de nómina masiva...");
     try {
       const selectedPayments = payments.filter(p => selectedIds.includes(p.id));
 
-      // 1. HOJA 1: RESUMEN DE TRANSFERENCIAS (Agrupar y sumar montos pendientes o seleccionados)
+      const selectedEventPayments = selectedPayments.filter(p => !p.is_expense);
+      const selectedExpensePayments = selectedPayments.filter(p => p.is_expense);
+
+      // 1. HOJA 1: RESUMEN DE TRANSFERENCIAS (Agrupar y sumar todos los montos)
       const grouped = {};
       selectedPayments.forEach(p => {
         const key = p.staff_rut || p.staff_id;
@@ -324,8 +487,8 @@ export default function Finanzas() {
         };
       });
 
-      // 2. HOJA 2: DESGLOSE COMPLETO POR EVENTO
-      const dataDesglose = selectedPayments.map(p => ({
+      // 2. HOJA 2: DESGLOSE COMPLETO POR EVENTO (Solo eventos, manteniendo Rol Staff)
+      const dataDesglose = selectedEventPayments.map(p => ({
         "Nombre Staff": p.staff_name,
         "RUT Staff": p.staff_rut,
         "Correo": p.staff_email,
@@ -340,12 +503,49 @@ export default function Finanzas() {
         "Mensaje": p.mensaje_beneficiario || ""
       }));
 
-      // Crear Libro de Trabajo (Workbook)
+      // 3. HOJA 3: DETALLE VIÁTICOS (Generación de enlaces de comprobantes válidos por 7 días)
+      const selectedExpenseIds = selectedExpensePayments.map(p => p.expense_id);
+      const matchingExpenses = expenses.filter(e => selectedExpenseIds.includes(e.id));
+
+      const expensesWithUrls = await Promise.all(
+        matchingExpenses.map(async (e) => {
+          let signedUrl = "Sin adjunto";
+          if (e.receipt_url) {
+            try {
+              const { data, error } = await supabase.storage
+                .from("receipts")
+                .createSignedUrl(e.receipt_url, 604800); // 7 días (604800s)
+              if (!error && data?.signedUrl) {
+                signedUrl = data.signedUrl;
+              }
+            } catch (err) {
+              console.error("Error al generar Signed URL de 7 días:", err);
+            }
+          }
+          return {
+            ...e,
+            signedUrl
+          };
+        })
+      );
+
+      const dataViaticos = expensesWithUrls.map(e => ({
+        "Trabajador": e.profiles?.name || "Desconocido",
+        "RUT": e.profiles?.rut || "",
+        "Categoría": e.expense_type,
+        "Fecha Gasto": e.expense_date,
+        "Evento Relacionado": e.events?.name || "Gasto General",
+        "Monto Solicitado": parseFloat(e.requested_amount || 0),
+        "Monto Aprobado": parseFloat(e.approved_amount || 0),
+        "Descripción / Motivo": e.description || "",
+        "Estado": e.status,
+        "Comprobante (Enlace Seguro 7 días)": e.signedUrl
+      }));
+
       const workbook = XLSX.utils.book_new();
 
-      // Generar Hoja 1
+      // Hoja 1
       const worksheetResumen = XLSX.utils.json_to_sheet(dataResumen);
-      // Auto-ajustar columnas Hoja 1
       const maxColWidthsResumen = [];
       dataResumen.forEach(row => {
         Object.keys(row).forEach((key, colIndex) => {
@@ -357,9 +557,8 @@ export default function Finanzas() {
       worksheetResumen["!cols"] = maxColWidthsResumen.map(w => ({ wch: w }));
       XLSX.utils.book_append_sheet(workbook, worksheetResumen, "Resumen Transferencias");
 
-      // Generar Hoja 2
+      // Hoja 2
       const worksheetDesglose = XLSX.utils.json_to_sheet(dataDesglose);
-      // Auto-ajustar columnas Hoja 2
       const maxColWidthsDesglose = [];
       dataDesglose.forEach(row => {
         Object.keys(row).forEach((key, colIndex) => {
@@ -371,12 +570,23 @@ export default function Finanzas() {
       worksheetDesglose["!cols"] = maxColWidthsDesglose.map(w => ({ wch: w }));
       XLSX.utils.book_append_sheet(workbook, worksheetDesglose, "Detalle de Eventos");
 
-      // Guardar archivo
+      // Hoja 3
+      const worksheetViaticos = XLSX.utils.json_to_sheet(dataViaticos);
+      const maxColWidthsViaticos = [];
+      dataViaticos.forEach(row => {
+        Object.keys(row).forEach((key, colIndex) => {
+          const value = row[key] ? String(row[key]) : "";
+          const length = Math.max(value.length, key.length) + 3;
+          maxColWidthsViaticos[colIndex] = Math.max(maxColWidthsViaticos[colIndex] || 10, length);
+        });
+      });
+      worksheetViaticos["!cols"] = maxColWidthsViaticos.map(w => ({ wch: w }));
+      XLSX.utils.book_append_sheet(workbook, worksheetViaticos, "Detalle Viáticos");
+
       const excelBuffer = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
       const blob = new Blob([excelBuffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
 
       const fileName = `NOMINA_PAGOS_AMPOLLETA_${new Date().toISOString().slice(0, 10)}.xlsx`;
-      
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
@@ -386,22 +596,26 @@ export default function Finanzas() {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
 
-      toast.success("¡Nómina de Excel de Pagos (2 Hojas) descargada con éxito!");
+      toast.success("¡Nómina de Excel de Pagos (3 Hojas) descargada con éxito!", { id: loadingToast });
     } catch (error) {
       console.error("Error al exportar Excel:", error);
-      toast.error(`Error al generar Excel: ${error.message || "Error desconocido"}`);
+      toast.error(`Error al generar Excel: ${error.message || "Error desconocido"}`, { id: loadingToast });
     }
   };
 
-  // Generador de reporte financiero filtrado (2 Hojas)
-  const handleExportFilteredReport = () => {
+  // Generador de reporte financiero filtrado (3 Hojas)
+  const handleExportFilteredReport = async () => {
     if (filteredPayments.length === 0) {
       toast.error("No hay registros en el filtro actual para exportar.");
       return;
     }
 
+    const loadingToast = toast.loading("Generando reporte financiero filtrado...");
     try {
-      // 1. HOJA 1: RESUMEN DE TRANSFERENCIAS (Suma de pagos PENDIENTES del filtro actual por persona)
+      const selectedEventPayments = filteredPayments.filter(p => !p.is_expense);
+      const selectedExpensePayments = filteredPayments.filter(p => p.is_expense);
+
+      // 1. HOJA 1: RESUMEN DE TRANSFERENCIAS
       const grouped = {};
       filteredPayments.forEach(p => {
         const key = p.staff_rut || p.staff_id;
@@ -419,7 +633,6 @@ export default function Finanzas() {
             monto_total: 0
           };
         }
-        // Sumar solo los pagos pendientes de la persona en este conjunto filtrado
         if (p.status !== "Pagado") {
           grouped[key].monto_total += parseFloat(p.monto) || 0;
         }
@@ -446,7 +659,7 @@ export default function Finanzas() {
       });
 
       // 2. HOJA 2: DESGLOSE COMPLETO POR EVENTO
-      const dataDesglose = filteredPayments.map(p => ({
+      const dataDesglose = selectedEventPayments.map(p => ({
         "Nombre Staff": p.staff_name,
         "RUT Staff": p.staff_rut,
         "Correo": p.staff_email,
@@ -461,12 +674,49 @@ export default function Finanzas() {
         "Mensaje": p.mensaje_beneficiario || ""
       }));
 
-      // Crear Libro de Trabajo (Workbook)
+      // 3. HOJA 3: DETALLE VIÁTICOS
+      const selectedExpenseIds = selectedExpensePayments.map(p => p.expense_id);
+      const matchingExpenses = expenses.filter(e => selectedExpenseIds.includes(e.id));
+
+      const expensesWithUrls = await Promise.all(
+        matchingExpenses.map(async (e) => {
+          let signedUrl = "Sin adjunto";
+          if (e.receipt_url) {
+            try {
+              const { data, error } = await supabase.storage
+                .from("receipts")
+                .createSignedUrl(e.receipt_url, 604800); // 7 días
+              if (!error && data?.signedUrl) {
+                signedUrl = data.signedUrl;
+              }
+            } catch (err) {
+              console.error("Error al generar Signed URL de 7 días:", err);
+            }
+          }
+          return {
+            ...e,
+            signedUrl
+          };
+        })
+      );
+
+      const dataViaticos = expensesWithUrls.map(e => ({
+        "Trabajador": e.profiles?.name || "Desconocido",
+        "RUT": e.profiles?.rut || "",
+        "Categoría": e.expense_type,
+        "Fecha Gasto": e.expense_date,
+        "Evento Relacionado": e.events?.name || "Gasto General",
+        "Monto Solicitado": parseFloat(e.requested_amount || 0),
+        "Monto Aprobado": parseFloat(e.approved_amount || 0),
+        "Descripción / Motivo": e.description || "",
+        "Estado": e.status,
+        "Comprobante (Enlace Seguro 7 días)": e.signedUrl
+      }));
+
       const workbook = XLSX.utils.book_new();
 
-      // Generar Hoja 1
+      // Hoja 1
       const worksheetResumen = XLSX.utils.json_to_sheet(dataResumen);
-      // Auto-ajustar columnas Hoja 1
       const maxColWidthsResumen = [];
       dataResumen.forEach(row => {
         Object.keys(row).forEach((key, colIndex) => {
@@ -478,9 +728,8 @@ export default function Finanzas() {
       worksheetResumen["!cols"] = maxColWidthsResumen.map(w => ({ wch: w }));
       XLSX.utils.book_append_sheet(workbook, worksheetResumen, "Resumen Transferencias");
 
-      // Generar Hoja 2
+      // Hoja 2
       const worksheetDesglose = XLSX.utils.json_to_sheet(dataDesglose);
-      // Auto-ajustar columnas Hoja 2
       const maxColWidthsDesglose = [];
       dataDesglose.forEach(row => {
         Object.keys(row).forEach((key, colIndex) => {
@@ -492,11 +741,22 @@ export default function Finanzas() {
       worksheetDesglose["!cols"] = maxColWidthsDesglose.map(w => ({ wch: w }));
       XLSX.utils.book_append_sheet(workbook, worksheetDesglose, "Detalle de Eventos");
 
-      // Guardar archivo
+      // Hoja 3
+      const worksheetViaticos = XLSX.utils.json_to_sheet(dataViaticos);
+      const maxColWidthsViaticos = [];
+      dataViaticos.forEach(row => {
+        Object.keys(row).forEach((key, colIndex) => {
+          const value = row[key] ? String(row[key]) : "";
+          const length = Math.max(value.length, key.length) + 3;
+          maxColWidthsViaticos[colIndex] = Math.max(maxColWidthsViaticos[colIndex] || 10, length);
+        });
+      });
+      worksheetViaticos["!cols"] = maxColWidthsViaticos.map(w => ({ wch: w }));
+      XLSX.utils.book_append_sheet(workbook, worksheetViaticos, "Detalle Viáticos");
+
       const excelBuffer = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
       const blob = new Blob([excelBuffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
 
-      // Nombre inteligente
       const filterStr = statusFilter === "all" ? "TODOS" : statusFilter === "paid" ? "PAGADOS" : "PENDIENTES";
       const fileName = `REPORTE_FINANZAS_${filterStr}_${new Date().toISOString().slice(0, 10)}.xlsx`;
       
@@ -509,10 +769,10 @@ export default function Finanzas() {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
 
-      toast.success("¡Reporte financiero filtrado (2 Hojas) descargado con éxito!");
+      toast.success("¡Reporte financiero filtrado (3 Hojas) descargado con éxito!", { id: loadingToast });
     } catch (error) {
       console.error("Error al exportar reporte filtrado:", error);
-      toast.error(`Error al generar reporte: ${error.message || "Error desconocido"}`);
+      toast.error(`Error al generar reporte: ${error.message || "Error desconocido"}`, { id: loadingToast });
     }
   };
 
@@ -601,6 +861,28 @@ export default function Finanzas() {
         </div>
       </motion.header>
 
+      {/* Tabs Administrador de Finanzas */}
+      <motion.div variants={itemVariants} className="flex items-center gap-2 bg-gray-900/60 p-1.5 rounded-xl border border-white/5 max-w-sm mb-6">
+        <button
+          onClick={() => setAdminTab("nominas")}
+          className={`flex-1 py-2 px-3 rounded-lg text-xs font-extrabold transition-all flex items-center justify-center gap-1.5 ${
+            adminTab === "nominas" ? "bg-amber-500/20 text-amber-300 border border-amber-500/20 shadow-[0_0_12px_rgba(245,158,11,0.1)]" : "text-gray-400 hover:text-gray-200"
+          }`}
+        >
+          <DollarSign className="w-3.5 h-3.5" />
+          Nóminas y Pagos
+        </button>
+        <button
+          onClick={() => setAdminTab("viaticos")}
+          className={`flex-1 py-2 px-3 rounded-lg text-xs font-extrabold transition-all flex items-center justify-center gap-1.5 ${
+            adminTab === "viaticos" ? "bg-amber-500/20 text-amber-300 border border-amber-500/20 shadow-[0_0_12px_rgba(245,158,11,0.1)]" : "text-gray-400 hover:text-gray-200"
+          }`}
+        >
+          <FileText className="w-3.5 h-3.5" />
+          Aprobación Viáticos
+        </button>
+      </motion.div>
+
       {dbErrorWarning && (
         <motion.div
           variants={itemVariants}
@@ -666,237 +948,490 @@ export default function Finanzas() {
         </GlassCard>
       </motion.div>
 
-      {/* Acciones de Lote y Filtros */}
-      <motion.div variants={itemVariants} className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
-        {/* Filtros */}
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="relative">
-            <Search className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
-            <input
-              type="text"
-              placeholder="Buscar por staff o evento..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="bg-gray-800/40 border border-gray-700/60 rounded-xl py-2 pl-9 pr-4 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-amber-500 w-64 transition-all duration-300"
-            />
-          </div>
+      {adminTab === "nominas" ? (
+        <>
+          {/* Acciones de Lote y Filtros */}
+          <motion.div variants={itemVariants} className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+            {/* Filtros */}
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="relative">
+                <Search className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
+                <input
+                  type="text"
+                  placeholder="Buscar por staff o evento..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="bg-gray-800/40 border border-gray-700/60 rounded-xl py-2 pl-9 pr-4 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-amber-500 w-64 transition-all duration-300"
+                />
+              </div>
 
-          <div className="relative">
-            <select
-              value={monthFilter}
-              onChange={(e) => setMonthFilter(e.target.value)}
-              className="bg-gray-800/40 border border-gray-700/60 rounded-xl py-2 pl-4 pr-10 text-sm text-white focus:outline-none focus:border-amber-500 appearance-none transition-all duration-300 font-semibold cursor-pointer"
-            >
-              <option value="all">Todos los meses</option>
-              {uniqueMonths.map(p => (
-                <option key={p} value={p}>{formatPeriod(p)}</option>
-              ))}
-            </select>
-            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-gray-400">
-              <Sliders className="w-3.5 h-3.5" />
+              <div className="relative">
+                <select
+                  value={monthFilter}
+                  onChange={(e) => setMonthFilter(e.target.value)}
+                  className="bg-gray-800/40 border border-gray-700/60 rounded-xl py-2 pl-4 pr-10 text-sm text-white focus:outline-none focus:border-amber-500 appearance-none transition-all duration-300 font-semibold cursor-pointer"
+                >
+                  <option value="all">Todos los meses</option>
+                  {uniqueMonths.map(p => (
+                    <option key={p} value={p}>{formatPeriod(p)}</option>
+                  ))}
+                </select>
+                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-gray-400">
+                  <Sliders className="w-3.5 h-3.5" />
+                </div>
+              </div>
+
+              <div className="flex items-center bg-gray-800/40 border border-gray-700/60 rounded-xl p-1 gap-1">
+                <button
+                  onClick={() => setStatusFilter("all")}
+                  className={`px-3 py-1 text-xs font-semibold rounded-lg transition-all duration-200 ${statusFilter === "all" ? "bg-amber-500/20 text-amber-300 border border-amber-500/20" : "text-gray-400 hover:text-gray-200"}`}
+                >
+                  Todos
+                </button>
+                <button
+                  onClick={() => setStatusFilter("pending")}
+                  className={`px-3 py-1 text-xs font-semibold rounded-lg transition-all duration-200 ${statusFilter === "pending" ? "bg-red-500/20 text-red-300 border border-red-500/20" : "text-gray-400 hover:text-gray-200"}`}
+                >
+                  Pendientes
+                </button>
+                <button
+                  onClick={() => setStatusFilter("paid")}
+                  className={`px-3 py-1 text-xs font-semibold rounded-lg transition-all duration-200 ${statusFilter === "paid" ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/20" : "text-gray-400 hover:text-gray-200"}`}
+                >
+                  Pagados
+                </button>
+              </div>
+
+              <label className="flex items-center gap-2 cursor-pointer bg-gray-800/40 border border-gray-700/60 rounded-xl px-3.5 py-1.5 text-xs font-semibold text-gray-300 hover:text-white hover:border-amber-500/30 transition-all select-none h-[38px]">
+                <input
+                  type="checkbox"
+                  checked={includeFuture}
+                  onChange={(e) => setIncludeFuture(e.target.checked)}
+                  className="accent-amber-500 rounded cursor-pointer w-3.5 h-3.5"
+                />
+                <span>Incluir Eventos Futuros</span>
+              </label>
+            </div>
+
+            {/* Acciones masivas o reporte filtrado */}
+            {selectedIds.length > 0 ? (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="flex items-center gap-2"
+              >
+                <span className="text-xs text-gray-400 mr-2 font-bold bg-gray-800 px-3 py-1.5 rounded-lg border border-gray-700">
+                  {selectedIds.length} seleccionados
+                </span>
+                <Button
+                  variant="amber"
+                  onClick={handleDownloadNomina}
+                  className="flex items-center gap-2 text-xs py-2 px-3 bg-amber-500/25 border border-amber-500/30 text-amber-300 font-bold hover:bg-amber-500 hover:text-gray-900 rounded-xl transition-all"
+                >
+                  <Download className="w-3.5 h-3.5" /> Generar Nómina
+                </Button>
+                <Button
+                  variant="emerald"
+                  onClick={handleMarkAsPaid}
+                  className="flex items-center gap-2 text-xs py-2 px-3 bg-emerald-500/25 border border-emerald-500/30 text-emerald-300 font-bold hover:bg-emerald-500 hover:text-gray-900 rounded-xl transition-all"
+                >
+                  <CheckCircle className="w-3.5 h-3.5" /> Marcar Pagado
+                </Button>
+              </motion.div>
+            ) : (
+              <Button
+                variant="amber"
+                onClick={handleExportFilteredReport}
+                className="flex items-center gap-2 text-xs py-2.5 px-4 bg-amber-500/10 border border-amber-500/20 text-amber-300 font-bold hover:bg-amber-500/20 hover:border-amber-500/40 rounded-xl transition-all h-[38px] self-start md:self-auto shadow-sm"
+              >
+                <Download className="w-3.5 h-3.5 text-amber-400" /> Exportar Reporte Filtrado
+              </Button>
+            )}
+          </motion.div>
+
+          {/* Tabla de Finanzas */}
+          <motion.div variants={itemVariants}>
+            <GlassCard className="overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="border-b border-gray-800 text-gray-400 text-xs font-semibold uppercase bg-gray-800/20">
+                      <th className="py-4 px-6 w-12">
+                        <button
+                          onClick={handleSelectAll}
+                          className="text-gray-400 hover:text-white transition-colors"
+                        >
+                          {(() => {
+                            const pending = filteredPayments.filter(item => item.status !== "Pagado");
+                            return selectedIds.length === pending.length && pending.length > 0 ? (
+                              <CheckSquare className="w-5 h-5 text-amber-500" />
+                            ) : (
+                              <Square className="w-5 h-5" />
+                            );
+                          })()}
+                        </button>
+                      </th>
+                      <th className="py-4 px-6 text-left">Trabajador (Staff)</th>
+                      <th className="py-4 px-6 text-left">Evento / Fecha</th>
+                      <th className="py-4 px-6 text-left">Monto Honorario / Gasto</th>
+                      <th className="py-4 px-6 text-left">Datos de Transferencia</th>
+                      <th className="py-4 px-6 text-center">Estado Pago</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-800 text-sm">
+                    {loading ? (
+                      <tr>
+                        <td colSpan="6" className="py-12 text-center text-gray-500 font-medium">
+                          Cargando registros financieros...
+                        </td>
+                      </tr>
+                    ) : filteredPayments.length === 0 ? (
+                      <tr>
+                        <td colSpan="6" className="py-12 text-center text-gray-500 font-medium">
+                          No se encontraron transferencias que coincidan con la búsqueda.
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredPayments.map(p => {
+                        const isSelected = selectedIds.includes(p.id);
+                        const missingBank = !p.cuenta_destino || !p.codigo_banco_destino;
+
+                        return (
+                          <tr
+                            key={p.id}
+                            className={`transition-colors duration-200 ${isSelected ? 'bg-amber-500/5' : 'hover:bg-gray-800/10'}`}
+                          >
+                            <td className="py-4 px-6">
+                              {p.status === "Pagado" ? (
+                                <CheckSquare className="w-5 h-5 text-gray-600/50 cursor-not-allowed" title="Ya está pagado" />
+                              ) : (
+                                <button
+                                  onClick={() => handleSelectOne(p.id)}
+                                  className="text-gray-400 hover:text-white transition-colors"
+                                >
+                                  {isSelected ? (
+                                    <CheckSquare className="w-5 h-5 text-amber-500" />
+                                  ) : (
+                                    <Square className="w-5 h-5" />
+                                  )}
+                                </button>
+                              )}
+                            </td>
+                            <td className="py-4 px-6 text-left">
+                              <div className="flex flex-col">
+                                <span className="font-bold text-white flex items-center gap-1.5">
+                                  {p.staff_name}
+                                  {p.is_expense && (
+                                    <span className="px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/20 text-amber-400 text-[10px] font-extrabold uppercase font-sans">
+                                      Viático
+                                    </span>
+                                  )}
+                                </span>
+                                <span className="text-xs text-gray-400 font-mono mt-0.5">{p.staff_rut}</span>
+                              </div>
+                            </td>
+                            <td className="py-4 px-6 text-left">
+                              <div className="flex flex-col">
+                                <span className="font-medium text-gray-200">{p.event_name}</span>
+                                <span className="text-xs text-gray-400 mt-0.5">{p.event_date}</span>
+                              </div>
+                            </td>
+                            <td className="py-4 px-6 text-left">
+                              <span className="font-extrabold text-amber-400">
+                                ${p.monto.toLocaleString("es-CL")}
+                              </span>
+                            </td>
+                            <td className="py-4 px-6 text-left">
+                              {missingBank ? (
+                                <span className="text-xs px-2.5 py-1 bg-red-500/10 text-red-400 border border-red-500/20 rounded-lg font-semibold inline-flex items-center gap-1">
+                                  ⚠️ Sin Datos de Transferencia
+                                </span>
+                              ) : (
+                                <div className="flex flex-col text-xs text-gray-300 gap-0.5">
+                                  <span className="font-bold flex items-center gap-1">
+                                    <Building className="w-3.5 h-3.5 text-gray-400" /> {p.banco_name}
+                                  </span>
+                                  <span className="text-gray-400 flex items-center gap-1.5">
+                                    Nº Cuenta:{" "}
+                                    <span className="font-mono text-white font-semibold">
+                                      {revealedAccounts[p.id] ? p.cuenta_destino : maskAccountNumber(p.cuenta_destino)}
+                                    </span>
+                                    <button
+                                      onClick={() => toggleRevealAccount(p.id)}
+                                      className="text-gray-400 hover:text-amber-400 transition-colors focus:outline-none"
+                                      title={revealedAccounts[p.id] ? "Ocultar número de cuenta" : "Mostrar número de cuenta"}
+                                    >
+                                      {revealedAccounts[p.id] ? (
+                                        <EyeOff className="w-3.5 h-3.5 text-amber-500" />
+                                      ) : (
+                                        <Eye className="w-3.5 h-3.5" />
+                                      )}
+                                    </button>
+                                  </span>
+                                </div>
+                              )}
+                            </td>
+                            <td className="py-4 px-6 text-center">
+                              <span className={`px-3 py-1.5 rounded-full text-xs font-extrabold shadow-sm border ${p.status === "Pagado"
+                                  ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                                  : 'bg-red-500/10 border-red-500/30 text-red-400'
+                                }`}>
+                                {p.status}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </GlassCard>
+          </motion.div>
+        </>
+      ) : (
+        <motion.div
+          variants={containerVariants}
+          initial="hidden"
+          animate="show"
+          className="space-y-6"
+        >
+          {/* Barra de Filtros de Gastos */}
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-gray-900/40 p-4 rounded-2xl border border-white/5 backdrop-blur-md">
+            <div className="flex flex-wrap gap-2">
+              {["all", "Pendiente", "En revisión", "Aprobado", "Rechazado", "Pagado"].map((status) => {
+                const label = status === "all" ? "Todos" : status;
+                const count = expenses.filter(e => status === "all" || e.status === status).length;
+                return (
+                  <button
+                    key={status}
+                    onClick={() => {
+                      setExpenseStatusFilter(status);
+                      setSelectedExpense(null);
+                    }}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                      expenseStatusFilter === status
+                        ? "bg-amber-500 text-black shadow-lg shadow-amber-500/20"
+                        : "bg-gray-800/60 text-gray-400 hover:text-white"
+                    }`}
+                  >
+                    {label} ({count})
+                  </button>
+                );
+              })}
+            </div>
+            <div className="text-sm text-gray-400 font-medium">
+              Mostrando {expenses.filter(e => expenseStatusFilter === "all" || e.status === expenseStatusFilter).length} solicitudes
             </div>
           </div>
 
-          <div className="flex items-center bg-gray-800/40 border border-gray-700/60 rounded-xl p-1 gap-1">
-            <button
-              onClick={() => setStatusFilter("all")}
-              className={`px-3 py-1 text-xs font-semibold rounded-lg transition-all duration-200 ${statusFilter === "all" ? "bg-amber-500/20 text-amber-300 border border-amber-500/20" : "text-gray-400 hover:text-gray-200"}`}
-            >
-              Todos
-            </button>
-            <button
-              onClick={() => setStatusFilter("pending")}
-              className={`px-3 py-1 text-xs font-semibold rounded-lg transition-all duration-200 ${statusFilter === "pending" ? "bg-red-500/20 text-red-300 border border-red-500/20" : "text-gray-400 hover:text-gray-200"}`}
-            >
-              Pendientes
-            </button>
-            <button
-              onClick={() => setStatusFilter("paid")}
-              className={`px-3 py-1 text-xs font-semibold rounded-lg transition-all duration-200 ${statusFilter === "paid" ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/20" : "text-gray-400 hover:text-gray-200"}`}
-            >
-              Pagados
-            </button>
-          </div>
-
-          <label className="flex items-center gap-2 cursor-pointer bg-gray-800/40 border border-gray-700/60 rounded-xl px-3.5 py-1.5 text-xs font-semibold text-gray-300 hover:text-white hover:border-amber-500/30 transition-all select-none h-[38px]">
-            <input
-              type="checkbox"
-              checked={includeFuture}
-              onChange={(e) => setIncludeFuture(e.target.checked)}
-              className="accent-amber-500 rounded cursor-pointer w-3.5 h-3.5"
-            />
-            <span>Incluir Eventos Futuros</span>
-          </label>
-        </div>
-
-        {/* Acciones masivas o reporte filtrado */}
-        {selectedIds.length > 0 ? (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="flex items-center gap-2"
-          >
-            <span className="text-xs text-gray-400 mr-2 font-bold bg-gray-800 px-3 py-1.5 rounded-lg border border-gray-700">
-              {selectedIds.length} seleccionados
-            </span>
-            <Button
-              variant="amber"
-              onClick={handleDownloadNomina}
-              className="flex items-center gap-2 text-xs py-2 px-3 bg-amber-500/25 border border-amber-500/30 text-amber-300 font-bold hover:bg-amber-500 hover:text-gray-900 rounded-xl transition-all"
-            >
-              <Download className="w-3.5 h-3.5" /> Generar Nómina
-            </Button>
-            <Button
-              variant="emerald"
-              onClick={handleMarkAsPaid}
-              className="flex items-center gap-2 text-xs py-2 px-3 bg-emerald-500/25 border border-emerald-500/30 text-emerald-300 font-bold hover:bg-emerald-500 hover:text-gray-900 rounded-xl transition-all"
-            >
-              <CheckCircle className="w-3.5 h-3.5" /> Marcar Pagado
-            </Button>
-          </motion.div>
-        ) : (
-          <Button
-            variant="amber"
-            onClick={handleExportFilteredReport}
-            className="flex items-center gap-2 text-xs py-2.5 px-4 bg-amber-500/10 border border-amber-500/20 text-amber-300 font-bold hover:bg-amber-500/20 hover:border-amber-500/40 rounded-xl transition-all h-[38px] self-start md:self-auto shadow-sm"
-          >
-            <Download className="w-3.5 h-3.5 text-amber-400" /> Exportar Reporte Filtrado
-          </Button>
-        )}
-      </motion.div>
-
-      {/* Tabla de Finanzas */}
-      <motion.div variants={itemVariants}>
-        <GlassCard className="overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="border-b border-gray-800 text-gray-400 text-xs font-semibold uppercase bg-gray-800/20">
-                  <th className="py-4 px-6 w-12">
-                    <button
-                      onClick={handleSelectAll}
-                      className="text-gray-400 hover:text-white transition-colors"
-                    >
-                      {(() => {
-                        const pending = filteredPayments.filter(item => item.status !== "Pagado");
-                        return selectedIds.length === pending.length && pending.length > 0 ? (
-                          <CheckSquare className="w-5 h-5 text-amber-500" />
-                        ) : (
-                          <Square className="w-5 h-5" />
-                        );
-                      })()}
-                    </button>
-                  </th>
-                  <th className="py-4 px-6">Trabajador (Staff)</th>
-                  <th className="py-4 px-6">Evento / Fecha</th>
-                  <th className="py-4 px-6">Monto Honorario</th>
-                  <th className="py-4 px-6">Datos de Transferencia</th>
-                  <th className="py-4 px-6 text-center">Estado Pago</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-800 text-sm">
-                {loading ? (
-                  <tr>
-                    <td colSpan="6" className="py-12 text-center text-gray-500 font-medium">
-                      Cargando registros financieros...
-                    </td>
-                  </tr>
-                ) : filteredPayments.length === 0 ? (
-                  <tr>
-                    <td colSpan="6" className="py-12 text-center text-gray-500 font-medium">
-                      No se encontraron transferencias que coincidan con la búsqueda.
-                    </td>
-                  </tr>
-                ) : (
-                  filteredPayments.map(p => {
-                    const isSelected = selectedIds.includes(p.id);
-                    const missingBank = !p.cuenta_destino || !p.codigo_banco_destino;
-
+          {/* Listado de Gastos */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Lista */}
+            <div className="lg:col-span-2 space-y-4">
+              {expenses.filter(e => expenseStatusFilter === "all" || e.status === expenseStatusFilter).length === 0 ? (
+                <GlassCard className="p-12 text-center flex flex-col items-center justify-center border-dashed border-gray-700/60">
+                  <FileText className="w-12 h-12 text-gray-500 mb-3" />
+                  <p className="text-gray-400 font-bold">No se encontraron solicitudes de viáticos.</p>
+                  <p className="text-xs text-gray-500 mt-1">Las solicitudes enviadas por los trabajadores aparecerán aquí.</p>
+                </GlassCard>
+              ) : (
+                expenses
+                  .filter(e => expenseStatusFilter === "all" || e.status === expenseStatusFilter)
+                  .map((e) => {
+                    const isSelected = selectedExpense?.id === e.id;
                     return (
-                      <tr
-                        key={p.id}
-                        className={`transition-colors duration-200 ${isSelected ? 'bg-amber-500/5' : 'hover:bg-gray-800/10'}`}
+                      <GlassCard
+                        key={e.id}
+                        onClick={() => {
+                          setSelectedExpense(e);
+                          setApprovedAmountInput(e.approved_amount || e.requested_amount || "");
+                          setExpenseComment(e.admin_comment || "");
+                        }}
+                        className={`p-5 transition-all cursor-pointer border ${
+                          isSelected
+                            ? "border-amber-500/50 bg-amber-500/[0.02]"
+                            : "border-white/5 hover:border-gray-700/80"
+                        }`}
                       >
-                        <td className="py-4 px-6">
-                          {p.status === "Pagado" ? (
-                            <CheckSquare className="w-5 h-5 text-gray-600/50 cursor-not-allowed" title="Ya está pagado" />
-                          ) : (
-                            <button
-                              onClick={() => handleSelectOne(p.id)}
-                              className="text-gray-400 hover:text-white transition-colors"
-                            >
-                              {isSelected ? (
-                                <CheckSquare className="w-5 h-5 text-amber-500" />
-                              ) : (
-                                <Square className="w-5 h-5" />
-                              )}
-                            </button>
-                          )}
-                        </td>
-                        <td className="py-4 px-6">
-                          <div className="flex flex-col">
-                            <span className="font-bold text-white">{p.staff_name}</span>
-                            <span className="text-xs text-gray-400 font-mono mt-0.5">{p.staff_rut}</span>
-                          </div>
-                        </td>
-                        <td className="py-4 px-6">
-                          <div className="flex flex-col">
-                            <span className="font-medium text-gray-200">{p.event_name}</span>
-                            <span className="text-xs text-gray-400 mt-0.5">{p.event_date}</span>
-                          </div>
-                        </td>
-                        <td className="py-4 px-6">
-                          <span className="font-extrabold text-amber-400">
-                            ${p.monto.toLocaleString("es-CL")}
-                          </span>
-                        </td>
-                        <td className="py-4 px-6">
-                          {missingBank ? (
-                            <span className="text-xs px-2.5 py-1 bg-red-500/10 text-red-400 border border-red-500/20 rounded-lg font-semibold inline-flex items-center gap-1">
-                              ⚠️ Sin Datos de Transferencia
-                            </span>
-                          ) : (
-                            <div className="flex flex-col text-xs text-gray-300 gap-0.5">
-                              <span className="font-bold flex items-center gap-1">
-                                <Building className="w-3.5 h-3.5 text-gray-400" /> {p.banco_name}
+                        <div className="flex justify-between items-start gap-4">
+                          <div className="space-y-2 text-left">
+                            <div className="flex items-center gap-2">
+                              <span className={`px-2.5 py-0.5 rounded-md text-[10px] font-extrabold uppercase tracking-wide border ${
+                                e.expense_type === "Viático" ? "bg-purple-500/10 border-purple-500/30 text-purple-400" :
+                                e.expense_type === "Reembolso" ? "bg-teal-500/10 border-teal-500/30 text-teal-400" :
+                                e.expense_type === "Compra Operacional" ? "bg-sky-500/10 border-sky-500/30 text-sky-400" :
+                                "bg-gray-500/10 border-gray-500/30 text-gray-400"
+                              }`}>
+                                {e.expense_type}
                               </span>
-                              <span className="text-gray-400 flex items-center gap-1.5">
-                                Nº Cuenta:{" "}
-                                <span className="font-mono text-white font-semibold">
-                                  {revealedAccounts[p.id] ? p.cuenta_destino : maskAccountNumber(p.cuenta_destino)}
-                                </span>
-                                <button
-                                  onClick={() => toggleRevealAccount(p.id)}
-                                  className="text-gray-400 hover:text-amber-400 transition-colors focus:outline-none"
-                                  title={revealedAccounts[p.id] ? "Ocultar número de cuenta" : "Mostrar número de cuenta"}
-                                >
-                                  {revealedAccounts[p.id] ? (
-                                    <EyeOff className="w-3.5 h-3.5 text-amber-500" />
-                                  ) : (
-                                    <Eye className="w-3.5 h-3.5" />
-                                  )}
-                                </button>
+                              <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold border ${
+                                e.status === "Pagado" ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400" :
+                                e.status === "Aprobado" ? "bg-amber-500/10 border-amber-500/30 text-amber-400" :
+                                e.status === "En revisión" ? "bg-blue-500/10 border-blue-500/30 text-blue-400" :
+                                e.status === "Rechazado" ? "bg-red-500/10 border-red-500/30 text-red-400" :
+                                "bg-gray-500/10 border-gray-500/30 text-gray-400"
+                              }`}>
+                                {e.status}
                               </span>
                             </div>
-                          )}
-                        </td>
-                        <td className="py-4 px-6 text-center">
-                          <span className={`px-3 py-1.5 rounded-full text-xs font-extrabold shadow-sm border ${p.status === "Pagado"
-                              ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
-                              : 'bg-red-500/10 border-red-500/30 text-red-400'
-                            }`}>
-                            {p.status}
-                          </span>
-                        </td>
-                      </tr>
+
+                            <div>
+                              <h4 className="font-extrabold text-white text-base">{e.profiles?.name || "Trabajador Desconocido"}</h4>
+                              <p className="text-xs text-gray-400 font-medium font-mono mt-0.5">{e.profiles?.rut}</p>
+                            </div>
+
+                            <p className="text-sm text-gray-300 line-clamp-2 bg-black/20 p-2.5 rounded-lg border border-white/5">
+                              {e.description || <span className="italic text-gray-500">Sin descripción</span>}
+                            </p>
+
+                            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-gray-400 pt-1">
+                              <span>Fecha: <strong className="text-gray-300 font-semibold">{e.expense_date}</strong></span>
+                              <span>Evento: <strong className="text-gray-300 font-semibold">{e.events?.name || "Gasto General"}</strong></span>
+                            </div>
+                          </div>
+
+                          <div className="text-right space-y-2 shrink-0">
+                            <div>
+                              <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Monto Solicitado</p>
+                              <p className="text-lg font-black text-gray-300">${parseFloat(e.requested_amount).toLocaleString("es-CL")}</p>
+                            </div>
+
+                            {e.approved_amount && (
+                              <div>
+                                <p className="text-[10px] text-amber-400 font-bold uppercase tracking-wider">Monto Aprobado</p>
+                                <p className="text-lg font-black text-amber-400">${parseFloat(e.approved_amount).toLocaleString("es-CL")}</p>
+                              </div>
+                            )}
+
+                            {e.receipt_url && (
+                              <button
+                                onClick={(ev) => {
+                                  ev.stopPropagation();
+                                  handleAdminViewReceipt(e.receipt_url);
+                                }}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-800/80 hover:bg-gray-700 text-xs font-bold text-gray-200 hover:text-white rounded-xl border border-white/5 transition-all mt-2 cursor-pointer"
+                              >
+                                <Eye className="w-3.5 h-3.5 text-amber-400" />
+                                Comprobante
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        {e.admin_comment && (
+                          <div className="mt-3 text-xs bg-gray-900/60 p-2.5 rounded-xl border border-white/5 text-gray-300 flex items-start gap-2">
+                            <MessageSquare className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
+                            <div className="text-left">
+                              <span className="font-bold text-gray-400">Comentario Admin: </span>
+                              {e.admin_comment}
+                            </div>
+                          </div>
+                        )}
+                      </GlassCard>
                     );
                   })
+              )}
+            </div>
+
+            {/* Panel de Detalle y Aprobación */}
+            <div className="lg:col-span-1">
+              <div className="sticky top-6">
+                {selectedExpense ? (
+                  <GlassCard className="p-6 border-amber-500/20 space-y-6">
+                    <div className="text-left">
+                      <h3 className="text-lg font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-amber-200 to-amber-400 flex items-center gap-2">
+                        <Sliders className="w-5 h-5 text-amber-400" />
+                        Revisar Solicitud
+                      </h3>
+                      <p className="text-xs text-gray-400 mt-1">Gestiona el estado y monto aprobado de la solicitud.</p>
+                    </div>
+
+                    <div className="space-y-4 text-sm text-left">
+                      <div className="bg-black/30 p-4 rounded-xl border border-white/5 space-y-2">
+                        <p className="text-gray-400 text-xs font-bold uppercase tracking-wide">Detalles de Transferencia</p>
+                        <div className="grid grid-cols-2 gap-2 text-xs">
+                          <div>
+                            <span className="text-gray-500 font-semibold">Banco:</span>
+                            <p className="font-bold text-gray-300">{BANCOS_CHILE[selectedExpense.profiles?.codigo_banco_destino] || "No registrado"}</p>
+                          </div>
+                          <div>
+                            <span className="text-gray-500 font-semibold">Nº Cuenta:</span>
+                            <p className="font-bold text-gray-300 font-mono">{selectedExpense.profiles?.cuenta_destino || "No registrada"}</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Monto Aprobado Input */}
+                      <div className="space-y-2">
+                        <label className="block text-xs font-extrabold text-gray-300 uppercase tracking-wide">Monto Aprobado (CLP)</label>
+                        <input
+                          type="number"
+                          placeholder="Monto final aprobado"
+                          value={approvedAmountInput}
+                          onChange={(e) => setApprovedAmountInput(e.target.value)}
+                          className="w-full bg-gray-950/80 border border-gray-800 rounded-xl py-2 px-3 text-sm text-white font-bold placeholder-gray-600 focus:outline-none focus:border-amber-500"
+                        />
+                        <p className="text-[10px] text-gray-500">
+                          Monto solicitado original: <strong className="text-gray-400">${parseFloat(selectedExpense.requested_amount).toLocaleString("es-CL")}</strong>
+                        </p>
+                      </div>
+
+                      {/* Comentario Admin */}
+                      <div className="space-y-2">
+                        <label className="block text-xs font-extrabold text-gray-300 uppercase tracking-wide">Comentario Administrativo</label>
+                        <textarea
+                          rows="3"
+                          placeholder="Agrega una glosa o motivo de la decisión..."
+                          value={expenseComment}
+                          onChange={(e) => setExpenseComment(e.target.value)}
+                          className="w-full bg-gray-950/80 border border-gray-800 rounded-xl py-2 px-3 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-amber-500 resize-none"
+                        />
+                      </div>
+
+                      {/* Acciones */}
+                      <div className="space-y-2 pt-2">
+                        <div className="grid grid-cols-2 gap-2">
+                          <button
+                            onClick={() => handleUpdateExpenseStatus(selectedExpense.id, "Aprobado")}
+                            disabled={submittingExpenseAction}
+                            className="bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-black text-xs font-black py-2.5 rounded-xl transition-all shadow-md flex items-center justify-center gap-1 cursor-pointer"
+                          >
+                            <CheckCircle className="w-3.5 h-3.5" />
+                            Aprobar
+                          </button>
+                          <button
+                            onClick={() => handleUpdateExpenseStatus(selectedExpense.id, "Rechazado")}
+                            disabled={submittingExpenseAction}
+                            className="bg-red-500 hover:bg-red-600 disabled:opacity-50 text-white text-xs font-black py-2.5 rounded-xl transition-all shadow-md flex items-center justify-center gap-1 cursor-pointer"
+                          >
+                            <XCircle className="w-3.5 h-3.5" />
+                            Rechazar
+                          </button>
+                        </div>
+                        <button
+                          onClick={() => handleUpdateExpenseStatus(selectedExpense.id, "En revisión")}
+                          disabled={submittingExpenseAction}
+                          className="w-full bg-blue-500/20 hover:bg-blue-500/30 disabled:opacity-50 text-blue-300 text-xs font-bold py-2.5 rounded-xl transition-all border border-blue-500/20 flex items-center justify-center gap-1 cursor-pointer"
+                        >
+                          <FileText className="w-3.5 h-3.5" />
+                          Poner en revisión
+                        </button>
+                      </div>
+                    </div>
+                  </GlassCard>
+                ) : (
+                  <GlassCard className="p-6 text-center border-dashed border-gray-700/60 py-16">
+                    <Sliders className="w-8 h-8 text-gray-600 mx-auto mb-2" />
+                    <p className="text-gray-400 text-xs font-bold">Selecciona una solicitud</p>
+                    <p className="text-[10px] text-gray-500 mt-1">Haz clic en cualquier viático de la lista para revisarlo aquí.</p>
+                  </GlassCard>
                 )}
-              </tbody>
-            </table>
+              </div>
+            </div>
           </div>
-        </GlassCard>
-      </motion.div>
+        </motion.div>
+      )}
     </motion.div>
   );
 }
