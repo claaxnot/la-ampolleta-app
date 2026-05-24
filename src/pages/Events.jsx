@@ -68,6 +68,23 @@ export default function Events({ user }) {
 
   React.useEffect(() => {
     fetchEvents();
+
+    console.log("🔌 [REALTIME EVENTS] - Subscribiendo a cambios en tabla events...");
+    const channel = supabase
+      .channel('events-list-changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'events' },
+        (payload) => {
+          console.log("🔔 [REALTIME EVENTS] - Cambio detectado en tabla events:", payload);
+          fetchEvents();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const handleSubmit = async (eventData) => {
