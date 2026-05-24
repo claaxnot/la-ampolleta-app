@@ -32,9 +32,8 @@ BEGIN
     WHERE 
       status IN ('Planificado', 'Confirmado')
       AND date IS NOT NULL 
-      AND date <> ''
       AND (
-        (date || ' ' || COALESCE(NULLIF(time, ''), '00:00'))::timestamp
+        (date::text || ' ' || COALESCE(NULLIF(time::text, ''), '00:00'))::timestamp
       ) <= current_time_santiago
     RETURNING id
   )
@@ -54,15 +53,14 @@ BEGIN
     WHERE 
       status = 'En progreso'
       AND date IS NOT NULL 
-      AND date <> ''
       AND end_time IS NOT NULL 
-      AND end_time <> ''
+      AND end_time::text <> ''
       AND (
         CASE 
-          WHEN COALESCE(NULLIF(time, ''), '00:00') > end_time THEN
-            ((date::date + interval '1 day')::date || ' ' || end_time)::timestamp
+          WHEN COALESCE(NULLIF(time::text, ''), '00:00')::time > (end_time::text)::time THEN
+            (((date::date + interval '1 day')::date)::text || ' ' || end_time::text)::timestamp
           ELSE
-            (date || ' ' || end_time)::timestamp
+            (date::text || ' ' || end_time::text)::timestamp
         END
       ) <= current_time_santiago
     RETURNING id
