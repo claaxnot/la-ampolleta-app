@@ -158,12 +158,8 @@ export default function WorkerDashboard({ user }) {
   const completedEvents = React.useMemo(() => {
     return assignedEvents.filter(event => {
       const eventStatus = event.status ? event.status.toLowerCase() : "";
-      const todayStr = new Date().toLocaleDateString("en-CA");
-      const isFinished = event.date ? event.date <= todayStr : false;
-      const isCompleted = eventStatus === "completado" || eventStatus === "finalizado" || isFinished;
-      
       const isValidAssignment = event.assignment_status === "Confirmado" || event.assignment_status === "Aceptado";
-      return isValidAssignment && isCompleted;
+      return isValidAssignment && eventStatus !== "cancelado";
     });
   }, [assignedEvents]);
 
@@ -182,7 +178,7 @@ export default function WorkerDashboard({ user }) {
     return assignedEvents
       .filter(event => {
         const eventStatus = event.status ? event.status.toLowerCase() : "";
-        const isFinished = event.date ? event.date <= todayStr : false;
+        const isFinished = event.date ? event.date < todayStr : false;
         const isCompleted = eventStatus === "completado" || eventStatus === "finalizado" || isFinished;
 
         if (isCompleted) {
@@ -195,8 +191,8 @@ export default function WorkerDashboard({ user }) {
       })
       .sort((a, b) => {
         const todayStrLocal = new Date().toLocaleDateString("en-CA");
-        const isACompleted = (a.status ? a.status.toLowerCase() : "") === "completado" || (a.status ? a.status.toLowerCase() : "") === "finalizado" || (a.date && a.date <= todayStrLocal);
-        const isBCompleted = (b.status ? b.status.toLowerCase() : "") === "completado" || (b.status ? b.status.toLowerCase() : "") === "finalizado" || (b.date && b.date <= todayStrLocal);
+        const isACompleted = (a.status ? a.status.toLowerCase() : "") === "completado" || (a.status ? a.status.toLowerCase() : "") === "finalizado" || (a.date && a.date < todayStrLocal);
+        const isBCompleted = (b.status ? b.status.toLowerCase() : "") === "completado" || (b.status ? b.status.toLowerCase() : "") === "finalizado" || (b.date && b.date < todayStrLocal);
 
         // Si uno está completado y el otro no, el completado va al final
         if (isACompleted && !isBCompleted) return 1;
@@ -310,10 +306,23 @@ export default function WorkerDashboard({ user }) {
         status,
         paid_count: paidEvents
       };
+     });
+
+    // 3.5 Filtrar según regla de negocio: período actual, o pasados pendientes. Excluir futuros.
+    const today = new Date();
+    const currentPeriodKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+    const filteredList = list.filter(p => {
+      if (p.period_key === currentPeriodKey) {
+        return true; // Período actual: mostrar siempre
+      }
+      if (p.period_key < currentPeriodKey) {
+        return p.status !== "Pagada"; // Períodos pasados: mostrar solo si están pendientes de pago
+      }
+      return false; // Períodos futuros: no mostrar todavía
     });
 
     // 4. Ordenación inteligente: los pendientes primero, y los pagados (historial) abajo
-    return list.sort((a, b) => {
+    return filteredList.sort((a, b) => {
       const isAPending = a.status !== "Pagada";
       const isBPending = b.status !== "Pagada";
       if (isAPending && !isBPending) return -1;
@@ -1124,7 +1133,7 @@ export default function WorkerDashboard({ user }) {
     if (eventInfo) {
       const eventStatus = eventInfo.status ? eventInfo.status.toLowerCase() : "";
       const todayStr = new Date().toLocaleDateString("en-CA");
-      const isFinished = eventInfo.date ? eventInfo.date <= todayStr : false;
+      const isFinished = eventInfo.date ? eventInfo.date < todayStr : false;
       const isEventCompleted = eventStatus === "completado" || eventStatus === "finalizado" || isFinished;
 
       if (isEventCompleted) {
@@ -1328,13 +1337,13 @@ export default function WorkerDashboard({ user }) {
                   (isPlanPending || event.setup_time || event.call_time || event.end_time);
 
                 // Decidir si mostrar supervisor y citación
-                const shouldShowSupervisor = !isEventSimpleType && (event.profiles?.name || isPlanPending);
-                const shouldShowCallTime = !isWorkerSimpleRole && !isEventSimpleType && (event.call_time || isPlanPending);
+                const shouldShowSupervisor = isPlanPending || (!isEventSimpleType && event.profiles?.name);
+                const shouldShowCallTime = isPlanPending || (!isWorkerSimpleRole && !isEventSimpleType && event.call_time);
 
                 // Determinar si el evento ya está completado/finalizado
                 const eventStatus = event.status ? event.status.toLowerCase() : "";
                 const todayStr = new Date().toLocaleDateString("en-CA");
-                const isFinished = event.date ? event.date <= todayStr : false;
+                const isFinished = event.date ? event.date < todayStr : false;
                 const isEventCompleted = eventStatus === "completado" || eventStatus === "finalizado" || isFinished;
 
                 // Dynamic styling based on assignment status

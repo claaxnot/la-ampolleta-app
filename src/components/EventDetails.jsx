@@ -79,7 +79,8 @@ export default function EventDetails({ event, isOpen, onClose }) {
         id,
         staff_id,
         status,
-        profiles (name, role)
+        custom_rate,
+        profiles:staff_id (name, role)
       `)
       .eq('event_id', event.id);
     
@@ -88,6 +89,7 @@ export default function EventDetails({ event, isOpen, onClose }) {
         assignment_id: d.id,
         id: d.staff_id,
         status: d.status,
+        custom_rate: d.custom_rate,
         name: d.profiles?.name || 'Desconocido',
         role: d.profiles?.role || ''
       })));
@@ -279,6 +281,8 @@ export default function EventDetails({ event, isOpen, onClose }) {
 
   if (!event) return null;
 
+  const isFinalized = event.status ? ['finalizado', 'completado', 'completed'].includes(event.status.toLowerCase()) : false;
+
   return (
     <AnimatePresence>
       {isOpen && (
@@ -314,195 +318,180 @@ export default function EventDetails({ event, isOpen, onClose }) {
                 </div>
                 {event.description && (
                   <p><strong>Descripción:</strong> {event.description}</p>
-                )}                {/* Staff Asignado con estados visuales detallados y módulo de asistencia */}
-                <div className="flex flex-col gap-2 pt-2 border-t border-white/5">
-                  <strong className="text-sm text-gray-100 mb-1">
-                    {event.attendance_control_enabled ? "Auditoría de Asistencia y Personal:" : "Staff asignado y confirmación:"}
-                  </strong>
-                  {assigned.length === 0 ? (
-                    <span className="text-xs text-gray-400 italic">Ningún trabajador asignado a este evento.</span>
-                  ) : event.attendance_control_enabled ? (
-                    // Vista detallada de Auditoría de Asistencia
-                    <div className="flex flex-col gap-3">
-                      {assigned.map(s => {
-                        const log = attendance[s.id];
-                        const isEditing = editingStaffId === s.id;
-                        
-                        let badgeStyle = "bg-amber-500/10 text-amber-400 border-amber-500/20";
-                        let statusLabel = "Pendiente";
-                        if (s.status === "Confirmado" || s.status === "Aceptado") {
-                          badgeStyle = "bg-emerald-500/10 text-emerald-400 border-emerald-500/20";
-                          statusLabel = "Confirmado";
-                        } else if (s.status === "Rechazado") {
-                          badgeStyle = "bg-red-500/10 text-red-400 border-red-500/20";
-                          statusLabel = "Rechazado";
-                        }
+                )}                {/* Staff Asignado / Sección de Personal */}
+                {(assigned.length > 0 || ['planificado', 'planned', 'confirmado', 'confirmed', 'active', 'activo', 'en curso', 'finalizado', 'completado', 'completed'].includes(event.status?.toLowerCase())) && (
+                  <div className="flex flex-col gap-2 pt-2 border-t border-white/5">
+                    <div className="flex flex-col mb-2">
+                      <strong className="text-sm text-gray-100">
+                        {isFinalized ? "Auditoría Final de Personal y Asistencia:" : "Personal y Asistencia:"}
+                      </strong>
+                      {!event.attendance_control_enabled && (
+                        <span className="text-[11px] text-amber-400/90 font-medium mt-0.5 flex items-center gap-1">
+                          ⚠️ Este evento no tenía control de ingreso/salida habilitado.
+                        </span>
+                      )}
+                    </div>
 
-                        return (
-                          <div key={s.id} className="p-4 rounded-2xl bg-black/30 border border-white/5 space-y-3">
-                            <div className="flex items-center justify-between">
-                              <div>
-                                <span className="font-bold text-gray-100 text-sm">{s.name}</span>
-                                <span className="text-[10px] text-gray-500 block capitalize">{s.role}</span>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <span className={`px-2 py-0.5 rounded-full border text-[9px] font-extrabold ${badgeStyle}`}>
-                                  {statusLabel}
-                                </span>
-                                {!isEditing && (
-                                  <button
-                                    onClick={() => startEditingAttendance(s.id)}
-                                    className="p-1.5 bg-white/5 hover:bg-white/10 rounded-lg text-amber-400 hover:text-amber-300 border border-white/10 transition-colors shadow-sm"
-                                    title="Corregir asistencia o registrar manual"
-                                  >
-                                    <Edit className="w-3.5 h-3.5" />
-                                  </button>
-                                )}
-                              </div>
-                            </div>
+                    {assigned.length === 0 ? (
+                      <span className="text-xs text-gray-400 italic">Ningún trabajador asignado a este evento.</span>
+                    ) : (
+                      // Vista única detallada de Personal, Asistencia y Corrección Administrativa
+                      <div className="flex flex-col gap-3">
+                        {assigned.map(s => {
+                          const log = attendance[s.id];
+                          const isEditing = editingStaffId === s.id;
+                          
+                          let badgeStyle = "bg-amber-500/10 text-amber-400 border-amber-500/20";
+                          let statusLabel = "Pendiente";
+                          if (s.status === "Confirmado" || s.status === "Aceptado") {
+                            badgeStyle = "bg-emerald-500/10 text-emerald-400 border-emerald-500/20";
+                            statusLabel = "Confirmado";
+                          } else if (s.status === "Rechazado") {
+                            badgeStyle = "bg-red-500/10 text-red-400 border-red-500/20";
+                            statusLabel = "Rechazado";
+                          }
 
-                            {isEditing ? (
-                              // Formulario de edición administrativa
-                              <div className="bg-white/5 border border-white/10 rounded-xl p-3.5 space-y-3">
-                                <div className="text-[10px] font-extrabold text-amber-400 flex items-center gap-1 uppercase tracking-wider">
-                                  <AlertTriangle className="w-3.5 h-3.5 text-amber-400" /> Corrección Administrativa
+                          return (
+                            <div key={s.id} className="p-4 rounded-2xl bg-black/30 border border-white/5 space-y-3">
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <span className="font-bold text-gray-100 text-sm">{s.name}</span>
+                                  <span className="text-[10px] text-gray-500 block capitalize">{s.role}</span>
                                 </div>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                  {/* Entrada Column */}
-                                  <div className="flex flex-col gap-2 bg-black/20 p-3 rounded-2xl border border-white/5">
-                                    <span className="text-[10px] text-amber-400 font-extrabold uppercase tracking-wider block mb-1">⏰ Entrada (Chile)</span>
-                                    <div className="grid grid-cols-2 gap-2">
-                                      <DatePicker
-                                        value={editCheckInDate}
-                                        onChange={(val) => setEditCheckInDate(val)}
-                                        label="Fecha"
-                                      />
-                                      <ClockPicker
-                                        value={editCheckInTime}
-                                        onChange={(val) => setEditCheckInTime(val)}
-                                        label="Hora"
-                                      />
-                                    </div>
+                                <div className="flex items-center gap-2">
+                                  <span className={`px-2 py-0.5 rounded-full border text-[9px] font-extrabold ${badgeStyle}`}>
+                                    {statusLabel}
+                                  </span>
+                                  {/* Honorario Líquido Badge */}
+                                  <span className="px-2 py-0.5 rounded-full border border-emerald-500/20 bg-emerald-500/10 text-emerald-400 text-[9px] font-black font-mono">
+                                    Liq: ${s.custom_rate && parseFloat(s.custom_rate) > 0 ? parseFloat(s.custom_rate).toLocaleString("es-CL") : "25.000"}
+                                  </span>
+                                  {!isEditing && event.attendance_control_enabled && (
+                                    <button
+                                      onClick={() => startEditingAttendance(s.id)}
+                                      className="p-1.5 bg-white/5 hover:bg-white/10 rounded-lg text-amber-400 hover:text-amber-300 border border-white/10 transition-colors shadow-sm"
+                                      title="Corregir asistencia o registrar manual"
+                                    >
+                                      <Edit className="w-3.5 h-3.5" />
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+
+                              {isEditing ? (
+                                // Formulario de edición administrativa
+                                <div className="bg-white/5 border border-white/10 rounded-xl p-3.5 space-y-3">
+                                  <div className="text-[10px] font-extrabold text-amber-400 flex items-center gap-1 uppercase tracking-wider">
+                                    <AlertTriangle className="w-3.5 h-3.5 text-amber-400" /> Corrección Administrativa
                                   </div>
-
-                                  {/* Salida Column */}
-                                  <div className="flex flex-col gap-2 bg-black/20 p-3 rounded-2xl border border-white/5">
-                                    <span className="text-[10px] text-amber-400 font-extrabold uppercase tracking-wider block mb-1">🚪 Salida (Chile)</span>
-                                    <div className="grid grid-cols-2 gap-2">
-                                      <DatePicker
-                                        value={editCheckOutDate}
-                                        onChange={(val) => setEditCheckOutDate(val)}
-                                        label="Fecha"
-                                      />
-                                      <ClockPicker
-                                        value={editCheckOutTime}
-                                        onChange={(val) => setEditCheckOutTime(val)}
-                                        label="Hora"
-                                      />
-                                    </div>
-                                  </div>
-                                </div>
-                                <div className="flex flex-col gap-1">
-                                  <label className="text-[10px] text-gray-400 font-extrabold uppercase tracking-wider">Motivo del Ajuste (Obligatorio)</label>
-                                  <input
-                                    type="text"
-                                    placeholder="Ej: Olvidó marcar salida al finalizar el evento"
-                                    value={editNotes}
-                                    onChange={(e) => setEditNotes(e.target.value)}
-                                    className="bg-black/40 border border-white/10 rounded-xl p-2.5 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50 transition-all font-medium w-full"
-                                  />
-                                </div>
-                                <div className="flex justify-end gap-2 pt-1">
-                                  <button
-                                    onClick={() => setEditingStaffId(null)}
-                                    className="px-3 py-1.5 bg-white/5 hover:bg-white/10 rounded-lg text-xs font-semibold text-gray-300 transition-colors"
-                                  >
-                                    Cancelar
-                                  </button>
-                                  <button
-                                    onClick={() => handleSaveCorrection(s.id, s.assignment_id)}
-                                    disabled={isSavingCorrection}
-                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500 text-gray-900 hover:bg-emerald-400 rounded-lg text-xs font-bold transition-all shadow-md"
-                                  >
-                                    {isSavingCorrection ? (
-                                      <span className="w-3.5 h-3.5 border-2 border-gray-900 border-t-transparent rounded-full animate-spin" />
-                                    ) : (
-                                      <><Save className="w-3.5 h-3.5" /> Guardar</>
-                                    )}
-                                  </button>
-                                </div>
-                              </div>
-                            ) : (
-                              // Estado de asistencia actual
-                              <div className="bg-black/20 rounded-xl p-3 border border-white/5 flex flex-wrap justify-between items-center gap-3">
-                                {!log ? (
-                                  <span className="text-xs text-gray-500 italic">No ha registrado entrada / salida</span>
-                                ) : (
-                                  <>
-                                    <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-gray-300">
-                                      <div className="flex flex-col">
-                                        <span className="text-[9px] text-gray-500 uppercase tracking-wider font-extrabold">Entrada</span>
-                                        <span className="font-semibold text-gray-200">📥 {formatChileDateTime(log.check_in_at)}</span>
-                                      </div>
-                                      <div className="flex flex-col">
-                                        <span className="text-[9px] text-gray-500 uppercase tracking-wider font-extrabold">Salida</span>
-                                        <span className="font-semibold text-gray-200">
-                                          {log.check_out_at ? `📤 ${formatChileDateTime(log.check_out_at)}` : "En curso ⏳"}
-                                        </span>
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {/* Entrada Column */}
+                                    <div className="flex flex-col gap-2 bg-black/20 p-3 rounded-2xl border border-white/5">
+                                      <span className="text-[10px] text-amber-400 font-extrabold uppercase tracking-wider block mb-1">⏰ Entrada (Chile)</span>
+                                      <div className="grid grid-cols-2 gap-2">
+                                        <DatePicker
+                                          value={editCheckInDate}
+                                          onChange={(val) => setEditCheckInDate(val)}
+                                          label="Fecha"
+                                        />
+                                        <ClockPicker
+                                          value={editCheckInTime}
+                                          onChange={(val) => setEditCheckInTime(val)}
+                                          label="Hora"
+                                        />
                                       </div>
                                     </div>
 
-                                    <div className="flex items-center gap-2">
-                                      {log.verified_by_admin && (
-                                        <span className="text-[8px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 font-bold uppercase tracking-wider cursor-help" title={`Corregido por admin: ${log.admin_adjustment_notes || 'Sin observaciones'}`}>
-                                          ✍️ Corregido
-                                        </span>
+                                    {/* Salida Column */}
+                                    <div className="flex flex-col gap-2 bg-black/20 p-3 rounded-2xl border border-white/5">
+                                      <span className="text-[10px] text-amber-400 font-extrabold uppercase tracking-wider block mb-1">🚪 Salida (Chile)</span>
+                                      <div className="grid grid-cols-2 gap-2">
+                                        <DatePicker
+                                          value={editCheckOutDate}
+                                          onChange={(val) => setEditCheckOutDate(val)}
+                                          label="Fecha"
+                                        />
+                                        <ClockPicker
+                                          value={editCheckOutTime}
+                                          onChange={(val) => setEditCheckOutTime(val)}
+                                          label="Hora"
+                                        />
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div className="flex flex-col gap-1">
+                                    <label className="text-[10px] text-gray-400 font-extrabold uppercase tracking-wider">Motivo del Ajuste (Obligatorio)</label>
+                                    <input
+                                      type="text"
+                                      placeholder="Ej: Olvidó marcar salida al finalizar el evento"
+                                      value={editNotes}
+                                      onChange={(e) => setEditNotes(e.target.value)}
+                                      className="bg-black/40 border border-white/10 rounded-xl p-2.5 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50 transition-all font-medium w-full"
+                                    />
+                                  </div>
+                                  <div className="flex justify-end gap-2 pt-1">
+                                    <button
+                                      onClick={() => setEditingStaffId(null)}
+                                      className="px-3 py-1.5 bg-white/5 hover:bg-white/10 rounded-lg text-xs font-semibold text-gray-300 transition-colors"
+                                    >
+                                      Cancelar
+                                    </button>
+                                    <button
+                                      onClick={() => handleSaveCorrection(s.id, s.assignment_id)}
+                                      disabled={isSavingCorrection}
+                                      className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500 text-gray-900 hover:bg-emerald-400 rounded-lg text-xs font-bold transition-all shadow-md"
+                                    >
+                                      {isSavingCorrection ? (
+                                        <span className="w-3.5 h-3.5 border-2 border-gray-900 border-t-transparent rounded-full animate-spin" />
+                                      ) : (
+                                        <><Save className="w-3.5 h-3.5" /> Guardar</>
                                       )}
-                                      <span className="text-xs font-extrabold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-lg border border-emerald-500/20 shadow-inner">
-                                        {formatDurationMinutes(log.total_duration_minutes)}
-                                      </span>
-                                    </div>
-                                  </>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    // Vista simple original
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      {assigned.map(s => {
-                        let badgeStyle = "bg-amber-500/10 text-amber-400 border-amber-500/20";
-                        let statusIcon = "⏳";
-                        let statusLabel = "Pendiente";
-                        
-                        if (s.status === "Confirmado" || s.status === "Aceptado") {
-                          badgeStyle = "bg-emerald-500/10 text-emerald-400 border-emerald-500/20";
-                          statusIcon = "✅";
-                          statusLabel = "Confirmado";
-                        } else if (s.status === "Rechazado") {
-                          badgeStyle = "bg-red-500/10 text-red-400 border-red-500/20";
-                          statusIcon = "❌";
-                          statusLabel = "Rechazado";
-                        }
-                        
-                        return (
-                          <div key={s.id} className="flex items-center justify-between p-3 rounded-2xl bg-black/20 border border-white/5 text-xs">
-                            <span className="font-semibold text-gray-100 truncate pr-2">
-                              {s.name} <span className="text-[10px] text-gray-500 font-normal block capitalize">{s.role}</span>
-                            </span>
-                            <span className={`px-2 py-0.5 rounded-full border text-[9px] font-extrabold flex items-center gap-1.5 shrink-0 ${badgeStyle}`}>
-                              <span>{statusIcon}</span>
-                              <span>{statusLabel}</span>
-                            </span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
+                                    </button>
+                                  </div>
+                                </div>
+                              ) : (
+                                // Estado de asistencia actual
+                                <div className="bg-black/20 rounded-xl p-3 border border-white/5 flex flex-wrap justify-between items-center gap-3">
+                                  {!log ? (
+                                    <span className="text-xs font-extrabold text-amber-400/90 bg-amber-500/10 px-2.5 py-1 rounded-lg border border-amber-500/20 shadow-inner flex items-center gap-1">
+                                      ⚠️ Sin registro de asistencia
+                                    </span>
+                                  ) : (
+                                    <>
+                                      <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-gray-300">
+                                        <div className="flex flex-col">
+                                          <span className="text-[9px] text-gray-500 uppercase tracking-wider font-extrabold">Entrada</span>
+                                          <span className="font-semibold text-gray-200">📥 {formatChileDateTime(log.check_in_at)}</span>
+                                        </div>
+                                        <div className="flex flex-col">
+                                          <span className="text-[9px] text-gray-500 uppercase tracking-wider font-extrabold">Salida</span>
+                                          <span className="font-semibold text-gray-200">
+                                            {log.check_out_at ? `📤 ${formatChileDateTime(log.check_out_at)}` : "En curso ⏳"}
+                                          </span>
+                                        </div>
+                                      </div>
+
+                                      <div className="flex items-center gap-2">
+                                        {log.verified_by_admin && (
+                                          <span className="text-[8px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 font-bold uppercase tracking-wider cursor-help" title={`Corregido por admin: ${log.admin_adjustment_notes || 'Sin observaciones'}`}>
+                                            ✍️ Corregido
+                                          </span>
+                                        )}
+                                        <span className="text-xs font-extrabold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-lg border border-emerald-500/20 shadow-inner">
+                                          {formatDurationMinutes(log.total_duration_minutes)}
+                                        </span>
+                                      </div>
+                                    </>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
               <div className="flex justify-end mt-6 pt-4 border-t border-white/5">
                 <Button type="button" variant="secondary" onClick={onClose}>Cerrar</Button>

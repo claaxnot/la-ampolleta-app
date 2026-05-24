@@ -70,7 +70,10 @@ export default function Finanzas() {
   const [dbErrorWarning, setDbErrorWarning] = useState(false);
 
   // Filtro de Período Mensual
-  const [monthFilter, setMonthFilter] = useState("all");
+  const [monthFilter, setMonthFilter] = useState(() => {
+    const today = new Date();
+    return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+  });
   const [includeFuture, setIncludeFuture] = useState(false);
 
   // Enmascaramiento de Cuentas Bancarias (Shoulder-Surfing prevention)
@@ -79,7 +82,7 @@ export default function Finanzas() {
   // Estados de Gestión de Viáticos y Reembolsos (Módulo Administrativo)
   const [expenses, setExpenses] = useState([]);
   const [adminTab, setAdminTab] = useState("nominas"); // "nominas" | "viaticos"
-  const [expenseStatusFilter, setExpenseStatusFilter] = useState("all");
+  const [expenseStatusFilter, setExpenseStatusFilter] = useState("Pendiente");
   const [expenseComment, setExpenseComment] = useState("");
   const [selectedExpense, setSelectedExpense] = useState(null);
   const [submittingExpenseAction, setSubmittingExpenseAction] = useState(false);
@@ -113,35 +116,39 @@ export default function Finanzas() {
     setRevealedAccounts(prev => ({ ...prev, [id]: !prev[id] }));
   };
 
-  // React.useMemo: Agrupar pagos de eventos pendientes por trabajador (Versión 3)
+  // React.useMemo: Agrupar pagos de eventos pendientes por trabajador y mes (Versión 3.2)
   const workerInvoiceGroups = React.useMemo(() => {
     const pendingEvents = payments.filter(p => !p.is_expense && p.status !== "Pagado");
 
     const groups = {};
     pendingEvents.forEach(p => {
-      const rutKey = p.staff_rut || p.staff_id;
-      if (!rutKey) return;
+      const dateStr = p.event_date || p.date || "";
+      const periodKey = dateStr.substring(0, 7) || new Date().toISOString().substring(0, 7); // "YYYY-MM"
+      const groupKey = `${p.staff_rut || p.staff_id}_${periodKey}`;
+      
+      if (!p.staff_rut && !p.staff_id) return;
 
-      if (!groups[rutKey]) {
-        groups[rutKey] = {
+      if (!groups[groupKey]) {
+        groups[groupKey] = {
           staff_id: p.staff_id,
           staff_name: p.staff_name,
           staff_rut: p.staff_rut,
           staff_email: p.staff_email,
+          period_key: periodKey,
           payments: [],
           total_liquid: 0,
           invoice_required: false
         };
       }
       
-      groups[rutKey].payments.push(p);
-      groups[rutKey].total_liquid += parseFloat(p.monto) || 0;
+      groups[groupKey].payments.push(p);
+      groups[groupKey].total_liquid += parseFloat(p.monto) || 0;
       if (p.invoice_required) {
-        groups[rutKey].invoice_required = true;
+        groups[groupKey].invoice_required = true;
       }
     });
 
-    return Object.values(groups).map(g => {
+    const list = Object.values(groups).map(g => {
       const rate = parseFloat(retentionRateSetting || 15.25);
       const brutoEsperado = Math.round(g.total_liquid / (1 - (rate / 100)));
       const retencionEstimada = brutoEsperado - g.total_liquid;
@@ -175,7 +182,7 @@ export default function Finanzas() {
       }
 
       if (invoiceBatches && invoiceBatches.length > 0) {
-        const foundBatch = invoiceBatches.find(b => b.worker_id === g.staff_id && b.status === "verified");
+        const foundBatch = invoiceBatches.find(b => b.worker_id === g.staff_id && b.status === "verified" && b.period_label === g.period_key);
         if (foundBatch) {
           batchStatus = "verified";
           activeBatch = {
@@ -189,15 +196,30 @@ export default function Finanzas() {
         }
       }
 
+      // Nombre del mes formateado bonito
+      const [year, monthStr] = g.period_key.split("-");
+      const monthNames = [
+        "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+        "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
+      ];
+      const monthIndex = parseInt(monthStr, 10) - 1;
+      const periodLabel = `${monthNames[monthIndex]} ${year}`;
+
       return {
         ...g,
+        period_label: periodLabel,
         expected_gross: brutoEsperado,
         estimated_retention: retencionEstimada,
         batchStatus,
         activeBatch
       };
     });
-  }, [payments, retentionRateSetting, invoiceBatches]);
+
+    if (monthFilter === "all") {
+      return list;
+    }
+    return list.filter(g => g.period_key === monthFilter);
+  }, [payments, retentionRateSetting, invoiceBatches, monthFilter]);
 
   const handleToggleInvoiceRequired = async (assignmentId, currentValue) => {
     const loadingToast = toast.loading("Actualizando requerimiento de boleta...");
@@ -294,7 +316,7 @@ export default function Finanzas() {
           .from("worker_invoice_batches")
           .insert({
             worker_id: workerId,
-            period_label: new Date().toISOString().substring(0, 7),
+            period_label: selectedWorkerGroup.period_key,
             total_liquid_amount: liquidoVal,
             retention_rate: rateVal,
             expected_gross_amount: brutoEsperado,
@@ -422,6 +444,7 @@ export default function Finanzas() {
         .from("worker_invoice_batches")
         .delete()
         .eq("worker_id", group.staff_id)
+        .eq("period_label", group.period_key)
         .eq("status", "verified");
 
       if (deleteError) throw deleteError;
@@ -2066,11 +2089,12 @@ export default function Finanzas() {
                     <tbody className="divide-y divide-white/5">
                       {workerInvoiceGroups.map(group => {
                         return (
-                          <tr key={group.staff_id} className="hover:bg-white/5 transition-colors">
+                          <tr key={`${group.staff_id}_${group.period_key}`} className="hover:bg-white/5 transition-colors">
                             <td className="py-3.5 px-4 font-bold text-gray-200">
                               <div className="flex flex-col">
                                 <span className="font-extrabold text-sm">{group.staff_name}</span>
-                                <span className="text-2xs text-gray-400 font-mono">{group.staff_email}</span>
+                                <span className="text-[10px] text-amber-400 font-black uppercase tracking-wider">{group.period_label}</span>
+                                <span className="text-2xs text-gray-400 font-mono mt-0.5">{group.staff_email}</span>
                               </div>
                             </td>
                             <td className="py-3.5 px-4 text-gray-300 font-mono font-semibold">{group.staff_rut || "Sin RUT"}</td>

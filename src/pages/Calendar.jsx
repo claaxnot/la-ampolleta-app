@@ -27,6 +27,23 @@ export default function Calendar() {
 
   React.useEffect(() => {
     fetchEvents();
+
+    console.log("🔌 [REALTIME CALENDAR] - Subscribiendo a cambios en tabla events...");
+    const channel = supabase
+      .channel('calendar-events-changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'events' },
+        (payload) => {
+          console.log("🔔 [REALTIME CALENDAR] - Cambio detectado en tabla events:", payload);
+          fetchEvents();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const fetchEvents = async () => {
@@ -161,13 +178,30 @@ export default function Calendar() {
                 {/* Lista de eventos del día */}
                 <div className="flex-1 overflow-y-auto space-y-1.5 custom-scrollbar pr-1">
                   {dayEvents.map(event => {
-                    // Determinar el color según el estado
-                    let statusColor = "bg-amber-500/20 text-amber-300 border-amber-500/30"; // Pendiente / Planificado
-                    if (event.status.toLowerCase() === 'confirmado' || event.status.toLowerCase() === 'active') {
-                      statusColor = "bg-emerald-500/20 text-emerald-300 border-emerald-500/30";
-                    } else if (event.status.toLowerCase() === 'completado') {
-                      statusColor = "bg-gray-500/20 text-gray-400 border-gray-500/30";
-                    }
+                    // Determinar el color según el estado con mapeador robusto tricolor
+                    const getStatusColor = (status) => {
+                      switch (status?.toLowerCase()) {
+                        case "confirmado":
+                        case "confirmed":
+                        case "active":
+                        case "activo":
+                          return "bg-emerald-500/20 text-emerald-300 border-emerald-500/30 hover:bg-emerald-500/30";
+                        case "completado":
+                        case "completed":
+                        case "finalizado":
+                          return "bg-gray-500/20 text-gray-400 border-gray-500/30 hover:bg-gray-500/30";
+                        case "cancelado":
+                        case "cancelled":
+                          return "bg-red-500/20 text-red-300 border-red-500/30 hover:bg-red-500/30";
+                        case "planned":
+                        case "planificado":
+                        case "pendiente":
+                        case "en progreso":
+                        default:
+                          return "bg-amber-500/20 text-amber-300 border-amber-500/30 hover:bg-amber-500/30";
+                      }
+                    };
+                    const statusColor = getStatusColor(event.status);
 
                     return (
                       <div 
@@ -198,7 +232,10 @@ export default function Calendar() {
       <EventDetails 
         event={selectedEvent} 
         isOpen={isDetailsOpen} 
-        onClose={() => setIsDetailsOpen(false)} 
+        onClose={() => {
+          setIsDetailsOpen(false);
+          fetchEvents();
+        }} 
       />
     </motion.div>
   );

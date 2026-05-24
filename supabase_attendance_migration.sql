@@ -47,6 +47,7 @@ ALTER TABLE public.event_attendance_logs ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Workers can view own attendance logs" ON public.event_attendance_logs;
 DROP POLICY IF EXISTS "Admins can view all attendance logs" ON public.event_attendance_logs;
 DROP POLICY IF EXISTS "Admins can update attendance logs for corrections" ON public.event_attendance_logs;
+DROP POLICY IF EXISTS "Admins can insert attendance logs for manual registrations" ON public.event_attendance_logs;
 
 -- 5. Crear políticas de visualización (SELECT)
 -- A. Trabajadores ven solo su propia asistencia
@@ -86,8 +87,17 @@ WITH CHECK (
   )
 );
 
--- Nota: No se definen políticas de INSERT directo desde frontend. 
--- Todo registro se realiza estrictamente a través de las RPC de base de datos seguras.
+-- D. Admins/Supervisores/Coordinadores pueden insertar registros para asistencia manual
+CREATE POLICY "Admins can insert attendance logs for manual registrations"
+ON public.event_attendance_logs
+FOR INSERT
+TO authenticated
+WITH CHECK (
+  EXISTS (
+    SELECT 1 FROM public.profiles 
+    WHERE id = auth.uid() AND (system_role = 'admin' OR role = 'Admin' OR role = 'Supervisor' OR role = 'Coordinador')
+  )
+);
 
 
 -- =====================================================================

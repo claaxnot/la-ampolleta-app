@@ -55,6 +55,8 @@
   - [x] Implementar badges visuales tricolores (`Falta boleta`, `Boleta verificada`, `No requiere boleta`).
   - [x] Deshabilitar botón individual "Marcar pagado" si falta boleta.
   - [x] Deshabilitar checkbox de fila y omitir del botón de nómina múltiple si falta boleta.
+  - [x] Control de pagos con boleta (si hay boleta se paga, sin boleta no se paga, verificar boleta antes de pagar).
+  - [x] Agregar validación que no se puede pagar un evento si hay boleta pendiente.
   - [x] Crear el modal esmerilado (`GlassCard`) "Confirmar Boleta" con los inputs requeridos, validación de montos CLP y confirmación de correo.
   - [x] Programar el guardado e integración de metadata en Supabase para validar la boleta.
 - [x] **Fase 3: Transparencia para Trabajadores (WorkerDashboard.jsx)**
@@ -66,6 +68,9 @@
 - [x] **Fase 5: Verificación Local y Compilación**
   - [x] Realizar pruebas locales de flujo completo (crear pago, validar bloqueo, verificar, liberar pago).
   - [x] Ejecutar `npm run build` para asegurar la correcta compilación en producción.
+- [x] **Fase 6: Consolidación de Finanzas V3 y UX Responsivo**
+  - [x] Limpieza completa de CTAs duplicados a nivel individual, centralizando la validación en el bloque de lotes del trabajador.
+  - [x] Rediseño responsivo de filtros en breakpoint `lg` con scroll lateral `shrink-0` y `.scrollbar-none` para eliminar solapamientos de capas y bloqueos táctiles.
 
 ## 6. Módulo de Viáticos e Integración de Nóminas
 - [x] **Esquema de Base de Datos y RLS:** Crear la tabla `expense_requests` con RLS, políticas seguras y configuración para Signed URLs.
@@ -93,11 +98,24 @@
 - [x] **Inputs Premium y Selectores Cohesivos:** Reemplazar selectores nativos por componentes personalizados `DatePicker` y `ClockPicker` con iconografía WebKit invertida de alta fidelidad.
 
 ## 9. Pendientes y Tareas Futuras
-- [ ] **Módulo de Subida de Boletas de Honorarios (Worker):** Subida de PDFs de boletas para eventos finalizados, con flujo de revisión y aprobación del administrador antes de liberar el pago.
 - [ ] **Reportes Visuales y Gráficos de Finanzas (Admin):** Gráficos interactivos de barra/línea sobre egresos mensuales y exportación de informes analíticos en PDF.
 - [ ] **Bitácora de Auditoría Operacional (Logs):** Registro e historial detallado de acciones administrativas críticas (ej: creación de eventos, cambios de estados de pago).
 - [ ] Escribir archivo README.md completo con instrucciones de configuración local y variables de entorno.
-- [ ] Control de pagos con boleta (si hay boleta se paga, sin boleta no se paga, verificar boleta antes de pagar).
-- [ ] Agregar validación que no se puede pagar un evento si hay boleta pendiente.
+
+## 10. Mejoras en Calendario y Auditoría de Eventos Finalizados
+- [x] **Sincronización en Tiempo Real del Calendario:** Integrar canal WebSocket en `Calendar.jsx` para refrescar los eventos en vivo ante cambios en la BD.
+- [x] **Estandarización de Colores en Calendario:** Sincronizar colores por estado en `Calendar.jsx` (Confirmado/Activo=Verde, Finalizado/Completado=Gris, Cancelado=Rojo, Planificado=Ámbar).
+- [x] **Módulo de Auditoría en Detalle de Eventos Finalizados:** Modificar `EventDetails.jsx` para obtener `custom_rate` y renderizar la grilla detallada de personal y asistencia siempre que un evento esté finalizado o completado.
+- [x] **Badges de Ausencia y Control Desactivado:** Integrar badges de advertencia sutiles cuando no existan logs de asistencia o cuando el control de ingreso haya estado desactivado.
+- [x] **Compilación de Producción:** Ejecutar `npm run build` para garantizar la correcta compilación en producción.
+
+## 11. Optimización del Dashboard de Eventos y Visibilidad Financiera (SII Lotes V3 y Viáticos)
+- [x] **Segmentación Contable por Trabajador y Período Mensual (SII Lotes V3):** Reestructurar el hook contable de agrupamiento en el backend y frontend del panel administrativo para separar los eventos por cada mes calendario (formato YYYY-MM), resolviendo discrepancias contables y alineándose con la legislación del SII.
+- [x] **Filtro Mensual por Defecto en Finanzas:** Inicializar dinámicamente el selector del período al mes actual de operaciones para evitar confusión visual y agilizar la navegación contable del administrador al cargar el panel de finanzas.
+- [x] **Sincronización Total de la Nómina y Lotes:** Restringir la visualización de la tabla consolidada de boletas (`CONTROL DE BOLETAS POR TRABAJADOR`) al período exacto que el administrador tenga filtrado.
+- [x] **Ocultación de Boletas de Períodos Futuros (Tablero del Trabajador):** Restringir visualmente en el portal del trabajador la tarjeta consolidada de boletas de meses que no han comenzado, mostrando solo el mes actual y meses pasados pendientes de pago.
+- [x] **Foco Predeterminado de Viáticos en Pendientes:** Configurar la pestaña de Viáticos y Reembolsos para mostrar por defecto las solicitudes en estado `"Pendiente"`, permitiendo una toma de decisiones y aprobaciones administrativas inmediatas.
+
+
 
 

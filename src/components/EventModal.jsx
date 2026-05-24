@@ -120,9 +120,9 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
   const [supervisorSearch, setSupervisorSearch] = useState("");
   const [isSupervisorDropdownOpen, setIsSupervisorDropdownOpen] = useState(false);
 
-  // Ocultar dinámicamente según Tipo de Evento
-  const showSetupField = eventType !== "Anfitrionas" && eventType !== "Promotoría" && eventType !== "Otro";
-  const showSupervisorField = eventType !== "Anfitrionas" && eventType !== "Promotoría";
+  // Ocultar dinámicamente según Tipo de Evento (Siempre visibles por requerimiento del administrador)
+  const showSetupField = true;
+  const showSupervisorField = true;
 
   useEffect(() => {
     const fetchStaff = async () => {
