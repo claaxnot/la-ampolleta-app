@@ -1,110 +1,9 @@
--- =====================================================================
--- MIGRACIÓN DE SUPABASE: SISTEMA DE CONTROL DE INGRESO Y SALIDA (ASISTENCIA)
--- =====================================================================
+-- ====================================================================
+-- PARCHE DE SEGURIDAD SUPABASE: Asistencia (Check-In & Check-Out)
+-- Ejecuta este script completo en el Editor SQL de Supabase
+-- ====================================================================
 
--- 1. Agregar columnas de habilitación en tabla events si no existen
-ALTER TABLE public.events 
-ADD COLUMN IF NOT EXISTS attendance_control_enabled BOOLEAN DEFAULT FALSE NOT NULL;
-
--- Ajuste 1: Flag configurable para exigir asignación confirmada (por defecto TRUE)
-ALTER TABLE public.events
-ADD COLUMN IF NOT EXISTS attendance_require_confirmed BOOLEAN DEFAULT TRUE NOT NULL;
-
--- 2. Crear tabla de logs de asistencia
-CREATE TABLE IF NOT EXISTS public.event_attendance_logs (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    event_id UUID NOT NULL REFERENCES public.events(id) ON DELETE CASCADE,
-    worker_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
-    assignment_id UUID REFERENCES public.event_assignments(id) ON DELETE CASCADE,
-    check_in_at TIMESTAMP WITH TIME ZONE,
-    check_out_at TIMESTAMP WITH TIME ZONE,
-    check_in_source TEXT DEFAULT 'worker_portal' NOT NULL,
-    check_out_source TEXT DEFAULT 'worker_portal' NOT NULL,
-    check_in_note TEXT,
-    check_out_note TEXT,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
-    
-    -- Ajuste 2: Campos de auditoría y corrección administrativa manual
-    verified_by_admin BOOLEAN DEFAULT FALSE NOT NULL,
-    admin_adjusted_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
-    admin_adjustment_notes TEXT,
-    original_check_in_at TIMESTAMP WITH TIME ZONE,
-    original_check_out_at TIMESTAMP WITH TIME ZONE,
-    
-    -- Ajuste 3: Campos financieros y métricas de jornada
-    is_complete BOOLEAN DEFAULT FALSE NOT NULL,
-    total_duration_minutes INTEGER DEFAULT 0 NOT NULL,
-    
-    -- Restricción única: un registro por trabajador por evento
-    CONSTRAINT event_attendance_logs_worker_event_unique UNIQUE (event_id, worker_id)
-);
-
--- 3. Habilitar RLS (Row Level Security)
-ALTER TABLE public.event_attendance_logs ENABLE ROW LEVEL SECURITY;
-
--- 4. Eliminar políticas existentes (evita duplicados al re-ejecutar)
-DROP POLICY IF EXISTS "Workers can view own attendance logs" ON public.event_attendance_logs;
-DROP POLICY IF EXISTS "Admins can view all attendance logs" ON public.event_attendance_logs;
-DROP POLICY IF EXISTS "Admins can update attendance logs for corrections" ON public.event_attendance_logs;
-DROP POLICY IF EXISTS "Admins can insert attendance logs for manual registrations" ON public.event_attendance_logs;
-
--- 5. Crear políticas de visualización (SELECT)
--- A. Trabajadores ven solo su propia asistencia
-CREATE POLICY "Workers can view own attendance logs"
-ON public.event_attendance_logs
-FOR SELECT
-TO authenticated
-USING (auth.uid() = worker_id);
-
--- B. Admins, Supervisores y Coordinadores ven toda la asistencia
-CREATE POLICY "Admins can view all attendance logs"
-ON public.event_attendance_logs
-FOR SELECT
-TO authenticated
-USING (
-  EXISTS (
-    SELECT 1 FROM public.profiles 
-    WHERE id = auth.uid() AND (system_role = 'admin' OR role = 'Admin' OR role = 'Supervisor' OR role = 'Coordinador')
-  )
-);
-
--- C. Ajuste 2: Admins/Supervisores/Coordinadores pueden actualizar para correcciones manuales
-CREATE POLICY "Admins can update attendance logs for corrections"
-ON public.event_attendance_logs
-FOR UPDATE
-TO authenticated
-USING (
-  EXISTS (
-    SELECT 1 FROM public.profiles 
-    WHERE id = auth.uid() AND (system_role = 'admin' OR role = 'Admin' OR role = 'Supervisor' OR role = 'Coordinador')
-  )
-)
-WITH CHECK (
-  EXISTS (
-    SELECT 1 FROM public.profiles 
-    WHERE id = auth.uid() AND (system_role = 'admin' OR role = 'Admin' OR role = 'Supervisor' OR role = 'Coordinador')
-  )
-);
-
--- D. Admins/Supervisores/Coordinadores pueden insertar registros para asistencia manual
-CREATE POLICY "Admins can insert attendance logs for manual registrations"
-ON public.event_attendance_logs
-FOR INSERT
-TO authenticated
-WITH CHECK (
-  EXISTS (
-    SELECT 1 FROM public.profiles 
-    WHERE id = auth.uid() AND (system_role = 'admin' OR role = 'Admin' OR role = 'Supervisor' OR role = 'Coordinador')
-  )
-);
-
-
--- =====================================================================
--- FUNCIONES SEGURAS (RPC) - SECURITY DEFINER
--- =====================================================================
-
--- Función 1: Registrar Entrada (Check-In)
+-- 1. Re-crear Función 1: Registrar Entrada (Check-In)
 CREATE OR REPLACE FUNCTION public.mark_event_check_in(p_event_id UUID, p_assignment_id UUID)
 RETURNS public.event_attendance_logs
 LANGUAGE plpgsql
@@ -134,7 +33,7 @@ BEGIN
     RAISE EXCEPTION 'El control de asistencia no está habilitado para este evento.';
   END IF;
 
-  -- 3. Obtener el estado de la asignación de la trabajadora
+  -- 3. Obtener el estado de la asignación de la trabajadora (Filtro estricto por v_user_id)
   SELECT status INTO v_assigned_status
   FROM public.event_assignments
   WHERE id = p_assignment_id AND event_id = p_event_id AND staff_id = v_user_id;
@@ -186,7 +85,7 @@ BEGIN
 END;
 $$;
 
--- Función 2: Registrar Salida (Check-Out)
+-- 2. Re-crear Función 2: Registrar Salida (Check-Out)
 CREATE OR REPLACE FUNCTION public.mark_event_check_out(p_event_id UUID, p_assignment_id UUID)
 RETURNS public.event_attendance_logs
 LANGUAGE plpgsql
@@ -215,7 +114,7 @@ BEGIN
     RAISE EXCEPTION 'El control de asistencia no está habilitado para este evento.';
   END IF;
 
-  -- 3. Validar asignación
+  -- 3. Validar asignación (Filtro estricto por v_user_id)
   SELECT status INTO v_assigned_status
   FROM public.event_assignments
   WHERE id = p_assignment_id AND event_id = p_event_id AND staff_id = v_user_id;
@@ -259,12 +158,7 @@ BEGIN
 END;
 $$;
 
-
--- =====================================================================
--- ENDURECIMIENTO DE ACCESOS Y ROLES
--- =====================================================================
-
--- Revocar permisos de ejecución a accesos públicos y anónimos (Warning 0029)
+-- 3. Asegurar los privilegios de ejecución estrictos para PostgREST
 REVOKE ALL ON FUNCTION public.mark_event_check_in(UUID, UUID) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.mark_event_check_in(UUID, UUID) FROM anon;
 GRANT EXECUTE ON FUNCTION public.mark_event_check_in(UUID, UUID) TO authenticated;

@@ -116,6 +116,7 @@
 - [x] **Ocultación de Boletas de Períodos Futuros (Tablero del Trabajador):** Restringir visualmente en el portal del trabajador la tarjeta consolidada de boletas de meses que no han comenzado, mostrando solo el mes actual y meses pasados pendientes de pago.
 - [x] **Foco Predeterminado de Viáticos en Pendientes:** Configurar la pestaña de Viáticos y Reembolsos para mostrar por defecto las solicitudes en estado `"Pendiente"`, permitiendo una toma de decisiones y aprobaciones administrativas inmediatas.
 
-
-
-
+## 12. Endurecimiento de Seguridad y Rendimiento Supabase (Advisor Hardening)
+- [x] **Parche de Seguridad en Autenticación:** Aplicar `SECURITY DEFINER` e inyección segura con `search_path = ''` y llamadas cualificadas a `public.handle_new_user` y `public.sync_user_confirmation`, restringiendo los privilegios RPC.
+- [x] **Parche de Seguridad en Asistencia:** Aplicar `SET search_path = ''` y llamadas de catálogo a `public.mark_event_check_in` y `public.mark_event_check_out`, bloqueando accesos anónimos e inyectando `pg_catalog.now()` AT TIME ZONE 'UTC'.
+- [x] **Parche de Rendimiento RLS (InitPlan Caching):** Resolver alerta de inicialización de RLS en `public.profiles` reemplazando la llamada directa `auth.uid()` por la subconsulta optimizada `(SELECT auth.uid()) IS NOT NULL` en la política `"Enable read access for all authenticated users"`.
