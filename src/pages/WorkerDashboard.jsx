@@ -32,7 +32,9 @@ import {
   FileText,
   Upload,
   Plus,
-  Eye
+  Eye,
+  Layers,
+  ShieldCheck
 } from "lucide-react";
 import GlassCard from "../components/GlassCard.jsx";
 import { supabase } from "../lib/supabase.js";
@@ -93,6 +95,10 @@ export default function WorkerDashboard({ user }) {
 
   // Estado del Clima en tiempo real por Geolocalización IP / Open-Meteo
   const [weatherData, setWeatherData] = useState({ temp: 18, city: "Santiago", icon: "sun" });
+
+  // Control de Boletas por Trabajador (Lotes V3)
+  const [workerInvoiceBatches, setWorkerInvoiceBatches] = useState([]);
+  const [retentionRateSetting, setRetentionRateSetting] = useState(15.25);
 
   useEffect(() => {
     const fetchWeather = async () => {
@@ -402,6 +408,13 @@ export default function WorkerDashboard({ user }) {
       fetchMyEvents(user.id);
       fetchMyAvailability(user.id);
       fetchExpenses();
+
+      // Cargar configuraciones de retención (V3)
+      supabase.from("app_settings").select("*").eq("key", "honorarios_retention_rate").single().then(({ data }) => {
+        if (data && data.value && data.value.rate !== undefined) {
+          setRetentionRateSetting(parseFloat(data.value.rate));
+        }
+      });
 
       // Cargar perfil real del trabajador
       supabase.from('profiles').select('*').eq('id', user.id).single().then(({ data }) => {
@@ -763,10 +776,31 @@ export default function WorkerDashboard({ user }) {
         .filter(e => e.status?.toLowerCase() !== "cancelado" && e.status?.toLowerCase() !== "cancelled");
         
       setAssignedEvents(formattedEvents);
+      fetchMyInvoiceBatches(workerId);
       fetchMyDbNotifications(workerId, formattedEvents);
       await fetchAttendanceLogs(workerId);
     }
     setIsLoading(false);
+  };
+
+  const fetchMyInvoiceBatches = async (workerId) => {
+    try {
+      const { data, error } = await supabase
+        .from("worker_invoice_batches")
+        .select(`
+          *,
+          profiles:invoice_verified_by (
+            name
+          )
+        `)
+        .eq("worker_id", workerId);
+
+      if (data) {
+        setWorkerInvoiceBatches(data);
+      }
+    } catch (err) {
+      console.warn("⚠️ [BATCHES]: No se pudieron cargar los lotes del trabajador.", err);
+    }
   };
 
   const fetchExpenses = async () => {
@@ -1979,6 +2013,167 @@ export default function WorkerDashboard({ user }) {
                   </GlassCard>
                 </motion.div>
 
+                {/* CONTROL DE BOLETAS POR LOTES (SII LOTES V3) */}
+                <motion.div variants={itemVariants} className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                        <Layers className="w-5 h-5 text-amber-400" />
+                        Control de Boletas SII (Lotes de Validación Consolidada V3)
+                      </h3>
+                      <p className="text-xs text-gray-400">
+                        Administración agrupa tus eventos completados en un solo período para validación ágil y transferencias masivas.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Tarjeta 1: Lote Pendiente / Proyección de Boleta */}
+                    {(() => {
+                      const pendingCompletedEvents = filteredCompletedEvents.filter(e => e.invoice_required && !e.invoice_received);
+                      const pendingLiquidTotal = pendingCompletedEvents.reduce((sum, e) => {
+                        const rate = e.custom_rate ? parseFloat(e.custom_rate) : baselineRate;
+                        return sum + rate;
+                      }, 0);
+
+                      if (pendingLiquidTotal === 0) {
+                        return (
+                          <GlassCard className="p-6 border border-white/5 flex flex-col justify-center items-center text-center">
+                            <div className="w-12 h-12 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-400 mb-3 border border-emerald-500/20">
+                              <ShieldCheck className="w-6 h-6" />
+                            </div>
+                            <h4 className="text-sm font-bold text-white">¡Al día con tus boletas!</h4>
+                            <p className="text-xs text-gray-400 max-w-xs mt-1 leading-relaxed">
+                              No tienes eventos completados pendientes de emitir boleta de honorarios en este período.
+                            </p>
+                          </GlassCard>
+                        );
+                      }
+
+                      const pendingRate = parseFloat(retentionRateSetting || 15.25);
+                      const pendingGrossExpected = Math.round(pendingLiquidTotal / (1 - (pendingRate / 100)));
+                      const pendingRetentionEstimated = pendingGrossExpected - pendingLiquidTotal;
+
+                      return (
+                        <GlassCard className="p-6 border border-amber-500/20 relative overflow-hidden bg-gradient-to-br from-amber-500/[0.03] to-transparent shadow-[0_0_24px_rgba(245,158,11,0.02)]">
+                          <div className="absolute top-0 right-0 p-4">
+                            <span className="px-2.5 py-1 rounded bg-amber-500/15 border border-amber-500/30 text-amber-300 text-3xs font-black uppercase tracking-wider animate-pulse flex items-center gap-1">
+                              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping" />
+                              Próxima Boleta
+                            </span>
+                          </div>
+
+                          <h4 className="text-sm font-black text-amber-300 flex items-center gap-1.5 mb-1.5 uppercase tracking-wider">
+                            Lote Pendiente Proyectado
+                          </h4>
+                          <p className="text-2xs text-gray-400 mb-4 leading-relaxed">
+                            Monto calculado para emitir una única boleta de honorarios cubriendo los <b>{pendingCompletedEvents.length} eventos</b> pendientes.
+                          </p>
+
+                          <div className="grid grid-cols-3 gap-2 bg-gray-950/60 p-3 rounded-xl border border-white/5 mb-4 font-mono">
+                            <div className="text-center border-r border-white/5">
+                              <p className="text-3xs text-gray-500 font-bold uppercase tracking-wider">Total Líquido</p>
+                              <p className="text-xs font-black text-white mt-0.5">${pendingLiquidTotal.toLocaleString("es-CL")}</p>
+                            </div>
+                            <div className="text-center border-r border-white/5">
+                              <p className="text-3xs text-gray-500 font-bold uppercase tracking-wider">Retención SII ({pendingRate}%)</p>
+                              <p className="text-xs font-black text-gray-400 mt-0.5">${pendingRetentionEstimated.toLocaleString("es-CL")}</p>
+                            </div>
+                            <div className="text-center">
+                              <p className="text-3xs text-gray-400 font-bold uppercase tracking-wider">Bruto Esperado</p>
+                              <p className="text-xs font-black text-amber-400 mt-0.5">${pendingGrossExpected.toLocaleString("es-CL")}</p>
+                            </div>
+                          </div>
+
+                          <div className="bg-amber-500/10 border border-amber-500/20 p-3 rounded-xl text-3xs text-amber-200 leading-relaxed space-y-1">
+                            <p className="font-extrabold flex items-center gap-1">
+                              💡 Instrucciones de Emisión SII:
+                            </p>
+                            <p>
+                              1. Emite <b>una sola boleta de honorarios</b> en el portal del SII por el monto bruto proyectado exacto de <b className="text-amber-300 font-extrabold font-mono">${pendingGrossExpected.toLocaleString("es-CL")}</b>.
+                            </p>
+                            <p>
+                              2. Envíala en PDF a <span className="text-white underline font-semibold">contacto@laampolleta.tv</span> indicando tu número de boleta.
+                            </p>
+                            <p>
+                              3. Al validarla, administración liberará todo el lote para la transferencia masiva mas cercana.
+                            </p>
+                          </div>
+                        </GlassCard>
+                      );
+                    })()}
+
+                    {/* Tarjeta 2: Lote Activo Verificado / Historial */}
+                    {(() => {
+                      const activeBatch = workerInvoiceBatches && workerInvoiceBatches.find(b => b.status === 'verified');
+
+                      if (!activeBatch) {
+                        return (
+                          <GlassCard className="p-6 border border-white/5 flex flex-col justify-center items-center text-center">
+                            <div className="w-12 h-12 rounded-full bg-gray-800 flex items-center justify-center text-gray-500 mb-3 border border-white/10">
+                              <Layers className="w-6 h-6" />
+                            </div>
+                            <h4 className="text-sm font-bold text-gray-400">Sin lotes validados activos</h4>
+                            <p className="text-xs text-gray-500 max-w-xs mt-1 leading-relaxed">
+                              Una vez que envíes tu boleta consolidada, administración validará tu lote y lo verás aquí como habilitado para pago.
+                            </p>
+                          </GlassCard>
+                        );
+                      }
+
+                      const verifierName = activeBatch.profiles?.name || "Administración";
+
+                      return (
+                        <GlassCard className="p-6 border border-emerald-500/20 relative overflow-hidden bg-gradient-to-br from-emerald-500/[0.03] to-transparent shadow-[0_0_24px_rgba(16,185,129,0.02)]">
+                          <div className="absolute top-0 right-0 p-4">
+                            <span className="px-2.5 py-1 rounded bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-3xs font-black uppercase tracking-wider flex items-center gap-1">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                              Verificado (Lote V3)
+                            </span>
+                          </div>
+
+                          <h4 className="text-sm font-black text-emerald-300 flex items-center gap-1.5 mb-1.5 uppercase tracking-wider">
+                            Lote Habilitado para Pago
+                          </h4>
+                          <p className="text-2xs text-gray-400 mb-4 leading-relaxed">
+                            Boleta consolidada recibida y cotejada con éxito. Tus pagos asociados están autorizados.
+                          </p>
+
+                          <div className="grid grid-cols-2 gap-4 mb-4">
+                            <div className="bg-gray-950/60 p-2.5 rounded-lg border border-white/5 font-mono">
+                              <p className="text-3xs text-gray-500 font-bold uppercase">Boleta Recibida</p>
+                              <p className="text-xs font-black text-white mt-0.5">Nº {activeBatch.invoice_number}</p>
+                              <p className="text-3xs text-gray-400 mt-0.5">${parseFloat(activeBatch.invoice_amount || 0).toLocaleString("es-CL")}</p>
+                            </div>
+                            <div className="bg-gray-950/60 p-2.5 rounded-lg border border-white/5 font-mono">
+                              <p className="text-3xs text-gray-500 font-bold uppercase">Líquido a Transferir</p>
+                              <p className="text-xs font-black text-emerald-400 mt-0.5">${parseFloat(activeBatch.total_liquid_amount || 0).toLocaleString("es-CL")}</p>
+                              <p className="text-3xs text-gray-400 mt-0.5">Bruto: ${parseFloat(activeBatch.expected_gross_amount || 0).toLocaleString("es-CL")}</p>
+                            </div>
+                          </div>
+
+                          <div className="bg-gray-900/60 border border-white/5 p-3 rounded-xl space-y-1 text-3xs text-gray-300">
+                            <div className="flex justify-between border-b border-white/5 pb-1">
+                              <span className="text-gray-500">Verificado Por:</span>
+                              <span className="font-bold text-gray-200">{verifierName}</span>
+                            </div>
+                            <div className="flex justify-between border-b border-white/5 pb-1 pt-1">
+                              <span className="text-gray-500">Fecha de Validación:</span>
+                              <span className="font-bold text-gray-200">{activeBatch.invoice_received_at ? new Date(activeBatch.invoice_received_at).toLocaleDateString("es-CL") : "N/A"}</span>
+                            </div>
+                            {activeBatch.invoice_notes && (
+                              <div className="pt-1">
+                                <span className="text-gray-500 block">Detalles / Nota:</span>
+                                <span className="font-medium text-amber-300 italic">"{activeBatch.invoice_notes}"</span>
+                              </div>
+                            )}
+                          </div>
+                        </GlassCard>
+                      );
+                    })()}
+                  </div>
+                </motion.div>
+
                 {/* Layout Dos Columnas */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                   {/* Columna Izquierda: Historial de Pagos */}
@@ -2020,8 +2215,8 @@ export default function WorkerDashboard({ user }) {
                                     <td className="py-3.5 px-4 text-center">
                                       {event.invoice_required ? (
                                         event.invoice_received ? (
-                                          <span className="px-2.5 py-1 rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-2xs font-extrabold" title={event.invoice_received_at ? `Validada el ${new Date(event.invoice_received_at).toLocaleDateString("es-CL")}` : ""}>
-                                            🟢 Nº {event.invoice_number}
+                                          <span className="px-2.5 py-1 rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-2xs font-extrabold" title={event.invoice_received_at ? `Validada en lote el ${new Date(event.invoice_received_at).toLocaleDateString("es-CL")}` : ""}>
+                                            🟢 Lote Nº {event.invoice_number}
                                           </span>
                                         ) : (
                                           <div className="flex flex-col items-center gap-0.5 justify-center">

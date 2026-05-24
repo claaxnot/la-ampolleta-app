@@ -96,6 +96,11 @@ export default function Finanzas() {
   const [isSubmittingInvoice, setIsSubmittingInvoice] = useState(false);
   const [invoiceFormConfirmDifference, setInvoiceFormConfirmDifference] = useState(false);
 
+  // Estados de Gestión de Boletas Agrupadas (Versión 3)
+  const [invoiceBatches, setInvoiceBatches] = useState([]);
+  const [invoiceBatchItems, setInvoiceBatchItems] = useState([]);
+  const [selectedWorkerGroup, setSelectedWorkerGroup] = useState(null); // Para abrir el modal de validación agrupado
+
   // Estados de Configuración de Retención y Tolerancia (SII V2)
   const [retentionRateSetting, setRetentionRateSetting] = useState(15.25);
   const [toleranceSetting, setToleranceSetting] = useState(10);
@@ -107,6 +112,92 @@ export default function Finanzas() {
   const toggleRevealAccount = (id) => {
     setRevealedAccounts(prev => ({ ...prev, [id]: !prev[id] }));
   };
+
+  // React.useMemo: Agrupar pagos de eventos pendientes por trabajador (Versión 3)
+  const workerInvoiceGroups = React.useMemo(() => {
+    const pendingEvents = payments.filter(p => !p.is_expense && p.status !== "Pagado");
+
+    const groups = {};
+    pendingEvents.forEach(p => {
+      const rutKey = p.staff_rut || p.staff_id;
+      if (!rutKey) return;
+
+      if (!groups[rutKey]) {
+        groups[rutKey] = {
+          staff_id: p.staff_id,
+          staff_name: p.staff_name,
+          staff_rut: p.staff_rut,
+          staff_email: p.staff_email,
+          payments: [],
+          total_liquid: 0,
+          invoice_required: false
+        };
+      }
+      
+      groups[rutKey].payments.push(p);
+      groups[rutKey].total_liquid += parseFloat(p.monto) || 0;
+      if (p.invoice_required) {
+        groups[rutKey].invoice_required = true;
+      }
+    });
+
+    return Object.values(groups).map(g => {
+      const rate = parseFloat(retentionRateSetting || 15.25);
+      const brutoEsperado = Math.round(g.total_liquid / (1 - (rate / 100)));
+      const retencionEstimada = brutoEsperado - g.total_liquid;
+
+      const requiredPayments = g.payments.filter(p => p.invoice_required);
+      const allReceived = requiredPayments.length > 0 && requiredPayments.every(p => p.invoice_received);
+      const someReceived = requiredPayments.some(p => p.invoice_received);
+
+      let batchStatus = "pending"; 
+      let activeBatch = null;
+
+      if (!g.invoice_required) {
+        batchStatus = "none";
+      } else if (allReceived) {
+        batchStatus = "verified";
+        const invoiceNum = requiredPayments.find(p => p.invoice_number)?.invoice_number || "";
+        const verificadoPor = requiredPayments.find(p => p.invoice_verified_by_name)?.invoice_verified_by_name || "Admin";
+        const fechaVal = requiredPayments.find(p => p.invoice_received_at)?.invoice_received_at || "";
+        const notes = requiredPayments.find(p => p.invoice_notes)?.invoice_notes || "";
+        const amount = requiredPayments.reduce((sum, p) => sum + (p.invoice_amount || 0), 0);
+        
+        activeBatch = {
+          invoice_number: invoiceNum,
+          invoice_amount: amount,
+          invoice_received_at: fechaVal,
+          invoice_verified_by_name: verificadoPor,
+          invoice_notes: notes
+        };
+      } else if (someReceived) {
+        batchStatus = "partial";
+      }
+
+      if (invoiceBatches && invoiceBatches.length > 0) {
+        const foundBatch = invoiceBatches.find(b => b.worker_id === g.staff_id && b.status === "verified");
+        if (foundBatch) {
+          batchStatus = "verified";
+          activeBatch = {
+            id: foundBatch.id,
+            invoice_number: foundBatch.invoice_number,
+            invoice_amount: foundBatch.invoice_amount,
+            invoice_received_at: foundBatch.invoice_received_at,
+            invoice_verified_by_name: "Admin",
+            invoice_notes: foundBatch.invoice_notes
+          };
+        }
+      }
+
+      return {
+        ...g,
+        expected_gross: brutoEsperado,
+        estimated_retention: retencionEstimada,
+        batchStatus,
+        activeBatch
+      };
+    });
+  }, [payments, retentionRateSetting, invoiceBatches]);
 
   const handleToggleInvoiceRequired = async (assignmentId, currentValue) => {
     const loadingToast = toast.loading("Actualizando requerimiento de boleta...");
@@ -144,7 +235,7 @@ export default function Finanzas() {
 
   const handleSaveInvoice = async (e) => {
     e.preventDefault();
-    if (!selectedInvoicePayment) return;
+    if (!selectedInvoicePayment && !selectedWorkerGroup) return;
 
     if (!invoiceFormNum.trim()) {
       toast.error("Por favor ingresa el número de la boleta.");
@@ -166,7 +257,10 @@ export default function Finanzas() {
 
     // Failsafe V2: Validar diferencia contra tolerancia
     const rateVal = parseFloat(retentionRateSetting || 15.25);
-    const liquidoVal = parseFloat(selectedInvoicePayment.monto) || 0;
+    const liquidoVal = selectedInvoicePayment
+      ? (parseFloat(selectedInvoicePayment.monto) || 0)
+      : (parseFloat(selectedWorkerGroup.total_liquid) || 0);
+
     const brutoEsperado = Math.round(liquidoVal / (1 - (rateVal / 100)));
     const difference = Math.abs(cleanAmount - brutoEsperado);
     const hasDifference = difference > toleranceSetting;
@@ -185,26 +279,92 @@ export default function Finanzas() {
     setIsSubmittingInvoice(true);
     const loadingToast = toast.loading("Verificando boleta...");
     try {
-      // Obtener el ID del administrador actual de la sesión
       const { data: { user } } = await supabase.auth.getUser();
+      const verifierId = user?.id || null;
+      const invoiceNum = invoiceFormNum.trim();
+      const receivedAt = new Date(invoiceFormDate + "T12:00:00").toISOString();
+      const notes = invoiceFormNotes.trim();
 
-      const { error } = await supabase
-        .from("event_assignments")
-        .update({
-          invoice_received: true,
-          invoice_number: invoiceFormNum.trim(),
-          invoice_received_at: new Date(invoiceFormDate + "T12:00:00").toISOString(),
-          invoice_amount: cleanAmount,
-          invoice_verified_by: user?.id || null,
-          invoice_notes: invoiceFormNotes.trim()
-        })
-        .eq("id", selectedInvoicePayment.id);
+      if (selectedWorkerGroup) {
+        // --- CASO 1: Validación Agrupada por Trabajador (V3) ---
+        const workerId = selectedWorkerGroup.staff_id;
 
-      if (error) throw error;
+        // A. Insertar el lote en worker_invoice_batches
+        const { data: newBatch, error: batchError } = await supabase
+          .from("worker_invoice_batches")
+          .insert({
+            worker_id: workerId,
+            period_label: new Date().toISOString().substring(0, 7),
+            total_liquid_amount: liquidoVal,
+            retention_rate: rateVal,
+            expected_gross_amount: brutoEsperado,
+            estimated_retention: brutoEsperado - liquidoVal,
+            invoice_number: invoiceNum,
+            invoice_amount: cleanAmount,
+            invoice_received_at: receivedAt,
+            invoice_verified_by: verifierId,
+            invoice_notes: notes,
+            status: 'verified'
+          })
+          .select()
+          .single();
 
-      toast.success("¡Boleta verificada con éxito! Pago desbloqueado.", { id: loadingToast });
+        if (batchError) throw batchError;
+
+        // B. Insertar relaciones en worker_invoice_batch_items
+        const batchItems = selectedWorkerGroup.payments.map(p => ({
+          batch_id: newBatch.id,
+          assignment_id: p.id,
+          liquid_amount: parseFloat(p.monto) || 0
+        }));
+
+        const { error: itemsError } = await supabase
+          .from("worker_invoice_batch_items")
+          .insert(batchItems);
+
+        if (itemsError) throw itemsError;
+
+        // C. Sincronizar individualmente las asignaciones legacy para compatibilidad
+        for (const p of selectedWorkerGroup.payments) {
+          const propRatio = (parseFloat(p.monto) || 0) / liquidoVal;
+          const propAmount = Math.round(cleanAmount * propRatio);
+
+          const { error: syncError } = await supabase
+            .from("event_assignments")
+            .update({
+              invoice_received: true,
+              invoice_number: invoiceNum,
+              invoice_received_at: receivedAt,
+              invoice_amount: propAmount,
+              invoice_verified_by: verifierId,
+              invoice_notes: notes
+            })
+            .eq("id", p.id);
+
+          if (syncError) throw syncError;
+        }
+
+      } else {
+        // --- CASO 2: Validación Legacy Individual ---
+        const { error } = await supabase
+          .from("event_assignments")
+          .update({
+            invoice_received: true,
+            invoice_number: invoiceNum,
+            invoice_received_at: receivedAt,
+            invoice_amount: cleanAmount,
+            invoice_verified_by: verifierId,
+            invoice_notes: notes
+          })
+          .eq("id", selectedInvoicePayment.id);
+
+        if (error) throw error;
+      }
+
+      toast.success("¡Boleta verificada con éxito! Pagos liberados.", { id: loadingToast });
       setShowInvoiceModal(false);
       setSelectedInvoicePayment(null);
+      setSelectedWorkerGroup(null);
       fetchPayments();
     } catch (err) {
       console.error("Error verifying invoice:", err);
@@ -236,6 +396,58 @@ export default function Finanzas() {
     } catch (err) {
       console.error("Error undoing invoice verification:", err);
       toast.error("Error al deshacer la verificación.", { id: loadingToast });
+    }
+  };
+
+  const handleOpenWorkerInvoiceModal = (group) => {
+    setSelectedWorkerGroup(group);
+    setSelectedInvoicePayment(null);
+    setInvoiceFormNum("");
+    setInvoiceFormDate(new Date().toISOString().split("T")[0]);
+
+    const rate = parseFloat(retentionRateSetting || 15.25) / 100;
+    const brutoSugerido = Math.round(group.total_liquid / (1 - rate));
+    setInvoiceFormAmount(String(brutoSugerido));
+    setInvoiceFormNotes("");
+    setInvoiceFormConfirmEmail(false);
+    setInvoiceFormConfirmDifference(false);
+    setShowInvoiceModal(true);
+  };
+
+  const handleUndoWorkerInvoice = async (group) => {
+    if (!window.confirm(`¿Estás seguro de que deseas deshacer la verificación de la boleta de ${group.staff_name}? Esto volverá a bloquear todos sus pagos.`)) return;
+    const loadingToast = toast.loading("Deshaciendo verificación de lote...");
+    try {
+      const { error: deleteError } = await supabase
+        .from("worker_invoice_batches")
+        .delete()
+        .eq("worker_id", group.staff_id)
+        .eq("status", "verified");
+
+      if (deleteError) throw deleteError;
+
+      const assignmentIds = group.payments.map(p => p.id);
+      if (assignmentIds.length > 0) {
+        const { error: updateError } = await supabase
+          .from("event_assignments")
+          .update({
+            invoice_received: false,
+            invoice_number: null,
+            invoice_received_at: null,
+            invoice_amount: null,
+            invoice_verified_by: null,
+            invoice_notes: null
+          })
+          .in("id", assignmentIds);
+
+        if (updateError) throw updateError;
+      }
+
+      toast.success("Verificación de lote deshecha correctamente.", { id: loadingToast });
+      fetchPayments();
+    } catch (err) {
+      console.error("Error reverting worker invoice batch:", err);
+      toast.error("Error al deshacer la verificación del lote.", { id: loadingToast });
     }
   };
 
@@ -372,6 +584,21 @@ export default function Finanzas() {
         }
       } catch (errSettings) {
         console.warn("⚠️ [APP_SETTINGS]: No se pudieron cargar las configuraciones de BD, usando fallbacks.", errSettings);
+      }
+
+      // Cargar lotes de boletas agrupadas (V3)
+      try {
+        const { data: dbBatches } = await supabase
+          .from("worker_invoice_batches")
+          .select("*");
+        setInvoiceBatches(dbBatches || []);
+
+        const { data: dbBatchItems } = await supabase
+          .from("worker_invoice_batch_items")
+          .select("*");
+        setInvoiceBatchItems(dbBatchItems || []);
+      } catch (errBatches) {
+        console.warn("⚠️ [BATCHES]: No se pudieron cargar los lotes de boletas agrupadas de la BD.", errBatches);
       }
 
       // Intentamos traer las asignaciones con los datos del perfil y del evento
@@ -821,12 +1048,20 @@ export default function Finanzas() {
     try {
       const selectedPayments = payments.filter(p => selectedIds.includes(p.id));
 
-      const selectedEventPayments = selectedPayments.filter(p => !p.is_expense);
-      const selectedExpensePayments = selectedPayments.filter(p => p.is_expense);
+      // Filtro de seguridad (V3): Si requiere boleta y no ha sido recibida, NO se incluye en el pago/transferencia
+      const eligiblePayments = selectedPayments.filter(p => {
+        if (p.is_expense) return true;
+        if (!p.invoice_required) return true;
+        return p.invoice_received === true;
+      });
 
-      // 1. HOJA 1: RESUMEN DE TRANSFERENCIAS (Agrupar y sumar todos los montos)
+      const selectedEventPayments = selectedPayments.filter(p => !p.is_expense);
+      const eligibleEventPayments = eligiblePayments.filter(p => !p.is_expense);
+      const eligibleExpensePayments = eligiblePayments.filter(p => p.is_expense);
+
+      // 1. HOJA 1: RESUMEN DE TRANSFERENCIAS (Agrupar y sumar todos los montos elegibles)
       const grouped = {};
-      selectedPayments.forEach(p => {
+      eligiblePayments.forEach(p => {
         const key = p.staff_rut || p.staff_id;
         if (!grouped[key]) {
           grouped[key] = {
@@ -865,8 +1100,8 @@ export default function Finanzas() {
         };
       });
 
-      // 2. HOJA 2: DESGLOSE COMPLETO POR EVENTO (Solo eventos, manteniendo Rol Staff)
-      const dataDesglose = selectedEventPayments.map(p => ({
+      // 2. HOJA 2: DESGLOSE COMPLETO POR EVENTO (Solo eventos elegibles, manteniendo compatibilidad)
+      const dataDesglose = eligibleEventPayments.map(p => ({
         "Nombre Staff": p.staff_name,
         "RUT Staff": p.staff_rut,
         "Correo": p.staff_email,
@@ -881,8 +1116,8 @@ export default function Finanzas() {
         "Mensaje": p.mensaje_beneficiario || ""
       }));
 
-      // 3. HOJA 3: DETALLE VIÁTICOS (Generación de enlaces de comprobantes válidos por 7 días)
-      const selectedExpenseIds = selectedExpensePayments.map(p => p.expense_id);
+      // 3. HOJA 3: DETALLE VIÁTICOS
+      const selectedExpenseIds = eligibleExpensePayments.map(p => p.expense_id);
       const matchingExpenses = expenses.filter(e => selectedExpenseIds.includes(e.id));
 
       const expensesWithUrls = await Promise.all(
@@ -920,9 +1155,92 @@ export default function Finanzas() {
         "Comprobante (Enlace Seguro 7 días)": e.signedUrl
       }));
 
+      // 4. HOJA 4: AUDITORÍA BOLETAS (V3 - Lote por Trabajador)
+      const auditGroups = {};
+      selectedEventPayments.forEach(p => {
+        const key = p.staff_rut || p.staff_id;
+        if (!key) return;
+        if (!auditGroups[key]) {
+          auditGroups[key] = {
+            staff_name: p.staff_name,
+            staff_rut: p.staff_rut,
+            staff_email: p.staff_email,
+            events_count: 0,
+            total_liquid: 0,
+            invoice_required: false,
+            invoice_received: false,
+            invoice_number: "",
+            invoice_amount: 0,
+            invoice_received_at: "",
+            invoice_verified_by_name: "",
+            invoice_notes: ""
+          };
+        }
+        auditGroups[key].events_count += 1;
+        auditGroups[key].total_liquid += parseFloat(p.monto) || 0;
+        if (p.invoice_required) {
+          auditGroups[key].invoice_required = true;
+        }
+        if (p.invoice_received) {
+          auditGroups[key].invoice_received = true;
+          if (p.invoice_number) auditGroups[key].invoice_number = p.invoice_number;
+          auditGroups[key].invoice_amount += parseFloat(p.invoice_amount) || 0;
+          if (p.invoice_received_at) auditGroups[key].invoice_received_at = p.invoice_received_at;
+          if (p.invoice_verified_by_name) auditGroups[key].invoice_verified_by_name = p.invoice_verified_by_name;
+          if (p.invoice_notes) auditGroups[key].invoice_notes = p.invoice_notes;
+        }
+      });
+
+      const dataAuditoriaBoletas = Object.values(auditGroups).map(g => {
+        const rate = parseFloat(retentionRateSetting || 15.25);
+        const brutoEsperado = Math.round(g.total_liquid / (1 - (rate / 100)));
+        const retencionEstimada = brutoEsperado - g.total_liquid;
+        const difference = g.invoice_received ? (g.invoice_amount - brutoEsperado) : 0;
+
+        return {
+          "Trabajador": g.staff_name,
+          "RUT": g.staff_rut,
+          "Correo": g.staff_email,
+          "Cantidad Eventos": g.events_count,
+          "Total Líquido Pactado (CLP)": g.total_liquid,
+          "Requiere Boleta": g.invoice_required ? "Sí" : "No",
+          "Estado Boleta Lote": g.invoice_required ? (g.invoice_received ? "Verificada (Lote)" : "Falta Boleta") : "Exento",
+          "% Retención SII": g.invoice_required ? `${rate}%` : "N/A",
+          "Monto Bruto Esperado": g.invoice_required ? brutoEsperado : "N/A",
+          "Retención Estimada": g.invoice_required ? retencionEstimada : "N/A",
+          "Monto Boleta Recibido": g.invoice_required && g.invoice_received ? g.invoice_amount : "N/A",
+          "Diferencia": g.invoice_required && g.invoice_received ? difference : "N/A",
+          "Número Boleta Lote": g.invoice_number || "N/A",
+          "Fecha Recepción": g.invoice_received_at ? new Date(g.invoice_received_at).toLocaleDateString("es-CL") : "N/A",
+          "Verificado Por": g.invoice_verified_by_name || "N/A",
+          "Observación / Justificación": g.invoice_notes || ""
+        };
+      });
+
+      // 5. HOJA 5: DETALLE BOLETA EVENTOS (Trazabilidad completa)
+      const dataDetalleBoletaEventos = selectedEventPayments.map(p => {
+        const rate = parseFloat(retentionRateSetting || 15.25);
+        const brutoEsperado = Math.round(p.monto / (1 - (rate / 100)));
+        const retencionEstimada = brutoEsperado - p.monto;
+
+        return {
+          "Trabajador": p.staff_name,
+          "RUT": p.staff_rut,
+          "Evento": p.event_name,
+          "Fecha Evento": p.event_date,
+          "Monto Líquido (CLP)": p.monto,
+          "Requiere Boleta": p.invoice_required ? "Sí" : "No",
+          "Estado Boleta Evento": p.invoice_required ? (p.invoice_received ? "Cubierto por Lote" : "Pendiente") : "Exento",
+          "Bruto Proporcional": p.invoice_required ? brutoEsperado : "N/A",
+          "Retención Proporcional": p.invoice_required ? retencionEstimada : "N/A",
+          "Número Boleta Asociada": p.invoice_number || "N/A",
+          "Fecha Validación": p.invoice_received_at ? new Date(p.invoice_received_at).toLocaleDateString("es-CL") : "N/A"
+        };
+      });
+
       const workbook = XLSX.utils.book_new();
 
-      // Hoja 1
+      // Hojas
       const worksheetResumen = XLSX.utils.json_to_sheet(dataResumen);
       const maxColWidthsResumen = [];
       dataResumen.forEach(row => {
@@ -935,7 +1253,6 @@ export default function Finanzas() {
       worksheetResumen["!cols"] = maxColWidthsResumen.map(w => ({ wch: w }));
       XLSX.utils.book_append_sheet(workbook, worksheetResumen, "Resumen Transferencias");
 
-      // Hoja 2
       const worksheetDesglose = XLSX.utils.json_to_sheet(dataDesglose);
       const maxColWidthsDesglose = [];
       dataDesglose.forEach(row => {
@@ -948,7 +1265,6 @@ export default function Finanzas() {
       worksheetDesglose["!cols"] = maxColWidthsDesglose.map(w => ({ wch: w }));
       XLSX.utils.book_append_sheet(workbook, worksheetDesglose, "Detalle de Eventos");
 
-      // Hoja 3
       const worksheetViaticos = XLSX.utils.json_to_sheet(dataViaticos);
       const maxColWidthsViaticos = [];
       dataViaticos.forEach(row => {
@@ -961,35 +1277,6 @@ export default function Finanzas() {
       worksheetViaticos["!cols"] = maxColWidthsViaticos.map(w => ({ wch: w }));
       XLSX.utils.book_append_sheet(workbook, worksheetViaticos, "Detalle Viáticos");
 
-      // 4. HOJA 4: AUDITORÍA BOLETAS
-      const dataAuditoriaBoletas = selectedEventPayments.map(p => {
-        const rate = parseFloat(retentionRateSetting || 15.25);
-        const brutoEsperado = Math.round(p.monto / (1 - (rate / 100)));
-        const retencionEstimada = brutoEsperado - p.monto;
-        const montoRecibido = p.invoice_amount || 0;
-        const diferencia = p.invoice_received ? (montoRecibido - brutoEsperado) : 0;
-
-        return {
-          "Trabajador": p.staff_name,
-          "RUT": p.staff_rut,
-          "Correo": p.staff_email,
-          "Evento Relacionado": p.event_name,
-          "Fecha Evento": p.event_date,
-          "Honorario Líquido (CLP)": parseFloat(p.monto || 0),
-          "Requiere Boleta": p.invoice_required ? "Sí" : "No",
-          "Estado Boleta": p.invoice_required ? (p.invoice_received ? "Recibida" : "Falta Boleta") : "Exento",
-          "% Retención SII": p.invoice_required ? `${rate}%` : "N/A",
-          "Monto Bruto Esperado": p.invoice_required ? brutoEsperado : "N/A",
-          "Retención Estimada": p.invoice_required ? retencionEstimada : "N/A",
-          "Monto Boleta Recibido": p.invoice_required && p.invoice_received ? montoRecibido : "N/A",
-          "Diferencia": p.invoice_required && p.invoice_received ? diferencia : "N/A",
-          "Número Boleta": p.invoice_number || "N/A",
-          "Fecha Recepción": p.invoice_received_at ? new Date(p.invoice_received_at).toLocaleDateString("es-CL") : "N/A",
-          "Verificado Por": p.invoice_verified_by_name || "N/A",
-          "Observación / Justificación": p.invoice_notes || ""
-        };
-      });
-
       const worksheetAuditoria = XLSX.utils.json_to_sheet(dataAuditoriaBoletas);
       const maxColWidthsAuditoria = [];
       dataAuditoriaBoletas.forEach(row => {
@@ -1001,6 +1288,18 @@ export default function Finanzas() {
       });
       worksheetAuditoria["!cols"] = maxColWidthsAuditoria.map(w => ({ wch: w }));
       XLSX.utils.book_append_sheet(workbook, worksheetAuditoria, "Auditoría Boletas");
+
+      const worksheetDetalleBoletas = XLSX.utils.json_to_sheet(dataDetalleBoletaEventos);
+      const maxColWidthsDetalleBoletas = [];
+      dataDetalleBoletaEventos.forEach(row => {
+        Object.keys(row).forEach((key, colIndex) => {
+          const value = row[key] ? String(row[key]) : "";
+          const length = Math.max(value.length, key.length) + 3;
+          maxColWidthsDetalleBoletas[colIndex] = Math.max(maxColWidthsDetalleBoletas[colIndex] || 10, length);
+        });
+      });
+      worksheetDetalleBoletas["!cols"] = maxColWidthsDetalleBoletas.map(w => ({ wch: w }));
+      XLSX.utils.book_append_sheet(workbook, worksheetDetalleBoletas, "Detalle Boleta Eventos");
 
       const excelBuffer = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
       const blob = new Blob([excelBuffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
@@ -1015,7 +1314,7 @@ export default function Finanzas() {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
 
-      toast.success("¡Nómina de Excel de Pagos (4 Hojas) descargada con éxito!", { id: loadingToast });
+      toast.success("¡Nómina de Excel de Pagos (5 Hojas) descargada con éxito!", { id: loadingToast });
     } catch (error) {
       console.error("Error al exportar Excel:", error);
       toast.error(`Error al generar Excel: ${error.message || "Error desconocido"}`, { id: loadingToast });
@@ -1031,12 +1330,20 @@ export default function Finanzas() {
 
     const loadingToast = toast.loading("Generando reporte financiero filtrado...");
     try {
+      // Filtro de seguridad (V3): Si requiere boleta y no ha sido recibida, NO se incluye en el pago/transferencia
+      const eligiblePayments = filteredPayments.filter(p => {
+        if (p.is_expense) return true;
+        if (!p.invoice_required) return true;
+        return p.invoice_received === true;
+      });
+
       const selectedEventPayments = filteredPayments.filter(p => !p.is_expense);
-      const selectedExpensePayments = filteredPayments.filter(p => p.is_expense);
+      const eligibleEventPayments = eligiblePayments.filter(p => !p.is_expense);
+      const eligibleExpensePayments = eligiblePayments.filter(p => p.is_expense);
 
       // 1. HOJA 1: RESUMEN DE TRANSFERENCIAS
       const grouped = {};
-      filteredPayments.forEach(p => {
+      eligiblePayments.forEach(p => {
         const key = p.staff_rut || p.staff_id;
         if (!grouped[key]) {
           grouped[key] = {
@@ -1078,7 +1385,7 @@ export default function Finanzas() {
       });
 
       // 2. HOJA 2: DESGLOSE COMPLETO POR EVENTO
-      const dataDesglose = selectedEventPayments.map(p => ({
+      const dataDesglose = eligibleEventPayments.map(p => ({
         "Nombre Staff": p.staff_name,
         "RUT Staff": p.staff_rut,
         "Correo": p.staff_email,
@@ -1094,7 +1401,7 @@ export default function Finanzas() {
       }));
 
       // 3. HOJA 3: DETALLE VIÁTICOS
-      const selectedExpenseIds = selectedExpensePayments.map(p => p.expense_id);
+      const selectedExpenseIds = eligibleExpensePayments.map(p => p.expense_id);
       const matchingExpenses = expenses.filter(e => selectedExpenseIds.includes(e.id));
 
       const expensesWithUrls = await Promise.all(
@@ -1132,9 +1439,92 @@ export default function Finanzas() {
         "Comprobante (Enlace Seguro 7 días)": e.signedUrl
       }));
 
+      // 4. HOJA 4: AUDITORÍA BOLETAS (V3 - Lote por Trabajador)
+      const auditGroups = {};
+      selectedEventPayments.forEach(p => {
+        const key = p.staff_rut || p.staff_id;
+        if (!key) return;
+        if (!auditGroups[key]) {
+          auditGroups[key] = {
+            staff_name: p.staff_name,
+            staff_rut: p.staff_rut,
+            staff_email: p.staff_email,
+            events_count: 0,
+            total_liquid: 0,
+            invoice_required: false,
+            invoice_received: false,
+            invoice_number: "",
+            invoice_amount: 0,
+            invoice_received_at: "",
+            invoice_verified_by_name: "",
+            invoice_notes: ""
+          };
+        }
+        auditGroups[key].events_count += 1;
+        auditGroups[key].total_liquid += parseFloat(p.monto) || 0;
+        if (p.invoice_required) {
+          auditGroups[key].invoice_required = true;
+        }
+        if (p.invoice_received) {
+          auditGroups[key].invoice_received = true;
+          if (p.invoice_number) auditGroups[key].invoice_number = p.invoice_number;
+          auditGroups[key].invoice_amount += parseFloat(p.invoice_amount) || 0;
+          if (p.invoice_received_at) auditGroups[key].invoice_received_at = p.invoice_received_at;
+          if (p.invoice_verified_by_name) auditGroups[key].invoice_verified_by_name = p.invoice_verified_by_name;
+          if (p.invoice_notes) auditGroups[key].invoice_notes = p.invoice_notes;
+        }
+      });
+
+      const dataAuditoriaBoletas = Object.values(auditGroups).map(g => {
+        const rate = parseFloat(retentionRateSetting || 15.25);
+        const brutoEsperado = Math.round(g.total_liquid / (1 - (rate / 100)));
+        const retencionEstimada = brutoEsperado - g.total_liquid;
+        const difference = g.invoice_received ? (g.invoice_amount - brutoEsperado) : 0;
+
+        return {
+          "Trabajador": g.staff_name,
+          "RUT": g.staff_rut,
+          "Correo": g.staff_email,
+          "Cantidad Eventos": g.events_count,
+          "Total Líquido Pactado (CLP)": g.total_liquid,
+          "Requiere Boleta": g.invoice_required ? "Sí" : "No",
+          "Estado Boleta Lote": g.invoice_required ? (g.invoice_received ? "Verificada (Lote)" : "Falta Boleta") : "Exento",
+          "% Retención SII": g.invoice_required ? `${rate}%` : "N/A",
+          "Monto Bruto Esperado": g.invoice_required ? brutoEsperado : "N/A",
+          "Retención Estimada": g.invoice_required ? retencionEstimada : "N/A",
+          "Monto Boleta Recibido": g.invoice_required && g.invoice_received ? g.invoice_amount : "N/A",
+          "Diferencia": g.invoice_required && g.invoice_received ? difference : "N/A",
+          "Número Boleta Lote": g.invoice_number || "N/A",
+          "Fecha Recepción": g.invoice_received_at ? new Date(g.invoice_received_at).toLocaleDateString("es-CL") : "N/A",
+          "Verificado Por": g.invoice_verified_by_name || "N/A",
+          "Observación / Justificación": g.invoice_notes || ""
+        };
+      });
+
+      // 5. HOJA 5: DETALLE BOLETA EVENTOS (Trazabilidad completa)
+      const dataDetalleBoletaEventos = selectedEventPayments.map(p => {
+        const rate = parseFloat(retentionRateSetting || 15.25);
+        const brutoEsperado = Math.round(p.monto / (1 - (rate / 100)));
+        const retencionEstimada = brutoEsperado - p.monto;
+
+        return {
+          "Trabajador": p.staff_name,
+          "RUT": p.staff_rut,
+          "Evento": p.event_name,
+          "Fecha Evento": p.event_date,
+          "Monto Líquido (CLP)": p.monto,
+          "Requiere Boleta": p.invoice_required ? "Sí" : "No",
+          "Estado Boleta Evento": p.invoice_required ? (p.invoice_received ? "Cubierto por Lote" : "Pendiente") : "Exento",
+          "Bruto Proporcional": p.invoice_required ? brutoEsperado : "N/A",
+          "Retención Proporcional": p.invoice_required ? retencionEstimada : "N/A",
+          "Número Boleta Asociada": p.invoice_number || "N/A",
+          "Fecha Validación": p.invoice_received_at ? new Date(p.invoice_received_at).toLocaleDateString("es-CL") : "N/A"
+        };
+      });
+
       const workbook = XLSX.utils.book_new();
 
-      // Hoja 1
+      // Hojas
       const worksheetResumen = XLSX.utils.json_to_sheet(dataResumen);
       const maxColWidthsResumen = [];
       dataResumen.forEach(row => {
@@ -1147,7 +1537,6 @@ export default function Finanzas() {
       worksheetResumen["!cols"] = maxColWidthsResumen.map(w => ({ wch: w }));
       XLSX.utils.book_append_sheet(workbook, worksheetResumen, "Resumen Transferencias");
 
-      // Hoja 2
       const worksheetDesglose = XLSX.utils.json_to_sheet(dataDesglose);
       const maxColWidthsDesglose = [];
       dataDesglose.forEach(row => {
@@ -1160,7 +1549,6 @@ export default function Finanzas() {
       worksheetDesglose["!cols"] = maxColWidthsDesglose.map(w => ({ wch: w }));
       XLSX.utils.book_append_sheet(workbook, worksheetDesglose, "Detalle de Eventos");
 
-      // Hoja 3
       const worksheetViaticos = XLSX.utils.json_to_sheet(dataViaticos);
       const maxColWidthsViaticos = [];
       dataViaticos.forEach(row => {
@@ -1173,35 +1561,6 @@ export default function Finanzas() {
       worksheetViaticos["!cols"] = maxColWidthsViaticos.map(w => ({ wch: w }));
       XLSX.utils.book_append_sheet(workbook, worksheetViaticos, "Detalle Viáticos");
 
-      // 4. HOJA 4: AUDITORÍA BOLETAS
-      const dataAuditoriaBoletas = selectedEventPayments.map(p => {
-        const rate = parseFloat(retentionRateSetting || 15.25);
-        const brutoEsperado = Math.round(p.monto / (1 - (rate / 100)));
-        const retencionEstimada = brutoEsperado - p.monto;
-        const montoRecibido = p.invoice_amount || 0;
-        const diferencia = p.invoice_received ? (montoRecibido - brutoEsperado) : 0;
-
-        return {
-          "Trabajador": p.staff_name,
-          "RUT": p.staff_rut,
-          "Correo": p.staff_email,
-          "Evento Relacionado": p.event_name,
-          "Fecha Evento": p.event_date,
-          "Honorario Líquido (CLP)": parseFloat(p.monto || 0),
-          "Requiere Boleta": p.invoice_required ? "Sí" : "No",
-          "Estado Boleta": p.invoice_required ? (p.invoice_received ? "Recibida" : "Falta Boleta") : "Exento",
-          "% Retención SII": p.invoice_required ? `${rate}%` : "N/A",
-          "Monto Bruto Esperado": p.invoice_required ? brutoEsperado : "N/A",
-          "Retención Estimada": p.invoice_required ? retencionEstimada : "N/A",
-          "Monto Boleta Recibido": p.invoice_required && p.invoice_received ? montoRecibido : "N/A",
-          "Diferencia": p.invoice_required && p.invoice_received ? diferencia : "N/A",
-          "Número Boleta": p.invoice_number || "N/A",
-          "Fecha Recepción": p.invoice_received_at ? new Date(p.invoice_received_at).toLocaleDateString("es-CL") : "N/A",
-          "Verificado Por": p.invoice_verified_by_name || "N/A",
-          "Observación / Justificación": p.invoice_notes || ""
-        };
-      });
-
       const worksheetAuditoria = XLSX.utils.json_to_sheet(dataAuditoriaBoletas);
       const maxColWidthsAuditoria = [];
       dataAuditoriaBoletas.forEach(row => {
@@ -1213,6 +1572,18 @@ export default function Finanzas() {
       });
       worksheetAuditoria["!cols"] = maxColWidthsAuditoria.map(w => ({ wch: w }));
       XLSX.utils.book_append_sheet(workbook, worksheetAuditoria, "Auditoría Boletas");
+
+      const worksheetDetalleBoletas = XLSX.utils.json_to_sheet(dataDetalleBoletaEventos);
+      const maxColWidthsDetalleBoletas = [];
+      dataDetalleBoletaEventos.forEach(row => {
+        Object.keys(row).forEach((key, colIndex) => {
+          const value = row[key] ? String(row[key]) : "";
+          const length = Math.max(value.length, key.length) + 3;
+          maxColWidthsDetalleBoletas[colIndex] = Math.max(maxColWidthsDetalleBoletas[colIndex] || 10, length);
+        });
+      });
+      worksheetDetalleBoletas["!cols"] = maxColWidthsDetalleBoletas.map(w => ({ wch: w }));
+      XLSX.utils.book_append_sheet(workbook, worksheetDetalleBoletas, "Detalle Boleta Eventos");
 
       const excelBuffer = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
       const blob = new Blob([excelBuffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
@@ -1229,7 +1600,7 @@ export default function Finanzas() {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
 
-      toast.success("¡Reporte financiero filtrado (4 Hojas) descargado con éxito!", { id: loadingToast });
+      toast.success("¡Reporte financiero filtrado (5 Hojas) descargado con éxito!", { id: loadingToast });
     } catch (error) {
       console.error("Error al exportar reporte filtrado:", error);
       toast.error(`Error al generar reporte: ${error.message || "Error desconocido"}`, { id: loadingToast });
@@ -1540,6 +1911,132 @@ export default function Finanzas() {
                 <Download className="w-3.5 h-3.5 text-amber-400" /> Exportar Reporte Filtrado
               </Button>
             )}
+          </motion.div>
+
+          {/* CONTROL DE BOLETAS DE HONORARIOS AGRUPADAS (V3) */}
+          <motion.div variants={itemVariants} className="mb-8">
+            <GlassCard className="p-6 border border-white/5 relative overflow-hidden bg-gray-900/60 backdrop-blur-xl rounded-3xl">
+              <div className="absolute top-0 right-0 w-80 h-80 bg-amber-500/5 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none"></div>
+              
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-5 pb-4 border-b border-white/5">
+                <div>
+                  <h3 className="text-base font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-amber-200 to-amber-400 flex items-center gap-2 uppercase tracking-wide">
+                    📋 Control de Boletas por Trabajador (SII Lotes V3)
+                  </h3>
+                  <p className="text-2xs text-gray-400 mt-0.5">
+                    Toda la app trabaja visualmente en líquidos, pero aquí puedes verificar la boleta combinada emitida por el total de eventos de cada staff.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-2xs font-extrabold text-gray-400 uppercase bg-white/5 px-2.5 py-1 rounded-md border border-white/5">
+                    SII: {retentionRateSetting}% Tasa
+                  </span>
+                  <span className="text-2xs font-extrabold text-gray-400 uppercase bg-white/5 px-2.5 py-1 rounded-md border border-white/5">
+                    Tol: ${toleranceSetting.toLocaleString("es-CL")} CLP
+                  </span>
+                </div>
+              </div>
+
+              {workerInvoiceGroups.length === 0 ? (
+                <div className="py-8 text-center text-xs text-gray-500 italic">
+                  No hay trabajadores con pagos de eventos pendientes en este lote.
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="border-b border-white/5 text-gray-400 font-extrabold uppercase bg-white/5">
+                        <th className="py-3 px-4">Trabajador (Staff)</th>
+                        <th className="py-3 px-4">RUT</th>
+                        <th className="py-3 px-4 text-center">Eventos</th>
+                        <th className="py-3 px-4 text-right">Total Líquido Pactado</th>
+                        <th className="py-3 px-4 text-right">Bruto Sugerido (SII)</th>
+                        <th className="py-3 px-4 text-right">Retención Estimada</th>
+                        <th className="py-3 px-4 text-center">Estado Boleta Lote</th>
+                        <th className="py-3 px-4 text-center">Acciones</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/5">
+                      {workerInvoiceGroups.map(group => {
+                        return (
+                          <tr key={group.staff_id} className="hover:bg-white/5 transition-colors">
+                            <td className="py-3.5 px-4 font-bold text-gray-200">
+                              <div className="flex flex-col">
+                                <span className="font-extrabold text-sm">{group.staff_name}</span>
+                                <span className="text-2xs text-gray-400 font-mono">{group.staff_email}</span>
+                              </div>
+                            </td>
+                            <td className="py-3.5 px-4 text-gray-300 font-mono font-semibold">{group.staff_rut || "Sin RUT"}</td>
+                            <td className="py-3.5 px-4 text-center font-black">
+                              <span className="bg-gray-800 border border-white/10 px-2 py-0.5 rounded-full text-amber-400 text-2xs">
+                                {group.payments.length}
+                              </span>
+                            </td>
+                            <td className="py-3.5 px-4 text-right font-extrabold text-gray-200">${group.total_liquid.toLocaleString("es-CL")}</td>
+                            <td className="py-3.5 px-4 text-right font-black text-amber-400 font-mono">${group.expected_gross.toLocaleString("es-CL")}</td>
+                            <td className="py-3.5 px-4 text-right font-semibold text-gray-400 font-mono">${group.estimated_retention.toLocaleString("es-CL")}</td>
+                            <td className="py-3.5 px-4 text-center">
+                              {(() => {
+                                if (group.batchStatus === "none") {
+                                  return (
+                                    <span className="px-2.5 py-1 rounded bg-gray-800 border border-white/10 text-gray-400 text-2xs font-extrabold whitespace-nowrap">
+                                      ⚪ No requiere boleta
+                                    </span>
+                                  );
+                                }
+                                if (group.batchStatus === "verified") {
+                                  return (
+                                    <span 
+                                      className="px-2.5 py-1 rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-2xs font-extrabold cursor-help whitespace-nowrap"
+                                      title={`Boleta verified: Nº ${group.activeBatch?.invoice_number || ""}\nMonto: $${(group.activeBatch?.invoice_amount || 0).toLocaleString("es-CL")}\nFecha: ${group.activeBatch?.invoice_received_at ? new Date(group.activeBatch.invoice_received_at).toLocaleDateString("es-CL") : ""}\nNotas: ${group.activeBatch?.invoice_notes || ""}`}
+                                    >
+                                      🟢 Boleta Verificada (Batch)
+                                    </span>
+                                  );
+                                }
+                                if (group.batchStatus === "partial") {
+                                  return (
+                                    <span className="px-2.5 py-1 rounded bg-indigo-500/10 border border-indigo-500/30 text-indigo-400 text-2xs font-extrabold animate-pulse whitespace-nowrap">
+                                      🔵 Parcialmente Verificado
+                                    </span>
+                                  );
+                                }
+                                return (
+                                  <span className="px-2.5 py-1 rounded bg-red-500/10 border border-red-500/30 text-red-400 text-2xs font-extrabold animate-pulse whitespace-nowrap">
+                                    🔴 Falta Boleta (Agrupada)
+                                  </span>
+                                );
+                              })()}
+                            </td>
+                            <td className="py-3.5 px-4 text-center">
+                              {group.invoice_required ? (
+                                group.batchStatus === "verified" ? (
+                                  <button
+                                    onClick={() => handleUndoWorkerInvoice(group)}
+                                    className="px-3 py-1.5 rounded-xl text-red-400 hover:text-white bg-red-500/15 hover:bg-red-500/30 transition-all text-3xs font-extrabold tracking-wide uppercase border border-red-500/20 cursor-pointer"
+                                  >
+                                    Deshacer Boleta
+                                  </button>
+                                ) : (
+                                  <button
+                                    onClick={() => handleOpenWorkerInvoiceModal(group)}
+                                    className="px-3 py-1.5 rounded-xl text-amber-300 hover:text-gray-900 bg-amber-500/15 hover:bg-amber-500 transition-all text-3xs font-extrabold tracking-wide uppercase border border-amber-500/20 cursor-pointer"
+                                  >
+                                    Validar Boleta
+                                  </button>
+                                )
+                              ) : (
+                                <span className="text-3xs text-gray-500 font-bold italic">Exento</span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </GlassCard>
           </motion.div>
 
           {/* Tabla de Finanzas */}
@@ -2212,7 +2709,7 @@ export default function Finanzas() {
       )}
 
       {/* Modal de Validación de Boleta de Honorarios */}
-      {showInvoiceModal && selectedInvoicePayment && (
+      {showInvoiceModal && (selectedInvoicePayment || selectedWorkerGroup) && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[100] flex items-center justify-center p-4">
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
@@ -2225,7 +2722,7 @@ export default function Finanzas() {
                   🧾 Validar Boleta de Honorarios
                 </h3>
                 <p className="text-xs text-gray-400 mt-1">
-                  Ingresa los datos para liberar el pago de <strong>{selectedInvoicePayment.staff_name}</strong>
+                  Ingresa los datos para liberar el pago de <strong>{selectedInvoicePayment ? selectedInvoicePayment.staff_name : selectedWorkerGroup.staff_name}</strong>
                 </p>
               </div>
               <button
@@ -2233,6 +2730,7 @@ export default function Finanzas() {
                 onClick={() => {
                   setShowInvoiceModal(false);
                   setSelectedInvoicePayment(null);
+                  setSelectedWorkerGroup(null);
                 }}
                 className="text-gray-400 hover:text-white bg-white/5 p-1.5 rounded-full transition-colors cursor-pointer"
               >
@@ -2243,7 +2741,7 @@ export default function Finanzas() {
             <form onSubmit={handleSaveInvoice} className="space-y-4 text-left">
               {(() => {
                 const rate = parseFloat(retentionRateSetting || 15.25);
-                const liquido = parseFloat(selectedInvoicePayment.monto) || 0;
+                const liquido = selectedInvoicePayment ? (parseFloat(selectedInvoicePayment.monto) || 0) : (parseFloat(selectedWorkerGroup.total_liquid) || 0);
                 const brutoEsperado = Math.round(liquido / (1 - (rate / 100)));
                 const retencionEstimada = brutoEsperado - liquido;
                 
@@ -2252,12 +2750,15 @@ export default function Finanzas() {
                 const hasDifference = difference > toleranceSetting;
                 const isSubmitDisabled = isSubmittingInvoice || (hasDifference && (!invoiceFormNotes.trim() || !invoiceFormConfirmDifference));
 
+                const detailLabel = selectedInvoicePayment ? selectedInvoicePayment.event_name : `${selectedWorkerGroup.payments.length} eventos agrupados`;
+                const detailDate = selectedInvoicePayment ? selectedInvoicePayment.event_date : "Lote actual de pagos pendientes";
+
                 return (
                   <>
                     <div className="bg-black/30 p-3.5 rounded-xl border border-white/5 space-y-1.5 text-xs">
                       <span className="text-gray-500 font-bold uppercase tracking-wider block text-3xs">Resumen Tributario del Servicio</span>
-                      <p className="text-gray-200 font-medium text-2xs">{selectedInvoicePayment.event_name}</p>
-                      <p className="text-gray-500 text-3xs">{selectedInvoicePayment.event_date}</p>
+                      <p className="text-gray-200 font-medium text-2xs">{detailLabel}</p>
+                      <p className="text-gray-500 text-3xs">{detailDate}</p>
                       
                       <div className="grid grid-cols-2 gap-3 pt-2 border-t border-white/5 mt-1.5 text-2xs">
                         <div>
@@ -2385,6 +2886,7 @@ export default function Finanzas() {
                         onClick={() => {
                           setShowInvoiceModal(false);
                           setSelectedInvoicePayment(null);
+                          setSelectedWorkerGroup(null);
                         }}
                         className="flex-1 bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs font-bold py-2.5 rounded-xl transition-all border border-white/5 text-center cursor-pointer"
                       >
