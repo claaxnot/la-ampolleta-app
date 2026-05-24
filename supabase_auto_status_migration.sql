@@ -27,8 +27,7 @@ BEGIN
   WITH to_in_progress AS (
     UPDATE public.events
     SET 
-      status = 'En progreso',
-      updated_at = pg_catalog.now()
+      status = 'En progreso'
     WHERE 
       status IN ('Planificado', 'Confirmado')
       AND date IS NOT NULL 
@@ -48,8 +47,7 @@ BEGIN
   WITH to_finished AS (
     UPDATE public.events
     SET 
-      status = 'Finalizado',
-      updated_at = pg_catalog.now()
+      status = 'Finalizado'
     WHERE 
       status = 'En progreso'
       AND date IS NOT NULL 
