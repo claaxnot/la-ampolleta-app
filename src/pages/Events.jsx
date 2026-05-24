@@ -140,9 +140,61 @@ export default function Events({ user }) {
         console.log("5️⃣ [UPDATE RESPONSE] - Error de actualización:", error);
         if (error) throw error;
         
-        // Clear old assignments
-        const { error: deleteError } = await supabase.from('event_assignments').delete().eq('event_id', eventId);
-        if (deleteError) throw deleteError;
+        // Smart Sync for assignments to preserve worker confirmation and billing statuses
+        const { data: existingAssignments, error: fetchError } = await supabase
+          .from('event_assignments')
+          .select('*')
+          .eq('event_id', eventId);
+        if (fetchError) throw fetchError;
+
+        const existingMap = existingAssignments || [];
+        const existingStaffIds = existingMap.map(ea => ea.staff_id);
+
+        // 1. Delete removed staff assignments
+        const staffIdsToDelete = existingStaffIds.filter(id => !staffIds.includes(id));
+        if (staffIdsToDelete.length > 0) {
+          const { error: delError } = await supabase
+            .from('event_assignments')
+            .delete()
+            .eq('event_id', eventId)
+            .in('staff_id', staffIdsToDelete);
+          if (delError) throw delError;
+        }
+
+        // 2. Insert new staff assignments
+        const staffIdsToInsert = staffIds.filter(id => !existingStaffIds.includes(id));
+        if (staffIdsToInsert.length > 0) {
+          const newAssignments = staffIdsToInsert.map(id => {
+            const rateVal = customRates[id] ? parseFloat(customRates[id]) : null;
+            return { 
+              event_id: eventId, 
+              staff_id: id,
+              custom_rate: rateVal && !Number.isNaN(rateVal) ? rateVal : null
+            };
+          });
+          const { error: insError } = await supabase
+            .from('event_assignments')
+            .insert(newAssignments);
+          if (insError) throw insError;
+        }
+
+        // 3. Update existing staff custom rate if it changed
+        for (const existing of existingMap) {
+          if (staffIds.includes(existing.staff_id)) {
+            const newRateVal = customRates[existing.staff_id] ? parseFloat(customRates[existing.staff_id]) : null;
+            const oldRateVal = existing.custom_rate ? parseFloat(existing.custom_rate) : null;
+            if (newRateVal !== oldRateVal) {
+              const { error: updError } = await supabase
+                .from('event_assignments')
+                .update({
+                  custom_rate: newRateVal && !Number.isNaN(newRateVal) ? newRateVal : null
+                })
+                .eq('id', existing.id);
+              if (updError) throw updError;
+            }
+          }
+        }
+
       } else {
         // Insert new Event
         const { data, error } = await supabase.from('events').insert([eventData]).select();
@@ -151,22 +203,24 @@ export default function Events({ user }) {
         if (data && data.length > 0) {
           eventId = data[0].id;
         }
+
+        // Insert new assignments since event is brand new
+        if (eventId && staffIds.length > 0) {
+          const assignments = staffIds.map(id => {
+            const rateVal = customRates[id] ? parseFloat(customRates[id]) : null;
+            return { 
+              event_id: eventId, 
+              staff_id: id,
+              custom_rate: rateVal && !Number.isNaN(rateVal) ? rateVal : null
+            };
+          });
+          const { error: assignError } = await supabase.from('event_assignments').insert(assignments);
+          if (assignError) throw assignError;
+        }
       }
 
-      // Insert new assignments with optional custom rates
+      // Create system notifications for the assigned staff
       if (eventId && staffIds.length > 0) {
-        const assignments = staffIds.map(id => {
-          const rateVal = customRates[id] ? parseFloat(customRates[id]) : null;
-          return { 
-            event_id: eventId, 
-            staff_id: id,
-            custom_rate: rateVal && !Number.isNaN(rateVal) ? rateVal : null
-          };
-        });
-        const { error: assignError } = await supabase.from('event_assignments').insert(assignments);
-        if (assignError) throw assignError;
-        
-        // Crear notificaciones físicas para los trabajadores asignados
         try {
           const isCancelled = eventData.status?.toLowerCase() === "cancelado" || eventData.status?.toLowerCase() === "cancelled";
           const notificationsPayload = staffIds.map(id => ({

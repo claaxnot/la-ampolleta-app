@@ -157,8 +157,13 @@ export default function WorkerDashboard({ user }) {
 
   const completedEvents = React.useMemo(() => {
     return assignedEvents.filter(event => {
-      const isFinished = event.date ? new Date(event.date) < new Date() : false;
-      return event.assignment_status === "Confirmado" && isFinished;
+      const eventStatus = event.status ? event.status.toLowerCase() : "";
+      const todayStr = new Date().toLocaleDateString("en-CA");
+      const isFinished = event.date ? event.date <= todayStr : false;
+      const isCompleted = eventStatus === "completado" || eventStatus === "finalizado" || isFinished;
+      
+      const isValidAssignment = event.assignment_status === "Confirmado" || event.assignment_status === "Aceptado";
+      return isValidAssignment && isCompleted;
     });
   }, [assignedEvents]);
 
@@ -169,6 +174,7 @@ export default function WorkerDashboard({ user }) {
     if (!assignedEvents) return [];
 
     const now = new Date();
+    const todayStr = now.toLocaleDateString("en-CA");
     const currentYear = now.getFullYear();
     const currentMonthStr = String(now.getMonth() + 1).padStart(2, '0');
     const currentMonthPrefix = `${currentYear}-${currentMonthStr}`; // "YYYY-MM"
@@ -176,7 +182,7 @@ export default function WorkerDashboard({ user }) {
     return assignedEvents
       .filter(event => {
         const eventStatus = event.status ? event.status.toLowerCase() : "";
-        const isFinished = event.date ? new Date(event.date + 'T23:59:59') < now : false;
+        const isFinished = event.date ? event.date <= todayStr : false;
         const isCompleted = eventStatus === "completado" || eventStatus === "finalizado" || isFinished;
 
         if (isCompleted) {
@@ -188,8 +194,9 @@ export default function WorkerDashboard({ user }) {
         return true;
       })
       .sort((a, b) => {
-        const isACompleted = (a.status ? a.status.toLowerCase() : "") === "completado" || (a.status ? a.status.toLowerCase() : "") === "finalizado" || (a.date && new Date(a.date + 'T23:59:59') < now);
-        const isBCompleted = (b.status ? b.status.toLowerCase() : "") === "completado" || (b.status ? b.status.toLowerCase() : "") === "finalizado" || (b.date && new Date(b.date + 'T23:59:59') < now);
+        const todayStrLocal = new Date().toLocaleDateString("en-CA");
+        const isACompleted = (a.status ? a.status.toLowerCase() : "") === "completado" || (a.status ? a.status.toLowerCase() : "") === "finalizado" || (a.date && a.date <= todayStrLocal);
+        const isBCompleted = (b.status ? b.status.toLowerCase() : "") === "completado" || (b.status ? b.status.toLowerCase() : "") === "finalizado" || (b.date && b.date <= todayStrLocal);
 
         // Si uno está completado y el otro no, el completado va al final
         if (isACompleted && !isBCompleted) return 1;
@@ -220,6 +227,100 @@ export default function WorkerDashboard({ user }) {
     if (financeMonthFilter === "all") return completedEvents;
     return completedEvents.filter(e => e.date && e.date.startsWith(financeMonthFilter));
   }, [completedEvents, financeMonthFilter]);
+
+  // Agrupar eventos completados y lotes de base de datos por periodo mensual (Versión 3.1)
+  const groupedInvoicePeriods = React.useMemo(() => {
+    const periods = {};
+    const baselineRate = workerProfile?.monto_transferencia ? parseFloat(workerProfile.monto_transferencia) : 25000;
+
+    // 1. Agrupar eventos completados por mes
+    completedEvents.forEach(e => {
+      if (!e.date) return;
+      const periodKey = e.date.substring(0, 7); // "YYYY-MM"
+      if (!periods[periodKey]) {
+        periods[periodKey] = {
+          period_key: periodKey,
+          total_liquid: 0,
+          events_count: 0,
+          events: [],
+          invoice_required: false,
+          activeBatch: null
+        };
+      }
+      periods[periodKey].events.push(e);
+      const rate = e.custom_rate ? parseFloat(e.custom_rate) : baselineRate;
+      periods[periodKey].total_liquid += rate;
+      periods[periodKey].events_count += 1;
+      if (e.invoice_required) {
+        periods[periodKey].invoice_required = true;
+      }
+    });
+
+    // 2. Asociar lotes del trabajador desde workerInvoiceBatches
+    if (workerInvoiceBatches) {
+      workerInvoiceBatches.forEach(b => {
+        const periodKey = b.period_label || (b.created_at ? b.created_at.substring(0, 7) : new Date().toISOString().substring(0, 7));
+        if (!periods[periodKey]) {
+          periods[periodKey] = {
+            period_key: periodKey,
+            total_liquid: parseFloat(b.total_liquid_amount) || 0,
+            events_count: 0,
+            events: [],
+            invoice_required: true,
+            activeBatch: b
+          };
+        } else {
+          periods[periodKey].activeBatch = b;
+        }
+      });
+    }
+
+    // 3. Procesar y definir estado dinámico por período
+    const list = Object.values(periods).map(p => {
+      const activeBatch = p.activeBatch;
+      let status = "Falta boleta";
+      
+      const totalEvents = p.events.length;
+      const paidEvents = p.events.filter(e => e.payment_status === "Pagado").length;
+
+      if (totalEvents > 0 && paidEvents === totalEvents) {
+        status = "Pagada";
+      } else if (activeBatch && activeBatch.status === "verified") {
+        status = "En proceso de pago";
+      } else if (!p.invoice_required) {
+        status = "En proceso de pago";
+      } else if (p.events.some(e => e.invoice_received)) {
+        status = "Boleta recibida";
+      } else {
+        status = "Falta boleta";
+      }
+
+      // Nombre del mes formateado bonito
+      const [year, monthStr] = p.period_key.split("-");
+      const monthNames = [
+        "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+        "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
+      ];
+      const monthIndex = parseInt(monthStr, 10) - 1;
+      const periodLabel = `${monthNames[monthIndex]} ${year}`;
+
+      return {
+        ...p,
+        period_label: periodLabel,
+        status,
+        paid_count: paidEvents
+      };
+    });
+
+    // 4. Ordenación inteligente: los pendientes primero, y los pagados (historial) abajo
+    return list.sort((a, b) => {
+      const isAPending = a.status !== "Pagada";
+      const isBPending = b.status !== "Pagada";
+      if (isAPending && !isBPending) return -1;
+      if (!isAPending && isBPending) return 1;
+      return b.period_key.localeCompare(a.period_key);
+    });
+  }, [completedEvents, workerInvoiceBatches, workerProfile]);
 
   // Estados de Finanzas y Sub-pestañas sincronizados con la URL
   const [activeSubTab, setActiveSubTab] = useState(() => {
@@ -1022,7 +1123,8 @@ export default function WorkerDashboard({ user }) {
     const eventInfo = assignedEvents.find(e => e.assignment_id === assignmentId);
     if (eventInfo) {
       const eventStatus = eventInfo.status ? eventInfo.status.toLowerCase() : "";
-      const isFinished = eventInfo.date ? new Date(eventInfo.date + 'T23:59:59') < new Date() : false;
+      const todayStr = new Date().toLocaleDateString("en-CA");
+      const isFinished = eventInfo.date ? eventInfo.date <= todayStr : false;
       const isEventCompleted = eventStatus === "completado" || eventStatus === "finalizado" || isFinished;
 
       if (isEventCompleted) {
@@ -1231,7 +1333,8 @@ export default function WorkerDashboard({ user }) {
 
                 // Determinar si el evento ya está completado/finalizado
                 const eventStatus = event.status ? event.status.toLowerCase() : "";
-                const isFinished = event.date ? new Date(event.date + 'T23:59:59') < new Date() : false;
+                const todayStr = new Date().toLocaleDateString("en-CA");
+                const isFinished = event.date ? event.date <= todayStr : false;
                 const isEventCompleted = eventStatus === "completado" || eventStatus === "finalizado" || isFinished;
 
                 // Dynamic styling based on assignment status
@@ -2028,149 +2131,203 @@ export default function WorkerDashboard({ user }) {
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* Tarjeta 1: Lote Pendiente / Proyección de Boleta */}
-                    {(() => {
-                      const pendingCompletedEvents = filteredCompletedEvents.filter(e => e.invoice_required && !e.invoice_received);
-                      const pendingLiquidTotal = pendingCompletedEvents.reduce((sum, e) => {
-                        const rate = e.custom_rate ? parseFloat(e.custom_rate) : baselineRate;
-                        return sum + rate;
-                      }, 0);
+                    {groupedInvoicePeriods.length === 0 ? (
+                      <GlassCard className="p-6 border border-white/5 flex flex-col justify-center items-center text-center col-span-2">
+                        <div className="w-12 h-12 rounded-full bg-gray-800 flex items-center justify-center text-gray-500 mb-3 border border-white/10">
+                          <Layers className="w-6 h-6" />
+                        </div>
+                        <h4 className="text-sm font-bold text-gray-400">Sin registros de pago</h4>
+                        <p className="text-xs text-gray-500 max-w-xs mt-1 leading-relaxed">
+                          Aún no tienes eventos completados ni boletas registradas en el sistema.
+                        </p>
+                      </GlassCard>
+                    ) : (
+                      groupedInvoicePeriods.map(period => {
+                        const activeBatch = period.activeBatch;
+                        const rate = parseFloat(retentionRateSetting || 15.25);
+                        
+                        const liquidAmount = activeBatch ? parseFloat(activeBatch.total_liquid_amount) : period.total_liquid;
+                        const grossExpected = activeBatch ? parseFloat(activeBatch.expected_gross_amount) : Math.round(liquidAmount / (1 - (rate / 100)));
+                        const retentionEstimated = activeBatch ? parseFloat(activeBatch.estimated_retention) : (grossExpected - liquidAmount);
+                        const numEvents = activeBatch ? (activeBatch.events_count || period.events_count) : period.events_count;
 
-                      if (pendingLiquidTotal === 0) {
-                        return (
-                          <GlassCard className="p-6 border border-white/5 flex flex-col justify-center items-center text-center">
-                            <div className="w-12 h-12 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-400 mb-3 border border-emerald-500/20">
-                              <ShieldCheck className="w-6 h-6" />
-                            </div>
-                            <h4 className="text-sm font-bold text-white">¡Al día con tus boletas!</h4>
-                            <p className="text-xs text-gray-400 max-w-xs mt-1 leading-relaxed">
-                              No tienes eventos completados pendientes de emitir boleta de honorarios en este período.
-                            </p>
-                          </GlassCard>
-                        );
-                      }
-
-                      const pendingRate = parseFloat(retentionRateSetting || 15.25);
-                      const pendingGrossExpected = Math.round(pendingLiquidTotal / (1 - (pendingRate / 100)));
-                      const pendingRetentionEstimated = pendingGrossExpected - pendingLiquidTotal;
-
-                      return (
-                        <GlassCard className="p-6 border border-amber-500/20 relative overflow-hidden bg-gradient-to-br from-amber-500/[0.03] to-transparent shadow-[0_0_24px_rgba(245,158,11,0.02)]">
-                          <div className="absolute top-0 right-0 p-4">
-                            <span className="px-2.5 py-1 rounded bg-amber-500/15 border border-amber-500/30 text-amber-300 text-3xs font-black uppercase tracking-wider animate-pulse flex items-center gap-1">
-                              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping" />
-                              Próxima Boleta
-                            </span>
-                          </div>
-
-                          <h4 className="text-sm font-black text-amber-300 flex items-center gap-1.5 mb-1.5 uppercase tracking-wider">
-                            Lote Pendiente Proyectado
-                          </h4>
-                          <p className="text-2xs text-gray-400 mb-4 leading-relaxed">
-                            Monto calculado para emitir una única boleta de honorarios cubriendo los <b>{pendingCompletedEvents.length} eventos</b> pendientes.
-                          </p>
-
-                          <div className="grid grid-cols-3 gap-2 bg-gray-950/60 p-3 rounded-xl border border-white/5 mb-4 font-mono">
-                            <div className="text-center border-r border-white/5">
-                              <p className="text-3xs text-gray-500 font-bold uppercase tracking-wider">Total Líquido</p>
-                              <p className="text-xs font-black text-white mt-0.5">${pendingLiquidTotal.toLocaleString("es-CL")}</p>
-                            </div>
-                            <div className="text-center border-r border-white/5">
-                              <p className="text-3xs text-gray-500 font-bold uppercase tracking-wider">Retención SII ({pendingRate}%)</p>
-                              <p className="text-xs font-black text-gray-400 mt-0.5">${pendingRetentionEstimated.toLocaleString("es-CL")}</p>
-                            </div>
-                            <div className="text-center">
-                              <p className="text-3xs text-gray-400 font-bold uppercase tracking-wider">Bruto Esperado</p>
-                              <p className="text-xs font-black text-amber-400 mt-0.5">${pendingGrossExpected.toLocaleString("es-CL")}</p>
-                            </div>
-                          </div>
-
-                          <div className="bg-amber-500/10 border border-amber-500/20 p-3 rounded-xl text-3xs text-amber-200 leading-relaxed space-y-1">
-                            <p className="font-extrabold flex items-center gap-1">
-                              💡 Instrucciones de Emisión SII:
-                            </p>
-                            <p>
-                              1. Emite <b>una sola boleta de honorarios</b> en el portal del SII por el monto bruto proyectado exacto de <b className="text-amber-300 font-extrabold font-mono">${pendingGrossExpected.toLocaleString("es-CL")}</b>.
-                            </p>
-                            <p>
-                              2. Envíala en PDF a <span className="text-white underline font-semibold">contacto@laampolleta.tv</span> indicando tu número de boleta.
-                            </p>
-                            <p>
-                              3. Al validarla, administración liberará todo el lote para la transferencia masiva mas cercana.
-                            </p>
-                          </div>
-                        </GlassCard>
-                      );
-                    })()}
-
-                    {/* Tarjeta 2: Lote Activo Verificado / Historial */}
-                    {(() => {
-                      const activeBatch = workerInvoiceBatches && workerInvoiceBatches.find(b => b.status === 'verified');
-
-                      if (!activeBatch) {
-                        return (
-                          <GlassCard className="p-6 border border-white/5 flex flex-col justify-center items-center text-center">
-                            <div className="w-12 h-12 rounded-full bg-gray-800 flex items-center justify-center text-gray-500 mb-3 border border-white/10">
-                              <Layers className="w-6 h-6" />
-                            </div>
-                            <h4 className="text-sm font-bold text-gray-400">Sin lotes validados activos</h4>
-                            <p className="text-xs text-gray-500 max-w-xs mt-1 leading-relaxed">
-                              Una vez que envíes tu boleta consolidada, administración validará tu lote y lo verás aquí como habilitado para pago.
-                            </p>
-                          </GlassCard>
-                        );
-                      }
-
-                      const verifierName = activeBatch.profiles?.name || "Administración";
-
-                      return (
-                        <GlassCard className="p-6 border border-emerald-500/20 relative overflow-hidden bg-gradient-to-br from-emerald-500/[0.03] to-transparent shadow-[0_0_24px_rgba(16,185,129,0.02)]">
-                          <div className="absolute top-0 right-0 p-4">
-                            <span className="px-2.5 py-1 rounded bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-3xs font-black uppercase tracking-wider flex items-center gap-1">
-                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                              Verificado (Lote V3)
-                            </span>
-                          </div>
-
-                          <h4 className="text-sm font-black text-emerald-300 flex items-center gap-1.5 mb-1.5 uppercase tracking-wider">
-                            Lote Habilitado para Pago
-                          </h4>
-                          <p className="text-2xs text-gray-400 mb-4 leading-relaxed">
-                            Boleta consolidada recibida y cotejada con éxito. Tus pagos asociados están autorizados.
-                          </p>
-
-                          <div className="grid grid-cols-2 gap-4 mb-4">
-                            <div className="bg-gray-950/60 p-2.5 rounded-lg border border-white/5 font-mono">
-                              <p className="text-3xs text-gray-500 font-bold uppercase">Boleta Recibida</p>
-                              <p className="text-xs font-black text-white mt-0.5">Nº {activeBatch.invoice_number}</p>
-                              <p className="text-3xs text-gray-400 mt-0.5">${parseFloat(activeBatch.invoice_amount || 0).toLocaleString("es-CL")}</p>
-                            </div>
-                            <div className="bg-gray-950/60 p-2.5 rounded-lg border border-white/5 font-mono">
-                              <p className="text-3xs text-gray-500 font-bold uppercase">Líquido a Transferir</p>
-                              <p className="text-xs font-black text-emerald-400 mt-0.5">${parseFloat(activeBatch.total_liquid_amount || 0).toLocaleString("es-CL")}</p>
-                              <p className="text-3xs text-gray-400 mt-0.5">Bruto: ${parseFloat(activeBatch.expected_gross_amount || 0).toLocaleString("es-CL")}</p>
-                            </div>
-                          </div>
-
-                          <div className="bg-gray-900/60 border border-white/5 p-3 rounded-xl space-y-1 text-3xs text-gray-300">
-                            <div className="flex justify-between border-b border-white/5 pb-1">
-                              <span className="text-gray-500">Verificado Por:</span>
-                              <span className="font-bold text-gray-200">{verifierName}</span>
-                            </div>
-                            <div className="flex justify-between border-b border-white/5 pb-1 pt-1">
-                              <span className="text-gray-500">Fecha de Validación:</span>
-                              <span className="font-bold text-gray-200">{activeBatch.invoice_received_at ? new Date(activeBatch.invoice_received_at).toLocaleDateString("es-CL") : "N/A"}</span>
-                            </div>
-                            {activeBatch.invoice_notes && (
-                              <div className="pt-1">
-                                <span className="text-gray-500 block">Detalles / Nota:</span>
-                                <span className="font-medium text-amber-300 italic">"{activeBatch.invoice_notes}"</span>
+                        if (period.status === "Pagada") {
+                          // Estado Pagada (Verde/Historial)
+                          return (
+                            <GlassCard 
+                              key={period.period_key}
+                              className="p-6 border border-emerald-500/10 relative overflow-hidden bg-gradient-to-br from-emerald-500/[0.01] to-transparent shadow-sm opacity-85 hover:opacity-100 transition-all duration-300"
+                            >
+                              <div className="absolute top-0 right-0 p-4">
+                                <span className="px-2.5 py-1 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-black uppercase tracking-wider flex items-center gap-1">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                                  Pagada
+                                </span>
                               </div>
-                            )}
-                          </div>
-                        </GlassCard>
-                      );
-                    })()}
+
+                              <h4 className="text-sm font-black text-emerald-300 flex items-center gap-1.5 mb-1.5 uppercase tracking-wider">
+                                Boleta {period.period_label}
+                              </h4>
+                              <p className="text-[10px] text-gray-400 mb-4 leading-relaxed">
+                                Lote consolidado de honorarios liquidado y transferido exitosamente.
+                              </p>
+
+                              <div className="grid grid-cols-2 gap-4 mb-4">
+                                <div className="bg-gray-950/60 p-2.5 rounded-lg border border-white/5 font-mono">
+                                  <p className="text-[9px] text-gray-500 font-bold uppercase">Boleta Asociada</p>
+                                  <p className="text-xs font-black text-white mt-0.5">Nº {activeBatch?.invoice_number || "N/A"}</p>
+                                  <p className="text-[9px] text-gray-400 mt-0.5">${parseFloat(activeBatch?.invoice_amount || grossExpected).toLocaleString("es-CL")}</p>
+                                </div>
+                                <div className="bg-gray-950/60 p-2.5 rounded-lg border border-white/5 font-mono">
+                                  <p className="text-[9px] text-gray-500 font-bold uppercase">Líquido Recibido</p>
+                                  <p className="text-xs font-black text-emerald-400 mt-0.5">${liquidAmount.toLocaleString("es-CL")}</p>
+                                  <p className="text-[9px] text-gray-400 mt-0.5">Bruto: ${grossExpected.toLocaleString("es-CL")}</p>
+                                </div>
+                              </div>
+
+                              <div className="bg-gray-900/60 border border-white/5 p-3 rounded-xl space-y-1 text-[10px] text-gray-300 font-mono">
+                                <div className="flex justify-between border-b border-white/5 pb-1">
+                                  <span className="text-gray-500">Eventos Cubiertos:</span>
+                                  <span className="font-bold text-gray-200">{numEvents} eventos</span>
+                                </div>
+                                <div className="flex justify-between border-b border-white/5 pb-1 pt-1">
+                                  <span className="text-gray-500">Validado Por:</span>
+                                  <span className="font-bold text-gray-200">{activeBatch?.profiles?.name || "Administración"}</span>
+                                </div>
+                                {activeBatch?.invoice_received_at && (
+                                  <div className="flex justify-between pt-1">
+                                    <span className="text-gray-500">Fecha Pago:</span>
+                                    <span className="font-bold text-gray-200">{new Date(activeBatch.invoice_received_at).toLocaleDateString("es-CL")}</span>
+                                  </div>
+                                )}
+                              </div>
+                            </GlassCard>
+                          );
+                        }
+
+                        if (period.status === "Falta boleta") {
+                          // Estado Falta Boleta (Naranja/Amber)
+                          return (
+                            <GlassCard 
+                              key={period.period_key}
+                              className="p-6 border border-amber-500/20 relative overflow-hidden bg-gradient-to-br from-amber-500/[0.03] to-transparent shadow-[0_0_24px_rgba(245,158,11,0.02)]"
+                            >
+                              <div className="absolute top-0 right-0 p-4">
+                                <span className="px-2.5 py-1 rounded bg-amber-500/15 border border-amber-500/30 text-amber-300 text-[10px] font-black uppercase tracking-wider animate-pulse flex items-center gap-1">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping" />
+                                  Falta Boleta
+                                </span>
+                              </div>
+
+                              <h4 className="text-sm font-black text-amber-300 flex items-center gap-1.5 mb-1.5 uppercase tracking-wider">
+                                Boleta {period.period_label}
+                              </h4>
+                              <p className="text-[10px] text-gray-400 mb-4 leading-relaxed">
+                                Monto calculado para emitir una única boleta de honorarios consolidada por los <b>{numEvents} eventos</b> de este período.
+                              </p>
+
+                              <div className="grid grid-cols-3 gap-2 bg-gray-950/60 p-3 rounded-xl border border-white/5 mb-4 font-mono">
+                                <div className="text-center border-r border-white/5">
+                                  <p className="text-[9px] text-gray-500 font-bold uppercase tracking-wider">Líquido</p>
+                                  <p className="text-xs font-black text-white mt-0.5">${liquidAmount.toLocaleString("es-CL")}</p>
+                                </div>
+                                <div className="text-center border-r border-white/5">
+                                  <p className="text-[9px] text-gray-500 font-bold uppercase tracking-wider">Retención ({rate}%)</p>
+                                  <p className="text-xs font-black text-gray-400 mt-0.5">${retentionEstimated.toLocaleString("es-CL")}</p>
+                                </div>
+                                <div className="text-center">
+                                  <p className="text-[9px] text-gray-500 font-bold uppercase tracking-wider">Bruto</p>
+                                  <p className="text-xs font-black text-amber-400 mt-0.5">${grossExpected.toLocaleString("es-CL")}</p>
+                                </div>
+                              </div>
+
+                              <div className="bg-amber-500/10 border border-amber-500/20 p-3 rounded-xl text-[10px] text-amber-200 leading-relaxed space-y-1">
+                                <p className="font-extrabold flex items-center gap-1">
+                                  💡 Instrucciones de Emisión SII:
+                                </p>
+                                <p>
+                                  1. Emite <b>una boleta de honorarios</b> en el portal del SII por el monto bruto de <b className="text-amber-300 font-extrabold font-mono">${grossExpected.toLocaleString("es-CL")}</b>.
+                                </p>
+                                <p>
+                                  2. Envíala en PDF a <span className="text-white underline font-semibold">contacto@laampolleta.tv</span> indicando tu RUT y número de boleta.
+                                </p>
+                                <p>
+                                  3. Al validarse, administración autorizará la transferencia en la próxima fecha masiva de pago.
+                                </p>
+                              </div>
+                            </GlassCard>
+                          );
+                        }
+
+                        // Estado Boleta Recibida / En Proceso de Pago (Azul/Teal)
+                        const isVerified = period.status === "En proceso de pago";
+                        return (
+                          <GlassCard 
+                            key={period.period_key}
+                            className={`p-6 border relative overflow-hidden bg-gradient-to-br shadow-sm transition-all duration-300 ${
+                              isVerified 
+                                ? 'border-teal-500/20 from-teal-500/[0.03] to-transparent shadow-[0_0_24px_rgba(20,184,166,0.02)]' 
+                                : 'border-indigo-500/20 from-indigo-500/[0.03] to-transparent shadow-[0_0_24px_rgba(99,102,241,0.02)]'
+                            }`}
+                          >
+                            <div className="absolute top-0 right-0 p-4">
+                              <span className={`px-2.5 py-1 rounded text-[10px] font-black uppercase tracking-wider flex items-center gap-1 ${
+                                isVerified 
+                                  ? 'bg-teal-500/15 border border-teal-500/30 text-teal-300' 
+                                  : 'bg-indigo-500/15 border border-indigo-500/30 text-indigo-300'
+                              }`}>
+                                <span className={`w-1.5 h-1.5 rounded-full ${isVerified ? 'bg-teal-400 animate-pulse' : 'bg-indigo-400 animate-pulse'}`} />
+                                {isVerified ? "En Proceso de Pago" : "Boleta Recibida"}
+                              </span>
+                            </div>
+
+                            <h4 className={`text-sm font-black flex items-center gap-1.5 mb-1.5 uppercase tracking-wider ${
+                              isVerified ? 'text-teal-300' : 'text-indigo-300'
+                            }`}>
+                              Boleta {period.period_label}
+                            </h4>
+                            <p className="text-[10px] text-gray-400 mb-4 leading-relaxed">
+                              {isVerified 
+                                ? "Boleta consolidada validada con éxito. Los pagos están autorizados para transferencia masiva." 
+                                : "Tu boleta consolidada ha sido cargada y está pendiente de validación formal administrativa."
+                              }
+                            </p>
+
+                            <div className="grid grid-cols-2 gap-4 mb-4">
+                              <div className="bg-gray-950/60 p-2.5 rounded-lg border border-white/5 font-mono">
+                                <p className="text-[9px] text-gray-500 font-bold uppercase">Boleta Recibida</p>
+                                <p className="text-xs font-black text-white mt-0.5">Nº {activeBatch?.invoice_number || "Registrada"}</p>
+                                <p className="text-[9px] text-gray-400 mt-0.5">${parseFloat(activeBatch?.invoice_amount || grossExpected).toLocaleString("es-CL")}</p>
+                              </div>
+                              <div className="bg-gray-950/60 p-2.5 rounded-lg border border-white/5 font-mono">
+                                <p className="text-[9px] text-gray-500 font-bold uppercase">Líquido Proyectado</p>
+                                <p className="text-xs font-black text-emerald-400 mt-0.5">${liquidAmount.toLocaleString("es-CL")}</p>
+                                <p className="text-[9px] text-gray-400 mt-0.5">Bruto: ${grossExpected.toLocaleString("es-CL")}</p>
+                              </div>
+                            </div>
+
+                            <div className="bg-gray-900/60 border border-white/5 p-3 rounded-xl space-y-1 text-[10px] text-gray-300 font-mono">
+                              <div className="flex justify-between border-b border-white/5 pb-1">
+                                <span className="text-gray-500">Eventos Cubiertos:</span>
+                                <span className="font-bold text-gray-200">{numEvents} eventos</span>
+                              </div>
+                              {activeBatch?.profiles?.name && (
+                                <div className="flex justify-between border-b border-white/5 pb-1 pt-1">
+                                  <span className="text-gray-500">Validado Por:</span>
+                                  <span className="font-bold text-gray-200">{activeBatch.profiles.name}</span>
+                                </div>
+                              )}
+                              {activeBatch?.invoice_notes && (
+                                <div className="pt-1">
+                                  <span className="text-gray-500 block">Nota Administración:</span>
+                                  <span className="font-medium text-amber-300 italic">"{activeBatch.invoice_notes}"</span>
+                                </div>
+                              )}
+                            </div>
+                          </GlassCard>
+                        );
+                      })
+                    )}
                   </div>
                 </motion.div>
 

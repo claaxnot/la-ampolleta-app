@@ -623,7 +623,8 @@ export default function Finanzas() {
             id,
             name,
             date,
-            time
+            time,
+            status
           ),
           profiles:staff_id (
             id,
@@ -729,7 +730,10 @@ export default function Finanzas() {
         const formatted = assignments.map(a => {
           const defaultRate = a.profiles?.monto_transferencia ? parseFloat(a.profiles.monto_transferencia) : 25000;
           const rate = a.custom_rate ? parseFloat(a.custom_rate) : defaultRate;
-          const isFinished = a.events?.date ? new Date(a.events.date) < new Date() : false;
+          const eventStatus = a.events?.status ? a.events.status.toLowerCase() : "";
+          const todayStr = new Date().toLocaleDateString("en-CA");
+          const isDateFinished = a.events?.date ? a.events.date <= todayStr : false;
+          const isFinished = eventStatus === "completado" || eventStatus === "finalizado" || isDateFinished;
           const attLog = attMap[`${a.events?.id}-${a.profiles?.id}`];
 
           return {
@@ -785,7 +789,7 @@ export default function Finanzas() {
         .select(`
           id,
           status,
-          events:event_id ( id, name, date, time ),
+          events:event_id ( id, name, date, time, status ),
           profiles:staff_id (
             id,
             name,
@@ -804,7 +808,10 @@ export default function Finanzas() {
       if (assignments) {
         const formatted = assignments.map(a => {
           const defaultRate = a.profiles?.monto_transferencia ? parseFloat(a.profiles.monto_transferencia) : 25000;
-          const isFinished = a.events?.date ? new Date(a.events.date) < new Date() : false;
+          const eventStatus = a.events?.status ? a.events.status.toLowerCase() : "";
+          const todayStr = new Date().toLocaleDateString("en-CA");
+          const isDateFinished = a.events?.date ? a.events.date <= todayStr : false;
+          const isFinished = eventStatus === "completado" || eventStatus === "finalizado" || isDateFinished;
 
           return {
             id: a.id,
@@ -1644,10 +1651,19 @@ export default function Finanzas() {
       eName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       sRut.includes(searchTerm);
 
-    const matchesStatus =
-      statusFilter === "all" ||
-      (statusFilter === "pending" && sStatus === "Pendiente") ||
-      (statusFilter === "paid" && sStatus === "Pagado");
+    let matchesStatus = false;
+    if (statusFilter === "all") {
+      matchesStatus = true;
+    } else if (statusFilter === "pending") {
+      // Pendientes: No pagados Y que requieran boleta pero NO la hayan entregado
+      matchesStatus = sStatus !== "Pagado" && p.invoice_required && !p.invoice_received;
+    } else if (statusFilter === "ready") {
+      // Liberados para pago: No pagados Y (no requieren boleta o ya la entregaron/verificado)
+      matchesStatus = sStatus !== "Pagado" && (!p.invoice_required || p.invoice_received);
+    } else if (statusFilter === "paid") {
+      // Pagados
+      matchesStatus = sStatus === "Pagado";
+    }
 
     const matchesMonth =
       monthFilter === "all" ||
@@ -1682,6 +1698,44 @@ export default function Finanzas() {
       countPaid: paidCount
     };
   }, [filteredPayments]);
+
+  const tabCounts = React.useMemo(() => {
+    let pending = 0;
+    let ready = 0;
+    let paid = 0;
+    let all = 0;
+
+    payments.forEach(p => {
+      const sName = p?.staff_name || "";
+      const eName = p?.event_name || "";
+      const sRut = p?.staff_rut || "";
+      const eDate = p?.event_date || "";
+
+      const matchesSearch =
+        sName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        eName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        sRut.includes(searchTerm);
+
+      const matchesMonth =
+        monthFilter === "all" ||
+        (eDate && eDate.startsWith(monthFilter));
+
+      const matchesFinished = includeFuture || p?.is_finished;
+
+      if (matchesSearch && matchesMonth && matchesFinished) {
+        all++;
+        if (p.status === "Pagado") {
+          paid++;
+        } else if (p.invoice_required && !p.invoice_received) {
+          pending++;
+        } else {
+          ready++;
+        }
+      }
+    });
+
+    return { pending, ready, paid, all };
+  }, [payments, searchTerm, monthFilter, includeFuture]);
 
   return (
     <motion.div
@@ -1845,24 +1899,46 @@ export default function Finanzas() {
                 </div>
               </div>
 
-              <div className="flex items-center bg-gray-800/40 border border-gray-700/60 rounded-xl p-1 gap-1">
-                <button
-                  onClick={() => setStatusFilter("all")}
-                  className={`px-4 py-2 text-xs font-semibold rounded-lg transition-all duration-150 cursor-pointer touch-manipulation active:bg-white/10 active:opacity-90 ${statusFilter === "all" ? "bg-amber-500/20 text-amber-300 border border-amber-500/20" : "text-gray-400 hover:text-gray-200"}`}
-                >
-                  Todos
-                </button>
+              <div className="flex items-center bg-gray-800/40 border border-gray-700/60 rounded-xl p-1 gap-1 flex-wrap md:flex-nowrap">
                 <button
                   onClick={() => setStatusFilter("pending")}
-                  className={`px-4 py-2 text-xs font-semibold rounded-lg transition-all duration-150 cursor-pointer touch-manipulation active:bg-white/10 active:opacity-90 ${statusFilter === "pending" ? "bg-red-500/20 text-red-300 border border-red-500/20" : "text-gray-400 hover:text-gray-200"}`}
+                  className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all duration-150 cursor-pointer touch-manipulation flex items-center gap-1.5 active:bg-white/10 active:opacity-90 ${statusFilter === "pending" ? "bg-red-500/20 text-red-300 border border-red-500/20 shadow-sm" : "text-gray-400 hover:text-gray-200"}`}
                 >
-                  Pendientes
+                  <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
+                  <span>Pendientes</span>
+                  <span className="px-1.5 py-0.5 text-[10px] font-extrabold rounded-md bg-red-500/10 border border-red-500/20 text-red-400">
+                    {tabCounts.pending}
+                  </span>
+                </button>
+                <button
+                  onClick={() => setStatusFilter("ready")}
+                  className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all duration-150 cursor-pointer touch-manipulation flex items-center gap-1.5 active:bg-white/10 active:opacity-90 ${statusFilter === "ready" ? "bg-sky-500/20 text-sky-300 border border-sky-500/20 shadow-sm" : "text-gray-400 hover:text-gray-200"}`}
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-sky-400 animate-pulse" />
+                  <span>Liberados</span>
+                  <span className="px-1.5 py-0.5 text-[10px] font-extrabold rounded-md bg-sky-500/10 border border-sky-500/20 text-sky-400">
+                    {tabCounts.ready}
+                  </span>
                 </button>
                 <button
                   onClick={() => setStatusFilter("paid")}
-                  className={`px-4 py-2 text-xs font-semibold rounded-lg transition-all duration-150 cursor-pointer touch-manipulation active:bg-white/10 active:opacity-90 ${statusFilter === "paid" ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/20" : "text-gray-400 hover:text-gray-200"}`}
+                  className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all duration-150 cursor-pointer touch-manipulation flex items-center gap-1.5 active:bg-white/10 active:opacity-90 ${statusFilter === "paid" ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/20 shadow-sm" : "text-gray-400 hover:text-gray-200"}`}
                 >
-                  Pagados
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                  <span>Pagados</span>
+                  <span className="px-1.5 py-0.5 text-[10px] font-extrabold rounded-md bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+                    {tabCounts.paid}
+                  </span>
+                </button>
+                <button
+                  onClick={() => setStatusFilter("all")}
+                  className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all duration-150 cursor-pointer touch-manipulation flex items-center gap-1.5 active:bg-white/10 active:opacity-90 ${statusFilter === "all" ? "bg-amber-500/20 text-amber-300 border border-amber-500/20 shadow-sm" : "text-gray-400 hover:text-gray-200"}`}
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-gray-400" />
+                  <span>Todos</span>
+                  <span className="px-1.5 py-0.5 text-[10px] font-extrabold rounded-md bg-amber-500/10 border border-amber-500/20 text-amber-400">
+                    {tabCounts.all}
+                  </span>
                 </button>
               </div>
 
