@@ -461,46 +461,77 @@ export default function Finanzas() {
   const renderInvoiceBadge = (p) => {
     if (!p.invoice_required) {
       return (
-        <span className="px-2.5 py-0.5 rounded-full text-2xs font-extrabold bg-gray-800 border border-white/10 text-gray-400">
-          ⚪ No requiere
+        <span className="px-2.5 py-0.5 rounded-full text-2xs font-extrabold bg-gray-800 border border-white/10 text-gray-400 select-none">
+          ⚪ No requiere boleta
         </span>
       );
     }
 
-    if (!p.invoice_received) {
+    if (p.status === "Pagado") {
+      const rate = parseFloat(retentionRateSetting || 15.25);
+      const brutoEsperado = Math.round(p.monto / (1 - (rate / 100)));
+      const retencionEstimada = brutoEsperado - p.monto;
+      const montoRecibido = p.invoice_amount || 0;
+      const diferencia = montoRecibido - brutoEsperado;
+      const diffText = diferencia === 0 ? "Sin diferencia" : `${diferencia > 0 ? "+" : ""}$${diferencia.toLocaleString("es-CL")} CLP`;
+      const verificadoPor = p.invoice_verified_by_name || 'Admin';
+      const fechaVal = p.invoice_received_at ? new Date(p.invoice_received_at).toLocaleDateString("es-CL") : 'No registrada';
+      
+      const tooltipText = `Detalles Tributarios:\n` +
+        `- Líquido Pactado: $${p.monto.toLocaleString("es-CL")} CLP\n` +
+        `- Retención SII (${rate}%): $${retencionEstimada.toLocaleString("es-CL")} CLP\n` +
+        `- Bruto Esperado: $${brutoEsperado.toLocaleString("es-CL")} CLP\n` +
+        `- Monto Recibido: $${montoRecibido.toLocaleString("es-CL")} CLP\n` +
+        `- Diferencia: ${diffText}\n` +
+        `---------------------------------\n` +
+        `- Verificado por: ${verificadoPor}\n` +
+        `- Fecha de validación: ${fechaVal}` +
+        `${p.invoice_notes ? '\n- Notas: ' + p.invoice_notes : ''}`;
+
       return (
-        <span className="px-2.5 py-0.5 rounded-full text-2xs font-extrabold bg-amber-500/10 border border-amber-500/30 text-amber-400 animate-pulse">
-          🔴 Falta Boleta
+        <span 
+          className="px-2.5 py-0.5 rounded-full text-2xs font-extrabold bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 cursor-help select-none"
+          title={p.invoice_received ? tooltipText : "Pago procesado y finalizado"}
+        >
+          🟢 Pagado mediante lote tributario {p.invoice_number ? `(Nº ${p.invoice_number})` : ''}
         </span>
       );
     }
 
-    const rate = parseFloat(retentionRateSetting || 15.25);
-    const brutoEsperado = Math.round(p.monto / (1 - (rate / 100)));
-    const retencionEstimada = brutoEsperado - p.monto;
-    const montoRecibido = p.invoice_amount || 0;
-    const diferencia = montoRecibido - brutoEsperado;
-    const diffText = diferencia === 0 ? "Sin diferencia" : `${diferencia > 0 ? "+" : ""}$${diferencia.toLocaleString("es-CL")} CLP`;
-    const verificadoPor = p.invoice_verified_by_name || 'Admin';
-    const fechaVal = p.invoice_received_at ? new Date(p.invoice_received_at).toLocaleDateString("es-CL") : 'No registrada';
-    
-    const tooltipText = `Detalles Tributarios:\n` +
-      `- Líquido Pactado: $${p.monto.toLocaleString("es-CL")} CLP\n` +
-      `- Retención SII (${rate}%): $${retencionEstimada.toLocaleString("es-CL")} CLP\n` +
-      `- Bruto Esperado: $${brutoEsperado.toLocaleString("es-CL")} CLP\n` +
-      `- Monto Recibido: $${montoRecibido.toLocaleString("es-CL")} CLP\n` +
-      `- Diferencia: ${diffText}\n` +
-      `---------------------------------\n` +
-      `- Verificado por: ${verificadoPor}\n` +
-      `- Fecha de validación: ${fechaVal}` +
-      `${p.invoice_notes ? '\n- Notas: ' + p.invoice_notes : ''}`;
+    if (p.invoice_received) {
+      const rate = parseFloat(retentionRateSetting || 15.25);
+      const brutoEsperado = Math.round(p.monto / (1 - (rate / 100)));
+      const retencionEstimada = brutoEsperado - p.monto;
+      const montoRecibido = p.invoice_amount || 0;
+      const diferencia = montoRecibido - brutoEsperado;
+      const diffText = diferencia === 0 ? "Sin diferencia" : `${diferencia > 0 ? "+" : ""}$${diferencia.toLocaleString("es-CL")} CLP`;
+      const verificadoPor = p.invoice_verified_by_name || 'Admin';
+      const fechaVal = p.invoice_received_at ? new Date(p.invoice_received_at).toLocaleDateString("es-CL") : 'No registrada';
+      
+      const tooltipText = `Detalles Tributarios:\n` +
+        `- Líquido Pactado: $${p.monto.toLocaleString("es-CL")} CLP\n` +
+        `- Retención SII (${rate}%): $${retencionEstimada.toLocaleString("es-CL")} CLP\n` +
+        `- Bruto Esperado: $${brutoEsperado.toLocaleString("es-CL")} CLP\n` +
+        `- Monto Recibido: $${montoRecibido.toLocaleString("es-CL")} CLP\n` +
+        `- Diferencia: ${diffText}\n` +
+        `---------------------------------\n` +
+        `- Verificado por: ${verificadoPor}\n` +
+        `- Fecha de validación: ${fechaVal}` +
+        `${p.invoice_notes ? '\n- Notas: ' + p.invoice_notes : ''}`;
+
+      return (
+        <span 
+          className="px-2.5 py-0.5 rounded-full text-2xs font-extrabold bg-blue-500/10 border border-blue-500/30 text-blue-300 cursor-help flex items-center gap-1"
+          title={tooltipText}
+        >
+          🧾 Incluido en boleta agrupada Nº {p.invoice_number}
+        </span>
+      );
+    }
 
     return (
-      <span 
-        className="px-2.5 py-1 rounded-full text-2xs font-extrabold bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 cursor-help flex items-center gap-1"
-        title={tooltipText}
-      >
-        🟢 Nº {p.invoice_number}
+      <span className="px-2.5 py-0.5 rounded-full text-2xs font-extrabold bg-amber-500/10 border border-amber-500/30 text-amber-400 select-none">
+        🟡 Pendiente en lote tributario
       </span>
     );
   };
@@ -1783,7 +1814,7 @@ export default function Finanzas() {
       <div className="relative z-10 flex items-center gap-2 bg-gray-900/60 p-1.5 rounded-xl border border-white/5 w-full max-w-sm sm:max-w-md mb-6">
         <button
           onClick={() => setAdminTab("nominas")}
-          className={`flex-1 py-3 px-4 rounded-lg text-xs sm:text-sm font-extrabold transition-all duration-150 flex items-center justify-center gap-1.5 cursor-pointer touch-manipulation active:bg-amber-500/30 active:opacity-90 ${
+          className={`flex-1 py-3 px-4 rounded-lg text-xs sm:text-sm font-extrabold transition-all duration-150 flex items-center justify-center gap-1.5 cursor-pointer active:bg-amber-500/30 active:opacity-90 ${
             adminTab === "nominas" ? "bg-amber-500/20 text-amber-300 border border-amber-500/20 shadow-[0_0_12px_rgba(245,158,11,0.15)]" : "text-gray-400 hover:text-gray-200"
           }`}
         >
@@ -1792,7 +1823,7 @@ export default function Finanzas() {
         </button>
         <button
           onClick={() => setAdminTab("viaticos")}
-          className={`flex-1 py-3 px-4 rounded-lg text-xs sm:text-sm font-extrabold transition-all duration-150 flex items-center justify-center gap-1.5 cursor-pointer touch-manipulation active:bg-amber-500/30 active:opacity-90 ${
+          className={`flex-1 py-3 px-4 rounded-lg text-xs sm:text-sm font-extrabold transition-all duration-150 flex items-center justify-center gap-1.5 cursor-pointer active:bg-amber-500/30 active:opacity-90 ${
             adminTab === "viaticos" ? "bg-amber-500/20 text-amber-300 border border-amber-500/20 shadow-[0_0_12px_rgba(245,158,11,0.15)]" : "text-gray-400 hover:text-gray-200"
           }`}
         >
@@ -1869,25 +1900,25 @@ export default function Finanzas() {
       {adminTab === "nominas" ? (
         <>
           {/* Acciones de Lote y Filtros */}
-          <motion.div variants={itemVariants} className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+          <motion.div variants={itemVariants} className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
             {/* Filtros */}
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="relative">
+            <div className="flex flex-col lg:flex-row lg:items-center gap-3 w-full lg:w-auto">
+              <div className="relative w-full lg:w-64">
                 <Search className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
                 <input
                   type="text"
                   placeholder="Buscar por staff o evento..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="bg-gray-800/40 border border-gray-700/60 rounded-xl py-2 pl-9 pr-4 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-amber-500 w-64 transition-all duration-300"
+                  className="bg-gray-800/40 border border-gray-700/60 rounded-xl py-2 pl-9 pr-4 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-amber-500 w-full transition-all duration-300"
                 />
               </div>
 
-              <div className="relative">
+              <div className="relative w-full lg:w-auto">
                 <select
                   value={monthFilter}
                   onChange={(e) => setMonthFilter(e.target.value)}
-                  className="bg-gray-800/40 border border-gray-700/60 rounded-xl py-2 pl-4 pr-10 text-sm text-white focus:outline-none focus:border-amber-500 appearance-none transition-all duration-300 font-semibold cursor-pointer"
+                  className="bg-gray-800/40 border border-gray-700/60 rounded-xl py-2 pl-4 pr-10 text-sm text-white focus:outline-none focus:border-amber-500 appearance-none transition-all duration-300 font-semibold cursor-pointer w-full lg:w-auto"
                 >
                   <option value="all">Todos los meses</option>
                   {uniqueMonths.map(p => (
@@ -1899,10 +1930,10 @@ export default function Finanzas() {
                 </div>
               </div>
 
-              <div className="flex items-center bg-gray-800/40 border border-gray-700/60 rounded-xl p-1 gap-1 flex-wrap md:flex-nowrap">
+              <div className="flex items-center bg-gray-800/40 border border-gray-700/60 rounded-xl p-1 gap-1 overflow-x-auto scrollbar-none w-full lg:w-auto flex-nowrap shrink-0">
                 <button
                   onClick={() => setStatusFilter("pending")}
-                  className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all duration-150 cursor-pointer touch-manipulation flex items-center gap-1.5 active:bg-white/10 active:opacity-90 ${statusFilter === "pending" ? "bg-red-500/20 text-red-300 border border-red-500/20 shadow-sm" : "text-gray-400 hover:text-gray-200"}`}
+                  className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all duration-150 cursor-pointer flex items-center gap-1.5 active:bg-white/10 active:opacity-90 shrink-0 ${statusFilter === "pending" ? "bg-red-500/20 text-red-300 border border-red-500/20 shadow-sm" : "text-gray-400 hover:text-gray-200"}`}
                 >
                   <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
                   <span>Pendientes</span>
@@ -1912,7 +1943,7 @@ export default function Finanzas() {
                 </button>
                 <button
                   onClick={() => setStatusFilter("ready")}
-                  className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all duration-150 cursor-pointer touch-manipulation flex items-center gap-1.5 active:bg-white/10 active:opacity-90 ${statusFilter === "ready" ? "bg-sky-500/20 text-sky-300 border border-sky-500/20 shadow-sm" : "text-gray-400 hover:text-gray-200"}`}
+                  className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all duration-150 cursor-pointer flex items-center gap-1.5 active:bg-white/10 active:opacity-90 shrink-0 ${statusFilter === "ready" ? "bg-sky-500/20 text-sky-300 border border-sky-500/20 shadow-sm" : "text-gray-400 hover:text-gray-200"}`}
                 >
                   <span className="w-1.5 h-1.5 rounded-full bg-sky-400 animate-pulse" />
                   <span>Liberados</span>
@@ -1922,7 +1953,7 @@ export default function Finanzas() {
                 </button>
                 <button
                   onClick={() => setStatusFilter("paid")}
-                  className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all duration-150 cursor-pointer touch-manipulation flex items-center gap-1.5 active:bg-white/10 active:opacity-90 ${statusFilter === "paid" ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/20 shadow-sm" : "text-gray-400 hover:text-gray-200"}`}
+                  className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all duration-150 cursor-pointer flex items-center gap-1.5 active:bg-white/10 active:opacity-90 shrink-0 ${statusFilter === "paid" ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/20 shadow-sm" : "text-gray-400 hover:text-gray-200"}`}
                 >
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                   <span>Pagados</span>
@@ -1932,7 +1963,7 @@ export default function Finanzas() {
                 </button>
                 <button
                   onClick={() => setStatusFilter("all")}
-                  className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all duration-150 cursor-pointer touch-manipulation flex items-center gap-1.5 active:bg-white/10 active:opacity-90 ${statusFilter === "all" ? "bg-amber-500/20 text-amber-300 border border-amber-500/20 shadow-sm" : "text-gray-400 hover:text-gray-200"}`}
+                  className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all duration-150 cursor-pointer flex items-center gap-1.5 active:bg-white/10 active:opacity-90 shrink-0 ${statusFilter === "all" ? "bg-amber-500/20 text-amber-300 border border-amber-500/20 shadow-sm" : "text-gray-400 hover:text-gray-200"}`}
                 >
                   <span className="w-1.5 h-1.5 rounded-full bg-gray-400" />
                   <span>Todos</span>
@@ -1942,7 +1973,7 @@ export default function Finanzas() {
                 </button>
               </div>
 
-              <label className="flex items-center gap-2 cursor-pointer bg-gray-800/40 border border-gray-700/60 rounded-xl px-3.5 py-1.5 text-xs font-semibold text-gray-300 hover:text-white hover:border-amber-500/30 transition-all h-[38px]">
+              <label className="flex items-center gap-2 cursor-pointer bg-gray-800/40 border border-gray-700/60 rounded-xl px-3.5 py-1.5 text-xs font-semibold text-gray-300 hover:text-white hover:border-amber-500/30 transition-all h-[38px] w-full lg:w-auto justify-center lg:justify-start shrink-0">
                 <input
                   type="checkbox"
                   checked={includeFuture}
@@ -1958,7 +1989,7 @@ export default function Finanzas() {
               <motion.div
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
-                className="flex items-center gap-2"
+                className="flex items-center gap-2 shrink-0"
               >
                 <span className="text-xs text-gray-400 mr-2 font-bold bg-gray-800 px-3 py-1.5 rounded-lg border border-gray-700">
                   {selectedIds.length} seleccionados
@@ -1966,14 +1997,14 @@ export default function Finanzas() {
                 <Button
                   variant="amber"
                   onClick={handleDownloadNomina}
-                  className="flex items-center gap-2 text-xs py-2 px-3 bg-amber-500/25 border border-amber-500/30 text-amber-300 font-bold hover:bg-amber-500 hover:text-gray-900 rounded-xl transition-all"
+                  className="flex items-center gap-2 text-xs py-2 px-3 bg-amber-500/25 border border-amber-500/30 text-amber-300 font-bold hover:bg-amber-500 hover:text-gray-900 rounded-xl transition-all shrink-0"
                 >
                   <Download className="w-3.5 h-3.5" /> Generar Nómina
                 </Button>
                 <Button
                   variant="emerald"
                   onClick={handleMarkAsPaid}
-                  className="flex items-center gap-2 text-xs py-2 px-3 bg-emerald-500/25 border border-emerald-500/30 text-emerald-300 font-bold hover:bg-emerald-500 hover:text-gray-900 rounded-xl transition-all"
+                  className="flex items-center gap-2 text-xs py-2 px-3 bg-emerald-500/25 border border-emerald-500/30 text-emerald-300 font-bold hover:bg-emerald-500 hover:text-gray-900 rounded-xl transition-all shrink-0"
                 >
                   <CheckCircle className="w-3.5 h-3.5" /> Marcar Pagado
                 </Button>
@@ -1982,7 +2013,7 @@ export default function Finanzas() {
               <Button
                 variant="amber"
                 onClick={handleExportFilteredReport}
-                className="flex items-center gap-2 text-xs py-2.5 px-4 bg-amber-500/10 border border-amber-500/20 text-amber-300 font-bold hover:bg-amber-500/20 hover:border-amber-500/40 rounded-xl transition-all h-[38px] self-start md:self-auto shadow-sm"
+                className="flex items-center gap-2 text-xs py-2.5 px-4 bg-amber-500/10 border border-amber-500/20 text-amber-300 font-bold hover:bg-amber-500/20 hover:border-amber-500/40 rounded-xl transition-all h-[38px] self-start lg:self-auto shadow-sm shrink-0"
               >
                 <Download className="w-3.5 h-3.5 text-amber-400" /> Exportar Reporte Filtrado
               </Button>
@@ -2115,6 +2146,20 @@ export default function Finanzas() {
             </GlassCard>
           </motion.div>
 
+          {/* SECCIÓN OPERACIONAL INFERIOR */}
+          <motion.div variants={itemVariants} className="mb-4 mt-6">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-1">
+              <div>
+                <h4 className="text-xs font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-gray-300 to-gray-400 flex items-center gap-2 uppercase tracking-wider">
+                  💼 Detalle Operacional Individual (Eventos y Transferencias)
+                </h4>
+                <p className="text-3xs text-gray-500 mt-0.5 font-medium">
+                  Información y montos líquidos pactados. Los estados de boletas se visualizan aquí en modo solo lectura.
+                </p>
+              </div>
+            </div>
+          </motion.div>
+
           {/* Tabla de Finanzas */}
           <motion.div variants={itemVariants}>
             <GlassCard className="overflow-hidden">
@@ -2162,6 +2207,11 @@ export default function Finanzas() {
                       filteredPayments.map(p => {
                         const isSelected = selectedIds.includes(p.id);
                         const missingBank = !p.cuenta_destino || !p.codigo_banco_destino;
+
+                        // Buscar lote tributario asociado
+                        const batchItem = invoiceBatchItems.find(item => item.assignment_id === p.id);
+                        const batch = batchItem ? invoiceBatches.find(b => b.id === batchItem.batch_id) : null;
+                        const batchPeriod = batch ? batch.period_label : null;
 
                         return (
                           <tr
@@ -2256,45 +2306,12 @@ export default function Finanzas() {
                               )}
                             </td>
                             <td className="py-4 px-6 text-center">
-                              <div className="flex flex-col items-center gap-1.5 justify-center">
+                              <div className="flex flex-col items-center gap-1 justify-center">
                                 {renderInvoiceBadge(p)}
-                                
-                                {p.invoice_required && !p.invoice_received && p.status !== "Pagado" && (
-                                  <button
-                                    onClick={() => handleOpenInvoiceModal(p)}
-                                    className="px-2 py-0.5 bg-amber-500/10 border border-amber-500/30 text-amber-400 hover:bg-amber-500 hover:text-gray-900 rounded-md text-[10px] font-extrabold uppercase transition-all duration-300 active:scale-95 cursor-pointer mt-1"
-                                  >
-                                    Confirmar Boleta
-                                  </button>
-                                )}
-
-                                {p.invoice_required && p.invoice_received && p.status !== "Pagado" && (
-                                  <div className="flex gap-2 mt-1">
-                                    <button
-                                      onClick={() => handleOpenInvoiceModal(p)}
-                                      className="text-[10px] text-gray-400 hover:text-white underline transition-colors"
-                                      title="Editar boleta"
-                                    >
-                                      Editar
-                                    </button>
-                                    <button
-                                      onClick={() => handleRevertInvoice(p.id)}
-                                      className="text-[10px] text-red-400 hover:text-red-300 underline transition-colors"
-                                      title="Deshacer boleta"
-                                    >
-                                      Deshacer
-                                    </button>
-                                  </div>
-                                )}
-
-                                {p.status !== "Pagado" && !p.is_expense && (
-                                  <button
-                                    onClick={() => handleToggleInvoiceRequired(p.id, p.invoice_required)}
-                                    className="text-[10px] text-gray-500 hover:text-amber-400 transition-colors mt-1 underline cursor-pointer"
-                                    title={p.invoice_required ? "Eximir del requisito de boleta" : "Exigir boleta para pagar"}
-                                  >
-                                    {p.invoice_required ? "Eximir boleta" : "Exigir boleta"}
-                                  </button>
+                                {batch && (
+                                  <span className="text-[10px] text-gray-500 font-mono mt-0.5" title={`Lote ID: ${batch.id}`}>
+                                    📦 Lote: {batchPeriod}
+                                  </span>
                                 )}
                               </div>
                             </td>
@@ -2329,20 +2346,17 @@ export default function Finanzas() {
                     const isSelected = selectedIds.includes(p.id);
                     const missingBank = !p.cuenta_destino || !p.codigo_banco_destino;
 
+                    // Buscar lote tributario asociado
+                    const batchItem = invoiceBatchItems.find(item => item.assignment_id === p.id);
+                    const batch = batchItem ? invoiceBatches.find(b => b.id === batchItem.batch_id) : null;
+                    const batchPeriod = batch ? batch.period_label : null;
+
                     return (
-                      <GlassCard
+                       <GlassCard
                         key={p.id}
-                        onClick={() => {
-                          if (p.status === "Pagado") return;
-                          if (p.invoice_required && !p.invoice_received) {
-                            toast.error("Este pago requiere boleta de honorarios verificada antes de poder seleccionarlo.");
-                            return;
-                          }
-                          handleSelectOne(p.id);
-                        }}
                         className={`p-5 transition-all duration-200 flex flex-col gap-4 border select-none ${
                           isSelected ? "border-amber-500/50 bg-amber-500/[0.03]" : "border-white/5 bg-gray-900/30"
-                        } ${p.status === "Pagado" ? "opacity-70" : "active:bg-white/5"}`}
+                        } ${p.status === "Pagado" ? "opacity-70" : ""}`}
                       >
                         {/* Fila Superior: Checkbox / Nombre / RUT / Estado */}
                         <div className="flex items-start justify-between gap-3">
@@ -2444,60 +2458,17 @@ export default function Finanzas() {
                             </div>
                           </div>
 
-                          {/* Acciones de Boleta para Mobile */}
-                          {p.status !== "Pagado" && (
-                            <div className="flex flex-wrap gap-2.5 items-center justify-between bg-black/20 p-2 rounded-xl mt-1">
-                              {!p.is_expense && (
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleToggleInvoiceRequired(p.id, p.invoice_required);
-                                  }}
-                                  className="text-[10px] text-gray-400 hover:text-amber-400 transition-colors underline cursor-pointer p-1"
-                                >
-                                  {p.invoice_required ? "Eximir boleta" : "Exigir boleta"}
-                                </button>
-                              )}
-
-                              {p.invoice_required && (
-                                p.invoice_received ? (
-                                  <div className="flex gap-2">
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleOpenInvoiceModal(p);
-                                      }}
-                                      className="text-[10px] text-gray-300 hover:text-white underline cursor-pointer p-1"
-                                    >
-                                      Editar
-                                    </button>
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleRevertInvoice(p.id);
-                                      }}
-                                      className="text-[10px] text-red-400 hover:text-red-300 underline cursor-pointer p-1"
-                                    >
-                                      Deshacer
-                                    </button>
-                                  </div>
-                                ) : (
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleOpenInvoiceModal(p);
-                                    }}
-                                    className="px-3 py-1 bg-amber-500 text-black font-extrabold rounded-lg text-[9px] uppercase transition-all active:scale-95 cursor-pointer ml-auto"
-                                  >
-                                    Confirmar Boleta
-                                  </button>
-                                )
-                              )}
+                          {batch && (
+                            <div className="flex items-center justify-between">
+                              <span className="text-[9px] text-gray-500 uppercase font-extrabold tracking-wider">Lote Tributario</span>
+                              <span className="text-[10px] text-gray-400 font-mono">
+                                📦 Lote: {batchPeriod}
+                              </span>
                             </div>
                           )}
 
                           {p.invoice_received && (
-                            <p className="text-[10px] text-gray-400 font-medium italic">
+                            <p className="text-[10px] text-gray-400 font-medium italic mt-1">
                               Verificado por {p.invoice_verified_by_name || 'Admin'} el {p.invoice_received_at ? new Date(p.invoice_received_at).toLocaleDateString("es-CL") : ''}
                               {p.invoice_notes && ` (Nota: "${p.invoice_notes}")`}
                             </p>
@@ -2546,7 +2517,7 @@ export default function Finanzas() {
                       setExpenseStatusFilter(status);
                       setSelectedExpense(null);
                     }}
-                    className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all duration-150 cursor-pointer touch-manipulation active:opacity-85 ${
+                    className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all duration-150 cursor-pointer active:opacity-85 ${
                       expenseStatusFilter === status
                         ? "bg-amber-500 text-black shadow-lg shadow-amber-500/20"
                         : "bg-gray-800/60 text-gray-400 hover:text-white"
