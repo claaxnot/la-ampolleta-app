@@ -135,7 +135,7 @@ export default function Login({ onLogin }) {
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-transparent text-white relative overflow-hidden p-4 md:p-0">
+    <div className="flex flex-col items-center justify-center min-h-screen bg-transparent text-white relative overflow-hidden p-4 md:p-0">
       <GlassCard className="w-full max-w-md p-6 md:p-8">
         <div className="flex flex-col items-center mb-8">
           <div className="w-20 h-20 bg-white/5 backdrop-blur-xl rounded-2xl flex items-center justify-center mb-4 shadow-xl border border-white/10 hover:border-accent/30 transition-all duration-300">
@@ -215,6 +215,16 @@ export default function Login({ onLogin }) {
           </Button>
         </form>
       </GlassCard>
+
+      {/* Sutil Footer Creds */}
+      <div className="mt-6 flex flex-col items-center gap-0.5 text-center pointer-events-none select-none opacity-30 hover:opacity-60 transition-opacity duration-300">
+        <span className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">
+          La Ampolleta Platform v3.1
+        </span>
+        <span className="text-[8px] text-gray-500 font-medium tracking-wider">
+          Engineered by Cristopher Vidal
+        </span>
+      </div>
     </div>
   );
 }

@@ -4,6 +4,17 @@ import App from './App.jsx';
 import { AuthProvider } from './context/AuthContext.jsx';
 import './index.css';
 
+// Premium Developer Console Signature
+console.log(
+  "%c⚡ LA AMPOLLETA PLATFORM v3.1 %c\n%cEngineered with ♥ by Cristopher Vidal%c\n%cEnvironment: Production | Build: 2026.05%c",
+  "color:#f5b301;font-size:13px;font-weight:900;font-family:system-ui;text-transform:uppercase;letter-spacing:1px;text-shadow:0 0 10px rgba(245,158,11,0.3);",
+  "",
+  "color:#e2e8f0;font-size:11px;font-family:system-ui;font-weight:600;",
+  "",
+  "color:#64748b;font-size:9px;font-family:system-ui;font-weight:bold;letter-spacing:0.5px;",
+  ""
+);
+
 ReactDOM.createRoot(document.getElementById('root')).render(
     <React.StrictMode>
         <AuthProvider>
