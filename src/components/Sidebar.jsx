@@ -194,7 +194,7 @@ export default function Sidebar({ user, onLogout, isOpen, setIsOpen }) {
               </div>
               <div className="flex flex-col">
                 <span className="text-[8px] text-gray-600 uppercase tracking-widest font-extrabold">Base de Datos</span>
-                <span className="text-[10px] text-gray-300 font-medium">Supabase + PostgreSQL</span>
+                <span className="text-[10px] text-gray-300 font-medium">PostgreSQL</span>
               </div>
             </div>
 
