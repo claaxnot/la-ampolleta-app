@@ -103,12 +103,38 @@ export default function WorkerDashboard({ user }) {
   useEffect(() => {
     const fetchWeather = async () => {
       try {
-        const ipRes = await fetch("https://ipapi.co/json/");
-        const ipData = await ipRes.json();
+        let city = "Santiago";
+        let lat = -33.4489;
+        let lon = -70.6693;
 
-        const city = ipData.city || "Santiago";
-        const lat = ipData.latitude || -33.4489;
-        const lon = ipData.longitude || -70.6693;
+        // Try freeipapi.com first (highly available free HTTPS geolocator)
+        try {
+          const ipRes = await fetch("https://freeipapi.com/api/json");
+          if (ipRes.ok) {
+            const ipData = await ipRes.json();
+            city = ipData.cityName || "Santiago";
+            lat = ipData.latitude || -33.4489;
+            lon = ipData.longitude || -70.6693;
+          } else {
+            throw new Error("freeipapi failed");
+          }
+        } catch (err) {
+          console.warn("⚠️ [WEATHER API] - freeipapi failed, trying ipapi.co:", err);
+          // Fallback to ipapi.co
+          try {
+            const ipRes2 = await fetch("https://ipapi.co/json/");
+            if (ipRes2.ok) {
+              const ipData2 = await ipRes2.json();
+              if (ipData2 && !ipData2.error) {
+                city = ipData2.city || "Santiago";
+                lat = ipData2.latitude || -33.4489;
+                lon = ipData2.longitude || -70.6693;
+              }
+            }
+          } catch (err2) {
+            console.warn("⚠️ [WEATHER API] - ipapi.co also failed:", err2);
+          }
+        }
 
         const weatherRes = await fetch(
           `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true`
