@@ -41,6 +41,9 @@ const eventSchema = z.object({
   operational_info_pending: z.boolean().default(false),
   attendance_control_enabled: z.boolean().default(false),
   attendance_require_confirmed: z.boolean().default(true),
+  latitude: z.string().nullable().optional(),
+  longitude: z.string().nullable().optional(),
+  allowed_radius_meters: z.preprocess((val) => val === "" || val === null || val === undefined ? 300 : Number(val), z.number().default(300)),
 }).refine((data) => {
   // Validar: hora presentación < hora inicio
   if (!data.call_time || !data.time || !data.call_time.includes(":") || !data.time.includes(":")) return true;
@@ -93,7 +96,10 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
       operational_notes: "",
       operational_info_pending: false,
       attendance_control_enabled: false,
-      attendance_require_confirmed: true
+      attendance_require_confirmed: true,
+      latitude: "",
+      longitude: "",
+      allowed_radius_meters: 300
     }
   });
 
@@ -278,9 +284,12 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
           operational_notes: initialData.operational_notes || "",
           operational_info_pending: initialData.operational_info_pending || false,
           attendance_control_enabled: initialData.attendance_control_enabled || false,
-          attendance_require_confirmed: initialData.attendance_require_confirmed !== false
+          attendance_require_confirmed: initialData.attendance_require_confirmed !== false,
+          latitude: initialData.latitude !== null && initialData.latitude !== undefined ? String(initialData.latitude) : "",
+          longitude: initialData.longitude !== null && initialData.longitude !== undefined ? String(initialData.longitude) : "",
+          allowed_radius_meters: initialData.allowed_radius_meters !== null && initialData.allowed_radius_meters !== undefined ? initialData.allowed_radius_meters : 300
         });
-
+ 
         const targetIdForAssignments = initialData.id || initialData.duplicateFromId;
         if (targetIdForAssignments) {
           supabase.from('event_assignments').select('staff_id, custom_rate').eq('event_id', targetIdForAssignments).then(({ data }) => {
@@ -305,7 +314,10 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
           setup_time: "", end_time: "", priority: "Media", operational_notes: "",
           operational_info_pending: false,
           attendance_control_enabled: false,
-          attendance_require_confirmed: true
+          attendance_require_confirmed: true,
+          latitude: "",
+          longitude: "",
+          allowed_radius_meters: 300
         });
       }
     }
@@ -584,6 +596,113 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
                         />
                         <span>Exigir asignación confirmada</span>
                       </label>
+                    )}
+
+                    {watch("attendance_control_enabled") && (
+                      <div className="col-span-full bg-white/[0.02] border border-white/10 rounded-2xl p-4 mt-2 space-y-4 shadow-xl backdrop-blur-md">
+                        <div className="flex items-center gap-2 border-b border-white/5 pb-2.5">
+                          <MapPin className="w-4 h-4 text-amber-400" />
+                          <h4 className="text-xs font-black text-amber-300 uppercase tracking-wider">Ubicación para control de asistencia</h4>
+                        </div>
+
+                        {/* Paste Coord box or Current Location Button */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
+                          <div className="md:col-span-2 flex flex-col gap-1.5">
+                            <label className="text-[10px] font-extrabold text-gray-400 uppercase tracking-widest">
+                              Pegar Enlace Google Maps o Coordenadas (lat, lng)
+                            </label>
+                            <input
+                              type="text"
+                              placeholder="Ej: https://maps.google.com/?q=-33.4429,-70.6538 o -33.4429, -70.6538"
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                if (!val) return;
+                                // Regex to find lat/lng coordinates in string or google maps url
+                                const coordRegex = /(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)/;
+                                const match = val.match(coordRegex);
+                                if (match) {
+                                  setValue("latitude", match[1]);
+                                  setValue("longitude", match[2]);
+                                  toast.success(`Coordenadas extraídas: Lat ${match[1]}, Lng ${match[2]}`);
+                                } else {
+                                  // Check for google maps @lat,lng format
+                                  const urlRegex = /@(-?\d+\.\d+),(-?\d+\.\d+)/;
+                                  const matchUrl = val.match(urlRegex);
+                                  if (matchUrl) {
+                                    setValue("latitude", matchUrl[1]);
+                                    setValue("longitude", matchUrl[2]);
+                                    toast.success(`Coordenadas de enlace extraídas: Lat ${matchUrl[1]}, Lng ${matchUrl[2]}`);
+                                  }
+                                }
+                              }}
+                              className="bg-black/30 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-amber-500/50 transition-all font-medium"
+                            />
+                          </div>
+
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            onClick={() => {
+                              if (!navigator.geolocation) {
+                                toast.error("Geolocalización no soportada en este navegador.");
+                                return;
+                              }
+                              toast.loading("Obteniendo tu ubicación actual...", { id: "gps-admin-loader" });
+                              navigator.geolocation.getCurrentPosition(
+                                (position) => {
+                                  setValue("latitude", String(position.coords.latitude.toFixed(6)));
+                                  setValue("longitude", String(position.coords.longitude.toFixed(6)));
+                                  toast.success("Ubicación actual obtenida con éxito.", { id: "gps-admin-loader" });
+                                },
+                                (err) => {
+                                  toast.error("Error al obtener ubicación. Asegúrate de dar permisos de GPS.", { id: "gps-admin-loader" });
+                                },
+                                { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+                              );
+                            }}
+                            className="w-full text-xs py-2 h-9 flex items-center justify-center gap-1.5"
+                          >
+                            <span>📍 Usar ubicación actual</span>
+                          </Button>
+                        </div>
+
+                        {/* Lat, Lng, Radius inputs */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+                          <div className="flex flex-col gap-1.5">
+                            <label className="text-[10px] font-extrabold text-gray-400 uppercase tracking-widest">Latitud</label>
+                            <input
+                              type="text"
+                              placeholder="Ej: -33.4429"
+                              {...register("latitude")}
+                              className="bg-black/30 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-amber-500/50 transition-all font-medium"
+                            />
+                          </div>
+
+                          <div className="flex flex-col gap-1.5">
+                            <label className="text-[10px] font-extrabold text-gray-400 uppercase tracking-widest">Longitud</label>
+                            <input
+                              type="text"
+                              placeholder="Ej: -70.6538"
+                              {...register("longitude")}
+                              className="bg-black/30 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-amber-500/50 transition-all font-medium"
+                            />
+                          </div>
+
+                          <div className="flex flex-col gap-1.5">
+                            <label className="text-[10px] font-extrabold text-gray-400 uppercase tracking-widest">Radio permitido (metros)</label>
+                            <input
+                              type="number"
+                              placeholder="Ej: 300"
+                              {...register("allowed_radius_meters")}
+                              className="bg-black/30 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-amber-500/50 transition-all font-medium"
+                            />
+                          </div>
+                        </div>
+
+                        <p className="text-[10px] text-gray-500 leading-relaxed italic">
+                          💡 Deja latitud/longitud en blanco si no deseas exigir control de ubicación para este evento. Las trabajadoras podrán marcar desde cualquier lugar sin advertencias si no hay coordenadas.
+                        </p>
+                      </div>
                     )}
                   </div>
 

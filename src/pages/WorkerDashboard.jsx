@@ -743,26 +743,96 @@ export default function WorkerDashboard({ user }) {
     }
   };
 
+  const getCurrentLocation = () => {
+    return new Promise((resolve) => {
+      if (!navigator.geolocation) {
+        resolve({ error: "no_support" });
+        return;
+      }
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          resolve({
+            lat: position.coords.latitude,
+            lng: position.coords.longitude,
+            accuracy: position.coords.accuracy
+          });
+        },
+        (error) => {
+          resolve({ error: error.code || "unknown" });
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 15000, // 15 seconds timeout for mobile GPS warm-up
+          maximumAge: 0
+        }
+      );
+    });
+  };
+
   const handleMarkCheckIn = async (eventId, assignmentId) => {
     if (!eventId || !assignmentId) return;
     setLoadingAttendanceId(`in-${eventId}`);
     try {
+      const eventObj = assignedEvents.find(e => e.id === eventId);
+      const hasCoordinates = eventObj && eventObj.latitude !== null && eventObj.longitude !== null && eventObj.latitude !== "";
+      
+      let lat = null;
+      let lng = null;
+      let accuracy = null;
+      let showWarning = false;
+
+      if (hasCoordinates) {
+        const proceed = window.confirm("📍 [Verificación de Ubicación]\n\nPara registrar tu entrada necesitamos solicitar tu ubicación GPS una sola vez.");
+        if (!proceed) {
+          setLoadingAttendanceId(null);
+          return;
+        }
+        
+        toast.loading("Obteniendo ubicación GPS...", { id: "gps-worker-loader" });
+        const locResult = await getCurrentLocation();
+        toast.dismiss("gps-worker-loader");
+
+        if (locResult.error) {
+          showWarning = true;
+          console.warn("GPS Check-In failed or was denied:", locResult.error);
+        } else {
+          lat = locResult.lat;
+          lng = locResult.lng;
+          accuracy = locResult.accuracy;
+        }
+      }
+
       const { data, error } = await supabase.rpc('mark_event_check_in', {
         p_event_id: eventId,
-        p_assignment_id: assignmentId
+        p_assignment_id: assignmentId,
+        p_lat: lat,
+        p_lng: lng,
+        p_accuracy: accuracy
       });
 
       if (error) {
         toast.error(error.message || "Error al registrar la entrada.");
       } else {
-        toast.success("¡Entrada registrada con éxito!", {
-          icon: "⚡",
-          style: {
-            background: 'rgba(245, 158, 11, 0.95)',
-            color: '#fff',
-            border: '1px solid rgba(245, 158, 11, 0.3)',
-          }
-        });
+        if (showWarning) {
+          toast("Entrada registrada con éxito, pero tu marca quedará registrada sin verificación GPS debido a un error de ubicación.", {
+            icon: "⚠️",
+            duration: 8000,
+            style: {
+              background: 'rgba(217, 119, 6, 0.95)',
+              color: '#fff',
+              border: '1px solid rgba(217, 119, 6, 0.3)',
+            }
+          });
+        } else {
+          toast.success("¡Entrada registrada con éxito!", {
+            icon: "⚡",
+            style: {
+              background: 'rgba(245, 158, 11, 0.95)',
+              color: '#fff',
+              border: '1px solid rgba(245, 158, 11, 0.3)',
+            }
+          });
+        }
         await fetchAttendanceLogs(user.id);
       }
     } catch (err) {
@@ -777,22 +847,66 @@ export default function WorkerDashboard({ user }) {
     if (!eventId || !assignmentId) return;
     setLoadingAttendanceId(`out-${eventId}`);
     try {
+      const eventObj = assignedEvents.find(e => e.id === eventId);
+      const hasCoordinates = eventObj && eventObj.latitude !== null && eventObj.longitude !== null && eventObj.latitude !== "";
+      
+      let lat = null;
+      let lng = null;
+      let accuracy = null;
+      let showWarning = false;
+
+      if (hasCoordinates) {
+        const proceed = window.confirm("📍 [Verificación de Ubicación]\n\nPara registrar tu salida necesitamos solicitar tu ubicación GPS una sola vez.");
+        if (!proceed) {
+          setLoadingAttendanceId(null);
+          return;
+        }
+
+        toast.loading("Obteniendo ubicación GPS...", { id: "gps-worker-loader" });
+        const locResult = await getCurrentLocation();
+        toast.dismiss("gps-worker-loader");
+
+        if (locResult.error) {
+          showWarning = true;
+          console.warn("GPS Check-Out failed or was denied:", locResult.error);
+        } else {
+          lat = locResult.lat;
+          lng = locResult.lng;
+          accuracy = locResult.accuracy;
+        }
+      }
+
       const { data, error } = await supabase.rpc('mark_event_check_out', {
         p_event_id: eventId,
-        p_assignment_id: assignmentId
+        p_assignment_id: assignmentId,
+        p_lat: lat,
+        p_lng: lng,
+        p_accuracy: accuracy
       });
 
       if (error) {
         toast.error(error.message || "Error al registrar la salida.");
       } else {
-        toast.success("¡Salida registrada con éxito! Jornada finalizada.", {
-          icon: "🎉",
-          style: {
-            background: 'rgba(16, 185, 129, 0.95)',
-            color: '#fff',
-            border: '1px solid rgba(16, 185, 129, 0.3)',
-          }
-        });
+        if (showWarning) {
+          toast("Salida registrada con éxito, pero tu marca quedará registrada sin verificación GPS debido a un error de ubicación.", {
+            icon: "⚠️",
+            duration: 8000,
+            style: {
+              background: 'rgba(217, 119, 6, 0.95)',
+              color: '#fff',
+              border: '1px solid rgba(217, 119, 6, 0.3)',
+            }
+          });
+        } else {
+          toast.success("¡Salida registrada con éxito! Jornada finalizada.", {
+            icon: "🎉",
+            style: {
+              background: 'rgba(16, 185, 129, 0.95)',
+              color: '#fff',
+              border: '1px solid rgba(16, 185, 129, 0.3)',
+            }
+          });
+        }
         await fetchAttendanceLogs(user.id);
       }
     } catch (err) {
@@ -861,7 +975,7 @@ export default function WorkerDashboard({ user }) {
           id, name, date, time, location, client, status, description,
           call_time, setup_time, end_time, priority, operational_notes,
           supervisor_id, type, operational_info_pending,
-          attendance_control_enabled, attendance_require_confirmed,
+          attendance_control_enabled, attendance_require_confirmed, latitude, longitude, allowed_radius_meters,
           profiles:supervisor_id (
             name
           )

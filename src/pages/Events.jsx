@@ -147,6 +147,23 @@ export default function Events({ user }) {
     eventData.attendance_control_enabled = !!eventData.attendance_control_enabled;
     eventData.attendance_require_confirmed = !!eventData.attendance_require_confirmed;
 
+    // Normalizar coordenadas GPS
+    if (eventData.latitude === "" || eventData.latitude === undefined || eventData.latitude === null) {
+      eventData.latitude = null;
+    } else {
+      eventData.latitude = Number(eventData.latitude);
+    }
+    if (eventData.longitude === "" || eventData.longitude === undefined || eventData.longitude === null) {
+      eventData.longitude = null;
+    } else {
+      eventData.longitude = Number(eventData.longitude);
+    }
+    if (eventData.allowed_radius_meters === "" || eventData.allowed_radius_meters === undefined || eventData.allowed_radius_meters === null) {
+      eventData.allowed_radius_meters = 300;
+    } else {
+      eventData.allowed_radius_meters = parseInt(eventData.allowed_radius_meters, 10);
+    }
+
     let eventId = eventData.id;
     console.log("4️⃣ [INSERTING EVENT] - Iniciando transacción en Supabase con payload normalizado:", eventData);
 

@@ -44,6 +44,43 @@ export default function EventDetails({ event, isOpen, onClose }) {
     return `${dateStr} ${timeStr}`;
   };
 
+  const renderGPSBadge = (status, distance, accuracy, lat, lng) => {
+    if (!status || status === "unavailable") {
+      return (
+        <span className="text-[9px] px-1.5 py-0.5 rounded bg-white/5 text-gray-400 border border-white/5 font-extrabold uppercase tracking-wider">
+          ⚪ Sin GPS
+        </span>
+      );
+    }
+    
+    const formattedDist = distance !== null && distance !== undefined ? `${Math.round(distance)}m` : "?m";
+    const formattedAcc = accuracy !== null && accuracy !== undefined ? `±${Math.round(accuracy)}m` : "";
+    const tooltip = `Coordenadas: ${lat || '?'}, ${lng || '?'}. Precisión del dispositivo: ${formattedAcc}`;
+
+    if (status === "verified") {
+      return (
+        <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-extrabold uppercase tracking-wider cursor-help" title={tooltip}>
+          🟢 Verificada ({formattedDist})
+        </span>
+      );
+    }
+    if (status === "approximate") {
+      return (
+        <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 font-extrabold uppercase tracking-wider cursor-help" title={tooltip}>
+          🟡 Aproximada ({formattedDist})
+        </span>
+      );
+    }
+    if (status === "out_of_range") {
+      return (
+        <span className="text-[9px] px-1.5 py-0.5 rounded bg-red-500/15 text-red-400 border border-red-500/20 font-extrabold uppercase tracking-wider cursor-help animate-pulse" title={tooltip}>
+          🔴 Fuera de rango ({formattedDist})
+        </span>
+      );
+    }
+    return null;
+  };
+
   const formatDurationMinutes = (mins) => {
     if (!mins) return "0 min";
     const hours = Math.floor(mins / 60);
@@ -450,40 +487,67 @@ export default function EventDetails({ event, isOpen, onClose }) {
                                   </div>
                                 </div>
                               ) : (
-                                // Estado de asistencia actual
-                                <div className="bg-black/20 rounded-xl p-3 border border-white/5 flex flex-wrap justify-between items-center gap-3">
-                                  {!log ? (
-                                    <span className="text-xs font-extrabold text-amber-400/90 bg-amber-500/10 px-2.5 py-1 rounded-lg border border-amber-500/20 shadow-inner flex items-center gap-1">
-                                      ⚠️ Sin registro de asistencia
-                                    </span>
-                                  ) : (
-                                    <>
-                                      <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-gray-300">
-                                        <div className="flex flex-col">
-                                          <span className="text-[9px] text-gray-500 uppercase tracking-wider font-extrabold">Entrada</span>
-                                          <span className="font-semibold text-gray-200">📥 {formatChileDateTime(log.check_in_at)}</span>
-                                        </div>
-                                        <div className="flex flex-col">
-                                          <span className="text-[9px] text-gray-500 uppercase tracking-wider font-extrabold">Salida</span>
-                                          <span className="font-semibold text-gray-200">
-                                            {log.check_out_at ? `📤 ${formatChileDateTime(log.check_out_at)}` : "En curso ⏳"}
-                                          </span>
-                                        </div>
-                                      </div>
+                                 (() => {
+                                   const isOutOfRange = log && (log.check_in_location_status === 'out_of_range' || log.check_out_location_status === 'out_of_range');
+                                   const containerBg = isOutOfRange 
+                                     ? 'bg-red-500/5 border-red-500/20 shadow-[0_0_15px_rgba(239,68,68,0.07)]' 
+                                     : 'bg-black/20 border-white/5';
+                                   return (
+                                     <div className={`rounded-xl p-3 border flex flex-wrap justify-between items-center gap-3 transition-all ${containerBg}`}>
+                                       {!log ? (
+                                         <span className="text-xs font-extrabold text-amber-400/90 bg-amber-500/10 px-2.5 py-1 rounded-lg border border-amber-500/20 shadow-inner flex items-center gap-1">
+                                           ⚠️ Sin registro de asistencia
+                                         </span>
+                                       ) : (
+                                         <>
+                                           <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-gray-300">
+                                             <div className="flex flex-col gap-0.5">
+                                               <span className="text-[9px] text-gray-500 uppercase tracking-wider font-extrabold">Entrada</span>
+                                               <span className="font-semibold text-gray-200">📥 {formatChileDateTime(log.check_in_at)}</span>
+                                               <div className="mt-1">
+                                                 {renderGPSBadge(
+                                                   log.check_in_location_status,
+                                                   log.check_in_distance_meters,
+                                                   log.check_in_accuracy,
+                                                   log.check_in_lat,
+                                                   log.check_in_lng
+                                                 )}
+                                               </div>
+                                             </div>
+                                             <div className="flex flex-col gap-0.5">
+                                               <span className="text-[9px] text-gray-500 uppercase tracking-wider font-extrabold">Salida</span>
+                                               <span className="font-semibold text-gray-200">
+                                                 {log.check_out_at ? `📤 ${formatChileDateTime(log.check_out_at)}` : "En curso ⏳"}
+                                               </span>
+                                               {log.check_out_at && (
+                                                 <div className="mt-1">
+                                                   {renderGPSBadge(
+                                                     log.check_out_location_status,
+                                                     log.check_out_distance_meters,
+                                                     log.check_out_accuracy,
+                                                     log.check_out_lat,
+                                                     log.check_out_lng
+                                                   )}
+                                                 </div>
+                                               )}
+                                             </div>
+                                           </div>
 
-                                      <div className="flex items-center gap-2">
-                                        {log.verified_by_admin && (
-                                          <span className="text-[8px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 font-bold uppercase tracking-wider cursor-help" title={`Corregido por admin: ${log.admin_adjustment_notes || 'Sin observaciones'}`}>
-                                            ✍️ Corregido
-                                          </span>
-                                        )}
-                                        <span className="text-xs font-extrabold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-lg border border-emerald-500/20 shadow-inner">
-                                          {formatDurationMinutes(log.total_duration_minutes)}
-                                        </span>
-                                      </div>
-                                    </>
-                                  )}
-                                </div>
+                                           <div className="flex items-center gap-2">
+                                             {log.verified_by_admin && (
+                                               <span className="text-[8px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 font-bold uppercase tracking-wider cursor-help" title={`Corregido por admin: ${log.admin_adjustment_notes || 'Sin observaciones'}`}>
+                                                 ✍️ Corregido
+                                               </span>
+                                             )}
+                                             <span className="text-xs font-extrabold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-lg border border-emerald-500/20 shadow-inner">
+                                               {formatDurationMinutes(log.total_duration_minutes)}
+                                             </span>
+                                           </div>
+                                         </>
+                                       )}
+                                     </div>
+                                   );
+                                 })()
                               )}
                             </div>
                           );
