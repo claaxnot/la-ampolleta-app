@@ -7,6 +7,7 @@ export default function Sidebar({ user, onLogout, isOpen, setIsOpen }) {
   const location = useLocation();
   const [logoError, setLogoError] = React.useState(false);
   const [isAboutOpen, setIsAboutOpen] = React.useState(false);
+  const [aboutLogoError, setAboutLogoError] = React.useState(false);
 
   const adminLinks = [
     { to: "/dashboard", label: "Menú", icon: LayoutDashboard },
@@ -154,9 +155,18 @@ export default function Sidebar({ user, onLogout, isOpen, setIsOpen }) {
             transition={{ type: "spring", duration: 0.4 }}
             className="relative w-full max-w-sm bg-gray-950/75 border border-white/10 p-6 rounded-3xl backdrop-blur-2xl shadow-[0_20px_50px_rgba(0,0,0,0.85)] flex flex-col items-center text-center select-none"
           >
-            {/* Pulsing Gold Lightbulb Icon */}
-            <div className="p-3 bg-amber-500/10 rounded-2xl border border-amber-500/20 mb-4 shadow-[0_0_15px_rgba(245,158,11,0.12)]">
-              <Lightbulb className="w-8 h-8 text-amber-400 animate-pulse" />
+            {/* Pulsing Gold Real Logo Icon */}
+            <div className="p-3.5 bg-amber-500/15 rounded-2xl border border-amber-500/20 mb-4 shadow-[0_0_20px_rgba(245,158,11,0.15)] flex items-center justify-center w-16 h-16 transition-all duration-300">
+              {!aboutLogoError ? (
+                <img 
+                  src="/isotipo.png" 
+                  alt="Logo" 
+                  onError={() => setAboutLogoError(true)}
+                  className="w-10 h-10 object-contain drop-shadow-[0_0_8px_rgba(245,158,11,0.5)] animate-pulse" 
+                />
+              ) : (
+                <Lightbulb className="w-8 h-8 text-amber-400 animate-pulse" />
+              )}
             </div>
 
             {/* Platform Title */}
