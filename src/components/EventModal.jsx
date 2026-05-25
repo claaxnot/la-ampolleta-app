@@ -121,6 +121,7 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
 
   // Drawer colapsable para configuración avanzada
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [showAdvancedFinished, setShowAdvancedFinished] = useState(false);
 
   // Searchable select para Supervisor
   const [supervisorSearch, setSupervisorSearch] = useState("");
@@ -263,6 +264,7 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
 
       const hasAdvancedFields = initialData.supervisor_id || initialData.call_time || initialData.setup_time || initialData.operational_notes;
       setShowAdvanced(!!hasAdvancedFields);
+      setShowAdvancedFinished(!!hasAdvancedFields);
 
       if (initialData && Object.keys(initialData).length > 0) {
         reset({
@@ -560,7 +562,12 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
                   <div className="flex flex-wrap items-center gap-4 mb-1">
                     <button
                       type="button"
-                      onClick={() => setShowAdvanced(!showAdvanced)}
+                      onClick={() => {
+                        if (showAdvanced) {
+                          setShowAdvancedFinished(false);
+                        }
+                        setShowAdvanced(!showAdvanced);
+                      }}
                       className="flex items-center gap-2 px-3 py-2 bg-white/5 hover:bg-white/10 rounded-xl border border-white/10 text-xs font-bold uppercase tracking-wider text-amber-400 transition-colors focus:outline-none shadow-md"
                     >
                       <span>{showAdvanced ? "▼ Ocultar Configuración Avanzada" : "▶ Mostrar Configuración Avanzada"}</span>
@@ -714,7 +721,12 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
                         animate={{ height: "auto", opacity: 1 }}
                         exit={{ height: 0, opacity: 0 }}
                         transition={{ duration: 0.3, ease: "easeInOut" }}
-                        className="overflow-hidden"
+                        className={showAdvancedFinished ? "overflow-visible" : "overflow-hidden"}
+                        onAnimationComplete={(definition) => {
+                          if (definition.opacity === 1) {
+                            setShowAdvancedFinished(true);
+                          }
+                        }}
                       >
                         <div className="pt-5 space-y-6">
 
@@ -756,6 +768,7 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
                                   label="Hora Finalización Estimada"
                                   id="end_time"
                                   error={errors.end_time}
+                                  align="right"
                                 />
                               </div>
                             </div>

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Clock, Check } from "lucide-react";
 
-export default function ClockPicker({ value, onChange, label, id, error }) {
+export default function ClockPicker({ value, onChange, label, id, error, align = "left" }) {
   const [isOpen, setIsOpen] = useState(false);
   const [mode, setMode] = useState("hours"); // "hours" | "minutes"
   const popoverRef = useRef(null);
@@ -106,7 +106,7 @@ export default function ClockPicker({ value, onChange, label, id, error }) {
       {isOpen && (
         <div 
           ref={popoverRef}
-          className="absolute z-50 mt-2 top-full left-0 bg-gray-950/95 border border-white/10 rounded-3xl p-4 shadow-[0_20px_50px_rgba(0,0,0,0.8)] backdrop-blur-2xl w-[220px] flex flex-col items-center select-none"
+          className={`absolute z-50 mt-2 top-full bg-gray-950/95 border border-white/10 rounded-3xl p-4 shadow-[0_20px_50px_rgba(0,0,0,0.8)] backdrop-blur-2xl w-[220px] flex flex-col items-center select-none ${align === "right" ? "right-0" : "left-0"}`}
         >
           {/* Header Display */}
           <div className="flex items-center justify-between w-full mb-3.5 px-1.5">
