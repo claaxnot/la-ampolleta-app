@@ -431,7 +431,12 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
                 status: d.status,
                 notes: d.notes || ""
               }));
-              setDays(loadedDays);
+              if (initialData.isDuplicate) {
+                // Clear the day IDs so they are inserted as new days instead of updating original ones
+                setDays(loadedDays.map(d => ({ ...d, id: undefined })));
+              } else {
+                setDays(loadedDays);
+              }
             } else {
               loadedDays = [{
                 date: initialData.date || "",
