@@ -109,7 +109,7 @@ export default function WorkerDashboard({ user }) {
 
         // Try freeipapi.com first (highly available free HTTPS geolocator)
         try {
-          const ipRes = await fetch("https://freeipapi.com/api/json");
+          const ipRes = await fetch("https://free.freeipapi.com/api/json");
           if (ipRes.ok) {
             const ipData = await ipRes.json();
             city = ipData.cityName || "Santiago";
