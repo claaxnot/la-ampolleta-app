@@ -16,7 +16,7 @@ export default function DatePicker({ value, onChange, label, id, error }) {
   };
 
   const selectedDate = parseDate(value);
-  
+
   // viewDate controls which month is currently visible in the picker grid
   const [viewDate, setViewDate] = useState(selectedDate);
 
@@ -49,8 +49,8 @@ export default function DatePicker({ value, onChange, label, id, error }) {
     "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
     "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
   ];
-  
-  const weekdays = ["D", "L", "M", "M", "J", "V", "S"];
+
+  const weekdays = ["L", "M", "M", "J", "V", "S", "D"];
 
   // Generate calendar days
   const getCalendarDays = () => {
@@ -60,8 +60,11 @@ export default function DatePicker({ value, onChange, label, id, error }) {
 
     const days = [];
 
+    // Adjust padding count so Monday is 0, Tuesday is 1, ..., Sunday is 6
+    const paddingCount = (firstDayIndex + 6) % 7;
+
     // Pad previous month's ending days
-    for (let i = firstDayIndex - 1; i >= 0; i--) {
+    for (let i = paddingCount - 1; i >= 0; i--) {
       days.push({
         day: prevDaysInMonth - i,
         isCurrentMonth: false,
@@ -193,15 +196,14 @@ export default function DatePicker({ value, onChange, label, id, error }) {
                   key={`day-${i}`}
                   type="button"
                   onClick={() => handleDaySelect(dayObj)}
-                  className={`h-6 w-6 rounded-full flex items-center justify-center text-[10px] font-semibold transition-all ${
-                    selected
+                  className={`h-6 w-6 rounded-full flex items-center justify-center text-[10px] font-semibold transition-all ${selected
                       ? "bg-amber-500 text-black font-extrabold shadow-[0_0_10px_rgba(245,158,11,0.4)]"
                       : today
-                      ? "border border-amber-500/50 text-amber-400 font-bold"
-                      : dayObj.isCurrentMonth
-                      ? "text-gray-300 hover:bg-white/10 hover:text-white"
-                      : "text-gray-600 hover:bg-white/5 hover:text-gray-400"
-                  }`}
+                        ? "border border-amber-500/50 text-amber-400 font-bold"
+                        : dayObj.isCurrentMonth
+                          ? "text-gray-300 hover:bg-white/10 hover:text-white"
+                          : "text-gray-600 hover:bg-white/5 hover:text-gray-400"
+                    }`}
                 >
                   {dayObj.day}
                 </button>
