@@ -474,6 +474,16 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
                         <option value="Anfitrionas">Anfitrionas (Modelo/Promotora)</option>
                         <option value="Promotoría">Promotoría</option>
                         <option value="Streaming">Streaming / Streaming Live</option>
+                        <option value="Montaje/Desmontaje">Montaje / Desmontaje</option>
+                        <option value="CCTV">CCTV</option>
+                        <option value="Encuestadores/as">Encuestadores/as</option>
+                        <option value="Flete/transporte">Flete / Transporte</option>
+                        <option value="Instalación/es">Instalación/es</option>
+                        <option value="RECICLAJE/BASURA">RECICLAJE/BASURA</option>
+                        <option value="TRASLADO A VERTEDERO">TRASLADO A VERTEDERO</option>
+                        <option value="SERV. ESPECIAL">SERV. ESPECIAL</option>
+                        <option value="SERV. FOTOGRAFÍA">SERV. FOTOGRAFÍA</option>
+                        <option value="VISITA TÉCNICA">VISITA TÉCNICA</option>
                         <option value="Otro">Otro</option>
                       </select>
                     </div>
