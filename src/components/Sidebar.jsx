@@ -10,12 +10,17 @@ export default function Sidebar({ user, onLogout, isOpen, setIsOpen }) {
   const [aboutLogoError, setAboutLogoError] = React.useState(false);
 
   const adminLinks = [
-    { to: "/dashboard", label: "Menú", icon: LayoutDashboard },
+    { to: "/dashboard", label: "Panel de Control", icon: LayoutDashboard },
     { to: "/events", label: "Eventos", icon: CalendarDays },
     { to: "/staff", label: "Personal", icon: Users },
     { to: "/calendar", label: "Calendario", icon: Calendar },
     { to: "/finanzas", label: "Finanzas", icon: DollarSign },
-    { to: "/profile", label: "Mi Perfil", icon: UserIcon },
+  ];
+
+  const adminWorkerLinks = [
+    { to: "/worker-dashboard", label: "Mi Panel", icon: LayoutDashboard },
+    { to: "/worker-dashboard?tab=finanzas", label: "Finanzas propias", icon: DollarSign },
+    { to: "/profile", label: "Mi perfil", icon: UserIcon },
   ];
 
   const workerLinks = [
@@ -23,8 +28,6 @@ export default function Sidebar({ user, onLogout, isOpen, setIsOpen }) {
     { to: "/worker-dashboard?tab=finanzas", label: "Finanzas", icon: DollarSign },
     { to: "/profile", label: "Mi Perfil", icon: UserIcon },
   ];
-
-  const links = user?.systemRole === 'worker' ? workerLinks : adminLinks;
 
   const isLinkActive = (to) => {
     if (to === "/worker-dashboard") {
@@ -83,26 +86,84 @@ export default function Sidebar({ user, onLogout, isOpen, setIsOpen }) {
           </div>
         </div>
 
-      <ul className="flex-1 space-y-2 px-4 relative z-10">
-        {links.map((link) => {
-          const active = isLinkActive(link.to);
-          return (
-            <li key={link.to}>
-              <Link
-                to={link.to}
-                onClick={() => setIsOpen(false)}
-                className={`flex items-center gap-3 py-3 px-4 rounded-xl transition-all duration-300 ${
-                  active 
-                  ? "bg-accent/10 text-accent font-medium shadow-[inset_0_0_0_1px_rgba(245,158,11,0.2)]" 
-                  : "text-gray-400 hover:bg-gray-800 hover:text-gray-200"
-                }`}
-              >
-                <link.icon className="w-5 h-5" />
-                {link.label}
-              </Link>
-            </li>
-          );
-        })}
+      <ul className="flex-1 space-y-2 px-4 relative z-10 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-800">
+        {user?.systemRole === 'worker' ? (
+          workerLinks.map((link) => {
+            const active = isLinkActive(link.to);
+            return (
+              <li key={link.to}>
+                <Link
+                  to={link.to}
+                  onClick={() => setIsOpen(false)}
+                  className={`flex items-center gap-3 py-3 px-4 rounded-xl transition-all duration-300 ${
+                    active 
+                    ? "bg-accent/10 text-accent font-medium shadow-[inset_0_0_0_1px_rgba(245,158,11,0.2)]" 
+                    : "text-gray-400 hover:bg-gray-800 hover:text-gray-200"
+                  }`}
+                >
+                  <link.icon className="w-5 h-5" />
+                  {link.label}
+                </Link>
+              </li>
+            );
+          })
+        ) : (
+          <>
+            {/* Subtle agrupador for Admin Menu */}
+            <div className="pb-1.5 px-4">
+              <span className="text-[10px] font-extrabold text-amber-500/80 uppercase tracking-widest block border-b border-gray-800/60 pb-1.5 mb-1">
+                Menú Administrador
+              </span>
+            </div>
+
+            {adminLinks.map((link) => {
+              const active = isLinkActive(link.to);
+              return (
+                <li key={link.to}>
+                  <Link
+                    to={link.to}
+                    onClick={() => setIsOpen(false)}
+                    className={`flex items-center gap-3 py-3 px-4 rounded-xl transition-all duration-300 ${
+                      active 
+                      ? "bg-accent/10 text-accent font-medium shadow-[inset_0_0_0_1px_rgba(245,158,11,0.2)]" 
+                      : "text-gray-400 hover:bg-gray-800 hover:text-gray-200"
+                    }`}
+                  >
+                    <link.icon className="w-5 h-5" />
+                    {link.label}
+                  </Link>
+                </li>
+              );
+            })}
+            
+            {/* Subtle agrupador for Worker Menu */}
+            <div className="pt-4 pb-1.5 px-4">
+              <span className="text-[10px] font-extrabold text-amber-500/80 uppercase tracking-widest block border-b border-gray-800/60 pb-1.5 mb-1">
+                Menú Trabajador
+              </span>
+            </div>
+
+            {adminWorkerLinks.map((link) => {
+              const active = isLinkActive(link.to);
+              return (
+                <li key={link.to}>
+                  <Link
+                    to={link.to}
+                    onClick={() => setIsOpen(false)}
+                    className={`flex items-center gap-3 py-3 px-4 rounded-xl transition-all duration-300 ${
+                      active 
+                      ? "bg-accent/10 text-accent font-medium shadow-[inset_0_0_0_1px_rgba(245,158,11,0.2)]" 
+                      : "text-gray-400 hover:bg-gray-800 hover:text-gray-200"
+                    }`}
+                  >
+                    <link.icon className="w-5 h-5" />
+                    {link.label}
+                  </Link>
+                </li>
+              );
+            })}
+          </>
+        )}
       </ul>
       
       <div className="p-4 relative z-10 border-t border-gray-800 flex flex-col items-center gap-3">
