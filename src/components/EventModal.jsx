@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -15,6 +15,25 @@ import { toast } from "react-hot-toast";
 import ClockPicker from "./ClockPicker.jsx";
 import DatePicker from "./DatePicker.jsx";
 import CurrencyInputCLP from "./CurrencyInputCLP.jsx";
+
+const mallLocations = [
+  { code: "PAK", address: "Av. Pdte. Kennedy 5413, Las Condes, Santiago", latitude: -33.4033686, longitude: -70.5787967, allowed_radius_meters: 300 },
+  { code: "MAM", address: "Av. Américo Vespucio 399, Maipú, Región Metropolitana", latitude: -33.4814037, longitude: -70.7519018, allowed_radius_meters: 300 },
+  { code: "MAE", address: "Av. Alameda Libertador Bernardo O'Higgins 3250, Estación Central", latitude: -33.4522129, longitude: -70.6797104, allowed_radius_meters: 300 },
+  { code: "MAQ", address: "Av. Bernardo O'Higgins 581, Quilicura", latitude: -33.3679549, longitude: -70.7303442, allowed_radius_meters: 300 },
+  { code: "AEB", address: "Gran Av. José Miguel Carrera 10375, El Bosque", latitude: -33.5536663, longitude: -70.6769562, allowed_radius_meters: 300 },
+  { code: "ASA", address: "Barros Luco 105, San Antonio, Valparaíso", latitude: -33.5816088, longitude: -71.613832, allowed_radius_meters: 300 },
+  { code: "ACH", address: "El Roble 770, Chillán, Ñuble", latitude: -36.6097439, longitude: -72.1007552, allowed_radius_meters: 300 },
+  { code: "ACO", address: "Carlos Pratt González 913, Coronel, Bío Bío", latitude: -37.0131897, longitude: -73.1586072, allowed_radius_meters: 300 },
+  { code: "PAN", address: "Av. Angamos 02170, Antofagasta", latitude: -23.6950327, longitude: -70.4162149, allowed_radius_meters: 300 },
+  { code: "BOM", address: "San Ignacio 500, Quilicura, Región Metropolitana", latitude: -33.3320303, longitude: -70.7035477, allowed_radius_meters: 300 },
+  { code: "CUR", address: "Av. Lomas de la Luz 4650, Curauma, Valparaíso", latitude: -33.1316449, longitude: -71.564289, allowed_radius_meters: 300 },
+  { code: "COQ", address: "Camino La Cantera 2325, Coquimbo", latitude: -29.9763306, longitude: -71.2961941, allowed_radius_meters: 300 },
+  { code: "CON", address: "Av. Portal San Pedro 4850, San Pedro de la Paz, Bío Bío", latitude: -36.8664577, longitude: -73.1368322, allowed_radius_meters: 300 },
+  { code: "BUIN", address: "Kilómetro 37 de la Ruta 5 Sur, Buin", latitude: -33.7612571, longitude: -70.7429046, allowed_radius_meters: 300 },
+  { code: "CHICUREO", address: "Avenida Chicureo 125, Chicureo, Colina", latitude: -33.2858607, longitude: -70.6785264, allowed_radius_meters: 300 },
+  { code: "QUILIN", address: "Av. Américo Vespucio 3300 / Av. Quilín, Peñalolén", latitude: -33.4875358, longitude: -70.5776595, allowed_radius_meters: 300 }
+];
 
 // Zod Schema tolerante y flexible para evitar bloqueos silenciosos
 const eventSchema = z.object({
@@ -108,6 +127,8 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
   const selectedSupervisorId = watch("supervisor_id");
   const eventType = watch("type") || "Producción técnica";
   const eventStartTime = watch("time");
+  const clientValue = watch("client");
+  const prevInitialClientRef = useRef("");
 
   const [staffSearch, setStaffSearch] = useState("");
   const [staffRole, setStaffRole] = useState("");
@@ -168,6 +189,38 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
       setValue("priority", "Media");
     }
   }, [eventType, setValue, isOpen, eventStartTime]);
+
+  // Autocompletado inteligente por código de Mall
+  useEffect(() => {
+    if (!isOpen || !clientValue) return;
+
+    // Si coincide con el cliente inicial cargado al abrir, evitar sobreescribir (respetar personalizaciones previas)
+    if (prevInitialClientRef.current === clientValue) {
+      return;
+    }
+
+    const codeTrimmed = clientValue.trim().toUpperCase();
+    const match = mallLocations.find(loc => loc.code === codeTrimmed);
+
+    if (match) {
+      // Autocompletar datos del catálogo base
+      setValue("location", match.address, { shouldDirty: true });
+      setValue("latitude", String(match.latitude), { shouldDirty: true });
+      setValue("longitude", String(match.longitude), { shouldDirty: true });
+      setValue("allowed_radius_meters", match.allowed_radius_meters, { shouldDirty: true });
+      setValue("attendance_control_enabled", true, { shouldDirty: true });
+
+      // Si el input original no estaba en mayúsculas completas, normalizarlo
+      if (clientValue !== match.code) {
+        setValue("client", match.code, { shouldDirty: true });
+      }
+
+      toast.success(`Código de Mall "${match.code}" detectado. Datos de ubicación autocompletados.`, {
+        id: "mall-autocomplete-toast",
+        duration: 3000
+      });
+    }
+  }, [clientValue, isOpen, setValue]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -267,6 +320,7 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
       setShowAdvancedFinished(!!hasAdvancedFields);
 
       if (initialData && Object.keys(initialData).length > 0) {
+        prevInitialClientRef.current = initialData.client || "";
         reset({
           name: initialData.name || "",
           client: initialData.client || "",
@@ -308,6 +362,7 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
           });
         }
       } else {
+        prevInitialClientRef.current = "";
         setCustomRates({});
         reset({
           name: "", client: "", date: "", time: "", location: "",
@@ -500,18 +555,26 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
                     </div>
 
                     <div className="flex flex-col">
-                      <label className="text-gray-300 mb-1.5 text-xs font-semibold" htmlFor="client">Cliente</label>
+                      <label className="text-gray-300 mb-1.5 text-xs font-semibold" htmlFor="client">Cliente (Código)</label>
                       <input
                         id="client"
-                        placeholder="Ej: Mall Arauco"
+                        placeholder="Ej: PAK, MAM o nombre de cliente..."
+                        list="mall-codes"
                         {...register("client")}
                         className={`w-full bg-gray-800/50 border rounded-xl p-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-amber-500/50 transition-colors ${errors.client ? 'border-red-500 focus:ring-red-500' : 'border-gray-700'}`}
                       />
+                      <datalist id="mall-codes">
+                        {mallLocations.map((loc) => (
+                          <option key={loc.code} value={loc.code}>
+                            {loc.code} - {loc.address.split(',')[0]}
+                          </option>
+                        ))}
+                      </datalist>
                       {errors.client && <span className="text-red-400 text-xs mt-1">{errors.client.message}</span>}
                     </div>
 
                     <div className="flex flex-col">
-                      <label className="text-gray-300 mb-1.5 text-xs font-semibold" htmlFor="location">Ubicación</label>
+                      <label className="text-gray-300 mb-1.5 text-xs font-semibold" htmlFor="location">Ubicación (Dirección)</label>
                       <input
                         id="location"
                         placeholder="Dirección o Recinto del evento"
