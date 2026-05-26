@@ -889,8 +889,7 @@ export default function WorkerDashboard({ user }) {
           await supabase
             .from('event_attendance_logs')
             .update({ event_day_id: eventObj.event_day_id })
-            .eq('event_id', eventId)
-            .eq('worker_id', user.id);
+            .eq('assignment_id', assignmentId);
         }
 
         if (showWarning) {
@@ -972,8 +971,7 @@ export default function WorkerDashboard({ user }) {
           await supabase
             .from('event_attendance_logs')
             .update({ event_day_id: eventObj.event_day_id })
-            .eq('event_id', eventId)
-            .eq('worker_id', user.id);
+            .eq('assignment_id', assignmentId);
         }
 
         if (showWarning) {
