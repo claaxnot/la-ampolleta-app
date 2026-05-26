@@ -120,3 +120,11 @@
 - [x] **Parche de Seguridad en Autenticación:** Aplicar `SECURITY DEFINER` e inyección segura con `search_path = ''` y llamadas cualificadas a `public.handle_new_user` y `public.sync_user_confirmation`, restringiendo los privilegios RPC.
 - [x] **Parche de Seguridad en Asistencia:** Aplicar `SET search_path = ''` y llamadas de catálogo a `public.mark_event_check_in` y `public.mark_event_check_out`, bloqueando accesos anónimos e inyectando `pg_catalog.now()` AT TIME ZONE 'UTC'.
 - [x] **Parche de Rendimiento RLS (InitPlan Caching):** Resolver alerta de inicialización de RLS en `public.profiles` reemplazando la llamada directa `auth.uid()` por la subconsulta optimizada `(SELECT auth.uid()) IS NOT NULL` en la política `"Enable read access for all authenticated users"`.
+
+## 13. Mejoras Operativas y Estructura Organizacional (Mayo 2026)
+- [x] **Alineación de Calendario Lunes-Domingo:** Corregir el cálculo de desfase de días en `DatePicker.jsx` para que el inicio de semana comience de forma natural el día Lunes y finalice el Domingo, previniendo errores de visualización de turnos.
+- [x] **Ampliación del Catálogo de Roles Operacionales:** Integrar en el formulario de creación de eventos los 10 nuevos tipos de evento clave (Montaje/Desmontaje, CCTV, Fletes, Servicios Especiales, Visita Técnica, etc.).
+- [x] **Autocompletado de Ubicaciones y Malls:** Incorporar catálogo precargado de 16 Malls en `EventModal.jsx` con direcciones físicas y coordenadas GPS, facilitando la autocompletación inteligente del formulario con protección anti-sobreescritura para personalizaciones manuales previas.
+- [x] **Acceso Híbrido a Portal Trabajador para Administradores:** Habilitar de manera sutil el acceso al WorkerDashboard para roles directivos (`admin` / `viewer`) sin alterar permisos principales en la BD. Integrar el agrupador `"MENÚ TRABAJADOR"` en la barra lateral (`Sidebar.jsx`) y aislar las finanzas individuales y boletas por el identificador del usuario autenticado.
+- [x] **Clima Resiliente y Autorreparable de Alta Velocidad:** Diseñar un sistema de doble endpoint que aborta en 2.0 segundos mediante `AbortController` si la API primaria (Open-Meteo) está caída (502 Bad Gateway), saltando automáticamente al fallback de `wttr.in` de manera completamente imperceptible para el usuario y con logs limpios en consola.
+
