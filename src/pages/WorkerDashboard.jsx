@@ -137,9 +137,15 @@ export default function WorkerDashboard({ user }) {
         }
 
         try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 2000); // 2 seconds timeout for fast fallback
+
           const weatherRes = await fetch(
-            `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true`
+            `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true`,
+            { signal: controller.signal }
           );
+          clearTimeout(timeoutId);
+
           if (!weatherRes.ok) {
             throw new Error(`Open-Meteo returned status ${weatherRes.status}`);
           }
@@ -161,7 +167,7 @@ export default function WorkerDashboard({ user }) {
             return;
           }
         } catch (openMeteoErr) {
-          console.warn("⚠️ [WEATHER API] - Open-Meteo failed, trying fallback wttr.in:", openMeteoErr);
+          console.log("ℹ️ [WEATHER API] - Open-Meteo offline or timed out, executing fast fallback to wttr.in...");
           
           try {
             const wttrRes = await fetch(`https://wttr.in/${encodeURIComponent(city || "Santiago")}?format=j1`);
@@ -187,7 +193,7 @@ export default function WorkerDashboard({ user }) {
               }
             }
           } catch (wttrErr) {
-            console.warn("⚠️ [WEATHER API] - wttr.in fallback also failed:", wttrErr);
+            console.log("⚠️ [WEATHER API] - wttr.in fallback also failed, using offline defaults.");
           }
         }
 
