@@ -1575,13 +1575,13 @@ export default function WorkerDashboard({ user }) {
 
                 // Decidir si mostrar el bloque operacional o el timeline técnico en el dashboard
                 const shouldShowOperationalSection =
+                  isPlanPending &&
                   !isWorkerSimpleRole &&
-                  !isEventSimpleType &&
-                  (isPlanPending || event.setup_time || event.call_time || event.end_time);
+                  !isEventSimpleType;
 
-                // Decidir si mostrar supervisor y citación
+                // Decidir si mostrar supervisor y término aproximado
                 const shouldShowSupervisor = isPlanPending || (!isEventSimpleType && event.profiles?.name);
-                const shouldShowCallTime = isPlanPending || (!isWorkerSimpleRole && !isEventSimpleType && event.call_time);
+                const shouldShowEndTime = isPlanPending || (!isWorkerSimpleRole && !isEventSimpleType && event.end_time);
 
                 // Determinar si el evento ya está completado/finalizado
                 const eventStatus = event.status ? event.status.toLowerCase() : "";
@@ -1604,9 +1604,9 @@ export default function WorkerDashboard({ user }) {
                   statusBadge = "bg-red-500/20 text-red-300 border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.1)]";
                 }
 
-                // Real presentation time and supervisor name from DB
-                const presentationTime = event.call_time
-                  ? `${event.call_time.slice(0, 5)} hrs`
+                // Real end time and supervisor name from DB
+                const endTimeStr = event.end_time
+                  ? `${event.end_time.slice(0, 5)} hrs`
                   : (isPlanPending ? 'Por definir' : null);
 
                 const supervisorName = event.profiles?.name
@@ -1700,21 +1700,21 @@ export default function WorkerDashboard({ user }) {
                               </span>
                             </div>
 
-                            {shouldShowCallTime && presentationTime && (
-                              <div className="flex flex-col gap-0.5">
-                                <span className="text-[10px] text-gray-500 uppercase tracking-wider font-extrabold">Presentación</span>
-                                <span className={`flex items-center gap-1.5 font-semibold ${presentationTime === "Por definir" ? "text-amber-500/50 italic animate-pulse" : "text-amber-300"}`}>
-                                  <Clock className="w-4 h-4 text-amber-400" />
-                                  {presentationTime}
-                                </span>
-                              </div>
-                            )}
-
                             {shouldShowSupervisor && supervisorName && (
                               <div className="flex flex-col gap-0.5">
                                 <span className="text-[10px] text-gray-500 uppercase tracking-wider font-extrabold">Supervisor</span>
                                 <span className={`flex items-center gap-1.5 font-semibold ${supervisorName === "Por definir" ? "text-gray-500 italic animate-pulse" : "text-gray-100 truncate"}`}>
                                   👤 {supervisorName}
+                                </span>
+                              </div>
+                            )}
+
+                            {shouldShowEndTime && endTimeStr && (
+                              <div className="flex flex-col gap-0.5">
+                                <span className="text-[10px] text-gray-500 uppercase tracking-wider font-extrabold">Término (Aprox)</span>
+                                <span className={`flex items-center gap-1.5 font-semibold ${endTimeStr === "Por definir" ? "text-amber-500/50 italic animate-pulse" : "text-amber-300"}`}>
+                                  <Clock className="w-4 h-4 text-amber-400" />
+                                  {endTimeStr}
                                 </span>
                               </div>
                             )}
