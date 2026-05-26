@@ -136,27 +136,65 @@ export default function WorkerDashboard({ user }) {
           }
         }
 
-        const weatherRes = await fetch(
-          `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true`
-        );
-        const wData = await weatherRes.json();
+        try {
+          const weatherRes = await fetch(
+            `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true`
+          );
+          if (!weatherRes.ok) {
+            throw new Error(`Open-Meteo returned status ${weatherRes.status}`);
+          }
+          const wData = await weatherRes.json();
 
-        if (wData && wData.current_weather) {
-          const temp = Math.round(wData.current_weather.temperature);
-          const weatherCode = wData.current_weather.weathercode;
+          if (wData && wData.current_weather) {
+            const temp = Math.round(wData.current_weather.temperature);
+            const weatherCode = wData.current_weather.weathercode;
 
-          let icon = "sun";
-          if (weatherCode >= 1 && weatherCode <= 3) icon = "cloudy";
-          else if (weatherCode >= 45 && weatherCode <= 48) icon = "fog";
-          else if (weatherCode >= 51 && weatherCode <= 67) icon = "rain";
-          else if (weatherCode >= 71 && weatherCode <= 77) icon = "snow";
-          else if (weatherCode >= 80 && weatherCode <= 82) icon = "rain";
-          else if (weatherCode >= 95 && weatherCode <= 99) icon = "storm";
+            let icon = "sun";
+            if (weatherCode >= 1 && weatherCode <= 3) icon = "cloudy";
+            else if (weatherCode >= 45 && weatherCode <= 48) icon = "fog";
+            else if (weatherCode >= 51 && weatherCode <= 67) icon = "rain";
+            else if (weatherCode >= 71 && weatherCode <= 77) icon = "snow";
+            else if (weatherCode >= 80 && weatherCode <= 82) icon = "rain";
+            else if (weatherCode >= 95 && weatherCode <= 99) icon = "storm";
 
-          setWeatherData({ temp, city, icon });
+            setWeatherData({ temp, city, icon });
+            return;
+          }
+        } catch (openMeteoErr) {
+          console.warn("⚠️ [WEATHER API] - Open-Meteo failed, trying fallback wttr.in:", openMeteoErr);
+          
+          try {
+            const wttrRes = await fetch(`https://wttr.in/${encodeURIComponent(city || "Santiago")}?format=j1`);
+            if (wttrRes.ok) {
+              const wttrData = await wttrRes.json();
+              if (wttrData && wttrData.current_condition && wttrData.current_condition[0]) {
+                const cond = wttrData.current_condition[0];
+                const temp = Math.round(parseFloat(cond.temp_C));
+                const desc = (cond.weatherDesc && cond.weatherDesc[0] && cond.weatherDesc[0].value) 
+                  ? cond.weatherDesc[0].value.toLowerCase() 
+                  : "sunny";
+                
+                let icon = "sun";
+                if (desc.includes("cloud") || desc.includes("overcast")) icon = "cloudy";
+                else if (desc.includes("fog") || desc.includes("mist")) icon = "fog";
+                else if (desc.includes("rain") || desc.includes("drizzle") || desc.includes("shower")) icon = "rain";
+                else if (desc.includes("snow") || desc.includes("sleet") || desc.includes("hail")) icon = "snow";
+                else if (desc.includes("thunder") || desc.includes("storm")) icon = "storm";
+
+                setWeatherData({ temp, city: city || "Santiago", icon });
+                console.log("☀️ [WEATHER API] - Fallback to wttr.in successful:", temp, desc);
+                return;
+              }
+            }
+          } catch (wttrErr) {
+            console.warn("⚠️ [WEATHER API] - wttr.in fallback also failed:", wttrErr);
+          }
         }
+
+        // Final fallback to default values in case both fail
+        setWeatherData({ temp: 18, city: city || "Santiago", icon: "sun" });
       } catch (err) {
-        console.warn("⚠️ [WEATHER API] - Error al obtener clima en tiempo real, usando Santiago:", err);
+        console.warn("⚠️ [WEATHER API] - Error al obtener clima en tiempo real:", err);
       }
     };
 
