@@ -291,7 +291,7 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
           longitude: initialData.longitude !== null && initialData.longitude !== undefined ? String(initialData.longitude) : "",
           allowed_radius_meters: initialData.allowed_radius_meters !== null && initialData.allowed_radius_meters !== undefined ? initialData.allowed_radius_meters : 300
         });
- 
+
         const targetIdForAssignments = initialData.id || initialData.duplicateFromId;
         if (targetIdForAssignments) {
           supabase.from('event_assignments').select('staff_id, custom_rate').eq('event_id', targetIdForAssignments).then(({ data }) => {
@@ -479,11 +479,11 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
                         <option value="Encuestadores/as">Encuestadores/as</option>
                         <option value="Flete/transporte">Flete / Transporte</option>
                         <option value="Instalación/es">Instalación/es</option>
-                        <option value="RECICLAJE/BASURA">RECICLAJE/BASURA</option>
-                        <option value="TRASLADO A VERTEDERO">TRASLADO A VERTEDERO</option>
-                        <option value="SERV. ESPECIAL">SERV. ESPECIAL</option>
-                        <option value="SERV. FOTOGRAFÍA">SERV. FOTOGRAFÍA</option>
-                        <option value="VISITA TÉCNICA">VISITA TÉCNICA</option>
+                        <option value="Reciclaje/Basura">Reciclaje/Basura</option>
+                        <option value="Traslado a Vertedero">Traslado a Vertedero</option>
+                        <option value="Servicios Especiales">Servicios Especiales</option>
+                        <option value="Servicios Fotografía">Servicios Fotografía</option>
+                        <option value="Visita Técnica">Visita Técnica</option>
                         <option value="Otro">Otro</option>
                       </select>
                     </div>
@@ -787,26 +787,26 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
                           {/* Subsección: Estado, Prioridad y Supervisor */}
                           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
 
-                             {/* Supervisor del Evento (Native Select) */}
-                             {showSupervisorField ? (
-                               <div className="flex flex-col">
-                                 <label className="text-gray-300 mb-1.5 text-xs font-semibold" htmlFor="supervisor_id">Supervisor Operativo</label>
-                                 <select
-                                   id="supervisor_id"
-                                   {...register("supervisor_id")}
-                                   className="bg-gray-800/50 border border-gray-700 rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-amber-500/50 transition-colors font-medium"
-                                 >
-                                   <option value="">Sin Supervisor</option>
-                                   {dbStaff.map(s => (
-                                     <option key={s.id} value={s.id}>
-                                       {s.name} ({s.role})
-                                     </option>
-                                   ))}
-                                 </select>
-                               </div>
-                             ) : (
-                               <div className="hidden" />
-                             )}
+                            {/* Supervisor del Evento (Native Select) */}
+                            {showSupervisorField ? (
+                              <div className="flex flex-col">
+                                <label className="text-gray-300 mb-1.5 text-xs font-semibold" htmlFor="supervisor_id">Supervisor Operativo</label>
+                                <select
+                                  id="supervisor_id"
+                                  {...register("supervisor_id")}
+                                  className="bg-gray-800/50 border border-gray-700 rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-amber-500/50 transition-colors font-medium"
+                                >
+                                  <option value="">Sin Supervisor</option>
+                                  {dbStaff.map(s => (
+                                    <option key={s.id} value={s.id}>
+                                      {s.name} ({s.role})
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                            ) : (
+                              <div className="hidden" />
+                            )}
 
                             <div className="flex flex-col">
                               <label className="text-gray-300 mb-1.5 text-xs font-semibold" htmlFor="status">Estado Operacional</label>
