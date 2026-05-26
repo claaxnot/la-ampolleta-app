@@ -8,19 +8,26 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey, {
 });
 
 async function run() {
-  const email = `test_user_${Date.now()}@laampolleta.tv`;
-  const password = "password123";
-
-  console.log(`Attempting signup for ${email}...`);
-  const { data, error } = await supabase.auth.signUp({
-    email,
-    password
-  });
-
-  if (error) {
-    console.log("Signup error:", JSON.stringify(error, null, 2));
+  console.log("Checking event_days table...");
+  const { data: days, error: daysError } = await supabase.from('event_days').select('*').limit(5);
+  if (daysError) {
+    console.log("Error querying event_days:", daysError);
   } else {
-    console.log("Signup success! Created User ID:", data.user?.id);
+    console.log("Success querying event_days! Found records:", days.length);
+    if (days.length > 0) {
+      console.log("Sample day keys:", Object.keys(days[0]));
+    }
+  }
+
+  console.log("\nChecking event_assignments table...");
+  const { data: assigns, error: assignsError } = await supabase.from('event_assignments').select('*').limit(5);
+  if (assignsError) {
+    console.log("Error querying event_assignments:", assignsError);
+  } else {
+    console.log("Success querying event_assignments! Found records:", assigns.length);
+    if (assigns.length > 0) {
+      console.log("Sample assignment keys:", Object.keys(assigns[0]));
+    }
   }
 }
 

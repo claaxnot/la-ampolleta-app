@@ -24,6 +24,8 @@ export default function EventDetails({ event, isOpen, onClose }) {
   const [editCheckInTime, setEditCheckInTime] = React.useState("09:00");
   const [editCheckOutDate, setEditCheckOutDate] = React.useState("");
   const [editCheckOutTime, setEditCheckOutTime] = React.useState("18:00");
+  const [eventDays, setEventDays] = React.useState([]);
+  const [selectedDayId, setSelectedDayId] = React.useState(null);
   const [isSavingCorrection, setIsSavingCorrection] = React.useState(false);
 
   const formatChileDateTime = (isoString) => {
@@ -107,19 +109,47 @@ export default function EventDetails({ event, isOpen, onClose }) {
     return formatted.replace(" ", "T");
   };
 
-  const fetchAssignedStaff = async () => {
+  const fetchAssignedStaff = async (currentDayId = null) => {
     if (!event?.id) return;
     
-    const { data: assignmentsData } = await supabase
+    // 1. Fetch event days
+    const { data: daysData } = await supabase
+      .from('event_days')
+      .select('*')
+      .eq('event_id', event.id)
+      .order('date', { ascending: true });
+    
+    let activeDayId = currentDayId || selectedDayId;
+    if (daysData && daysData.length > 0) {
+      setEventDays(daysData);
+      if (!activeDayId) {
+        activeDayId = daysData[0].id;
+        setSelectedDayId(activeDayId);
+      }
+    } else {
+      setEventDays([]);
+      setSelectedDayId(null);
+    }
+    
+    // 2. Fetch assignments
+    let query = supabase
       .from('event_assignments')
       .select(`
         id,
         staff_id,
         status,
         custom_rate,
+        event_day_id,
         profiles:staff_id (name, role)
-      `)
-      .eq('event_id', event.id);
+      `);
+    
+    if (activeDayId) {
+      query = query.eq('event_day_id', activeDayId);
+    } else {
+      query = query.eq('event_id', event.id);
+    }
+    
+    const { data: assignmentsData } = await query;
     
     if (assignmentsData) {
       setAssigned(assignmentsData.map(d => ({
@@ -130,13 +160,22 @@ export default function EventDetails({ event, isOpen, onClose }) {
         name: d.profiles?.name || 'Desconocido',
         role: d.profiles?.role || ''
       })));
+    } else {
+      setAssigned([]);
     }
 
-    // Fetch attendance logs for this event
-    const { data: attendanceData } = await supabase
+    // 3. Fetch attendance logs
+    let logsQuery = supabase
       .from('event_attendance_logs')
-      .select('*')
-      .eq('event_id', event.id);
+      .select('*');
+    
+    if (activeDayId) {
+      logsQuery = logsQuery.eq('event_day_id', activeDayId);
+    } else {
+      logsQuery = logsQuery.eq('event_id', event.id);
+    }
+    
+    const { data: attendanceData } = await logsQuery;
     
     if (attendanceData) {
       const attMap = {};
@@ -144,7 +183,14 @@ export default function EventDetails({ event, isOpen, onClose }) {
         attMap[log.worker_id] = log;
       });
       setAttendance(attMap);
+    } else {
+      setAttendance({});
     }
+  };
+
+  const handleDaySelect = (dayId) => {
+    setSelectedDayId(dayId);
+    fetchAssignedStaff(dayId);
   };
 
   React.useEffect(() => {
@@ -283,6 +329,7 @@ export default function EventDetails({ event, isOpen, onClose }) {
           .from('event_attendance_logs')
           .insert([{
             event_id: event.id,
+            event_day_id: selectedDayId || null,
             worker_id: staffId,
             assignment_id: assignmentId || null,
             check_in_at: checkInISO,
@@ -344,18 +391,64 @@ export default function EventDetails({ event, isOpen, onClose }) {
                 <X className="w-5 h-5" />
               </button>
               <h2 className="text-2xl font-bold mb-6 text-white tracking-tight border-b border-white/5 pb-3">Detalle del Evento</h2>
+              
+              {/* Selector horizontal de Jornadas (Event Days) */}
+              {eventDays.length > 0 && (
+                <div className="flex gap-2 overflow-x-auto pb-4 mb-4 border-b border-white/5 scrollbar-thin">
+                  {eventDays.map((day, idx) => {
+                    const isSelected = selectedDayId === day.id;
+                    const dateStr = day.date ? day.date.split('-').reverse().join('/') : `Día ${idx + 1}`;
+                    return (
+                      <button
+                        key={day.id}
+                        onClick={() => handleDaySelect(day.id)}
+                        className={`px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap border ${
+                          isSelected
+                            ? "bg-amber-500/20 text-amber-300 border-amber-500/50 shadow-md"
+                            : "bg-white/5 text-gray-400 border-white/10 hover:bg-white/10 hover:text-white"
+                        }`}
+                      >
+                        📅 Día {idx + 1} ({dateStr})
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
               <div className="space-y-4 text-gray-200">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <p><strong>Nombre:</strong> {event.name}</p>
                   <p><strong>Cliente:</strong> {event.client}</p>
-                  <p><strong>Fecha:</strong> {event.date ? event.date.split('-').reverse().join('/') : ''}</p>
-                  <p><strong>Hora:</strong> {event.time}</p>
+                  <p>
+                    <strong>Fecha:</strong>{" "}
+                    {selectedDayId
+                      ? (eventDays.find(d => d.id === selectedDayId)?.date ? eventDays.find(d => d.id === selectedDayId).date.split('-').reverse().join('/') : '')
+                      : (event.date ? event.date.split('-').reverse().join('/') : '')}
+                  </p>
+                  <p>
+                    <strong>Hora:</strong>{" "}
+                    {selectedDayId
+                      ? (eventDays.find(d => d.id === selectedDayId)?.start_time?.substring(0, 5) || event.time)
+                      : event.time}
+                  </p>
                   <p><strong>Ubicación:</strong> {event.location}</p>
-                  <p><strong>Estado:</strong> {event.status}</p>
+                  <p>
+                    <strong>Estado:</strong>{" "}
+                    {selectedDayId
+                      ? (eventDays.find(d => d.id === selectedDayId)?.status || event.status)
+                      : event.status}
+                  </p>
                 </div>
-                {event.description && (
-                  <p><strong>Descripción:</strong> {event.description}</p>
-                )}                {/* Staff Asignado / Sección de Personal */}
+                {(() => {
+                  const dayObj = eventDays.find(d => d.id === selectedDayId);
+                  const notes = dayObj?.notes || event.description;
+                  if (!notes) return null;
+                  return (
+                    <p>
+                      <strong>{dayObj?.notes ? "Notas de esta Jornada:" : "Descripción:"}</strong> {notes}
+                    </p>
+                  );
+                })()}                {/* Staff Asignado / Sección de Personal */}
                 {(assigned.length > 0 || ['planificado', 'planned', 'confirmado', 'confirmed', 'active', 'activo', 'en curso', 'finalizado', 'completado', 'completed'].includes(event.status?.toLowerCase())) && (
                   <div className="flex flex-col gap-2 pt-2 border-t border-white/5">
                     <div className="flex flex-col mb-2">

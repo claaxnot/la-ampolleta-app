@@ -28,7 +28,7 @@ export default function Calendar() {
   React.useEffect(() => {
     fetchEvents();
 
-    console.log("🔌 [REALTIME CALENDAR] - Subscribiendo a cambios en tabla events...");
+    console.log("🔌 [REALTIME CALENDAR] - Subscribiendo a cambios en tablas events y event_days...");
     const channel = supabase
       .channel('calendar-events-changes')
       .on(
@@ -36,6 +36,14 @@ export default function Calendar() {
         { event: '*', schema: 'public', table: 'events' },
         (payload) => {
           console.log("🔔 [REALTIME CALENDAR] - Cambio detectado en tabla events:", payload);
+          fetchEvents();
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'event_days' },
+        (payload) => {
+          console.log("🔔 [REALTIME CALENDAR] - Cambio detectado en tabla event_days:", payload);
           fetchEvents();
         }
       )
@@ -47,8 +55,35 @@ export default function Calendar() {
   }, []);
 
   const fetchEvents = async () => {
-    const { data } = await supabase.from('events').select('*');
-    if (data) setEvents(data);
+    const { data, error } = await supabase
+      .from('event_days')
+      .select('*, events(*)');
+      
+    if (error) {
+      console.error("Error fetching event days for calendar:", error);
+      return;
+    }
+
+    if (data) {
+      const mapped = data.map(d => {
+        const parent = d.events || {};
+        return {
+          ...parent,
+          ...d,
+          id: d.event_id, // Detalle modal uses parent event_id
+          day_id: d.id,
+          name: parent.name || "Sin nombre",
+          location: parent.location || "Sin ubicación",
+          date: d.date, // Usar la fecha específica de la jornada
+          time: d.start_time ? d.start_time.substring(0, 5) : "09:00",
+          end_time: d.end_time ? d.end_time.substring(0, 5) : "18:00",
+          call_time: d.call_time ? d.call_time.substring(0, 5) : "",
+          setup_time: d.setup_time ? d.setup_time.substring(0, 5) : "",
+          status: d.status || parent.status || "Planificado"
+        };
+      });
+      setEvents(mapped);
+    }
   };
   
   const currentYear = currentDate.getFullYear();
@@ -205,7 +240,7 @@ export default function Calendar() {
 
                     return (
                       <div 
-                        key={event.id}
+                        key={event.day_id || event.id}
                         onClick={() => {
                           setSelectedEvent(event);
                           setIsDetailsOpen(true);

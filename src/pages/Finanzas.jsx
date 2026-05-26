@@ -655,7 +655,7 @@ export default function Finanzas() {
         console.warn("⚠️ [BATCHES]: No se pudieron cargar los lotes de boletas agrupadas de la BD.", errBatches);
       }
 
-      // Intentamos traer las asignaciones con los datos del perfil y del evento
+      // Intentamos traer las asignaciones con los datos del perfil, del evento y de las jornadas específicas
       const { data: assignments, error } = await supabase
         .from("event_assignments")
         .select(`
@@ -663,6 +663,7 @@ export default function Finanzas() {
           status,
           payment_status,
           custom_rate,
+          event_day_id,
           invoice_required,
           invoice_received,
           invoice_number,
@@ -672,6 +673,13 @@ export default function Finanzas() {
           invoice_notes,
           verifier:invoice_verified_by (
             name
+          ),
+          event_days (
+            id,
+            date,
+            start_time,
+            end_time,
+            status
           ),
           events:event_id (
             id,
@@ -705,7 +713,10 @@ export default function Finanzas() {
       const attMap = {};
       if (attLogs) {
         attLogs.forEach(log => {
-          attMap[`${log.event_id}-${log.worker_id}`] = log;
+          // Si el registro de asistencia tiene event_day_id, lo indexamos usando ese id.
+          // Si es un log antiguo (legacy), usamos la combinación event_id-worker_id.
+          const key = log.event_day_id ? `${log.event_day_id}-${log.worker_id}` : `${log.event_id}-${log.worker_id}`;
+          attMap[key] = log;
         });
       }
 
@@ -784,16 +795,25 @@ export default function Finanzas() {
         const formatted = assignments.map(a => {
           const defaultRate = a.profiles?.monto_transferencia ? parseFloat(a.profiles.monto_transferencia) : 25000;
           const rate = a.custom_rate ? parseFloat(a.custom_rate) : defaultRate;
-          const eventStatus = a.events?.status ? a.events.status.toLowerCase() : "";
+          
+          const day = a.event_days;
+          const parent = a.events || {};
+          
+          const eventStatus = day ? (day.status ? day.status.toLowerCase() : "") : (parent.status ? parent.status.toLowerCase() : "");
+          const dayDate = day ? day.date : parent.date;
+          
           const todayStr = new Date().toLocaleDateString("en-CA");
-          const isDateFinished = a.events?.date ? a.events.date <= todayStr : false;
+          const isDateFinished = dayDate ? dayDate <= todayStr : false;
           const isFinished = eventStatus === "completado" || eventStatus === "finalizado" || isDateFinished;
-          const attLog = attMap[`${a.events?.id}-${a.profiles?.id}`];
+          
+          // Indexar log de asistencia por event_day_id o en su defecto por parent event_id
+          const attKey = a.event_day_id ? `${a.event_day_id}-${a.profiles?.id}` : `${parent.id}-${a.profiles?.id}`;
+          const attLog = attMap[attKey];
 
           return {
               id: a.id,
-              event_name: a.events?.name || "Sin Nombre",
-              event_date: a.events?.date || "",
+              event_name: parent.name || "Sin Nombre",
+              event_date: dayDate || "",
               is_finished: isFinished,
               staff_id: a.profiles?.id || "",
               staff_name: a.profiles?.name || "Personal Desconocido",

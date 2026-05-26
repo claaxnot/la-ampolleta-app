@@ -140,6 +140,75 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
   const [isSubmittingForm, setIsSubmittingForm] = useState(false);
   const [customRates, setCustomRates] = useState({});
 
+  const [days, setDays] = useState([
+    { date: "", time: "10:00", end_time: "18:00", call_time: "", setup_time: "", status: "Planificado", notes: "" }
+  ]);
+  const [staffDays, setStaffDays] = useState({});
+
+  const handleDayChange = (index, field, value) => {
+    setDays(prev => {
+      const copy = [...prev];
+      copy[index] = { ...copy[index], [field]: value };
+      return copy;
+    });
+  };
+
+  const addDay = () => {
+    const lastDay = days[days.length - 1];
+    let nextDateStr = "";
+    if (lastDay && lastDay.date) {
+      const parts = lastDay.date.split('-');
+      if (parts.length === 3) {
+        const d = new Date(parts[0], parts[1] - 1, parts[2]);
+        d.setDate(d.getDate() + 1);
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const dayVal = String(d.getDate()).padStart(2, '0');
+        nextDateStr = `${y}-${m}-${dayVal}`;
+      }
+    }
+    
+    setDays(prev => [
+      ...prev,
+      {
+        date: nextDateStr,
+        time: lastDay?.time || "10:00",
+        end_time: lastDay?.end_time || "18:00",
+        call_time: lastDay?.call_time || "",
+        setup_time: lastDay?.setup_time || "",
+        status: "Planificado",
+        notes: ""
+      }
+    ]);
+  };
+
+  const removeDay = (index) => {
+    if (days.length <= 1) return;
+    setDays(prev => prev.filter((_, idx) => idx !== index));
+    setStaffDays(prev => {
+      const copy = {};
+      Object.keys(prev).forEach(staffId => {
+        const assigned = prev[staffId] || [];
+        const updated = assigned
+          .filter(idx => idx !== index)
+          .map(idx => (idx > index ? idx - 1 : idx));
+        copy[staffId] = updated;
+      });
+      return copy;
+    });
+  };
+
+  // Sync first day details back to React Hook Form for backwards-compatible schema validations
+  useEffect(() => {
+    if (days[0]) {
+      setValue("date", days[0].date || "", { shouldValidate: true, shouldDirty: true });
+      setValue("time", days[0].time || "", { shouldValidate: true, shouldDirty: true });
+      if (days[0].end_time) setValue("end_time", days[0].end_time, { shouldValidate: true });
+      if (days[0].call_time) setValue("call_time", days[0].call_time, { shouldValidate: true });
+      if (days[0].setup_time) setValue("setup_time", days[0].setup_time, { shouldValidate: true });
+    }
+  }, [days, setValue]);
+
   // Drawer colapsable para configuración avanzada
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [showAdvancedFinished, setShowAdvancedFinished] = useState(false);
@@ -348,22 +417,74 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
 
         const targetIdForAssignments = initialData.id || initialData.duplicateFromId;
         if (targetIdForAssignments) {
-          supabase.from('event_assignments').select('staff_id, custom_rate').eq('event_id', targetIdForAssignments).then(({ data }) => {
-            if (data) {
-              setValue("staffIds", data.map(a => a.staff_id));
-              const rates = {};
-              data.forEach(a => {
-                if (a.custom_rate !== null && a.custom_rate !== undefined) {
-                  rates[a.staff_id] = String(a.custom_rate);
-                }
-              });
-              setCustomRates(rates);
+          // Fetch event days first, then fetch and map staff assignments to indices
+          supabase.from('event_days').select('*').eq('event_id', targetIdForAssignments).order('date', { ascending: true }).then(({ data: daysData }) => {
+            let loadedDays = [];
+            if (daysData && daysData.length > 0) {
+              loadedDays = daysData.map(d => ({
+                id: d.id,
+                date: d.date,
+                time: d.start_time ? d.start_time.substring(0, 5) : "10:00",
+                end_time: d.end_time ? d.end_time.substring(0, 5) : "18:00",
+                call_time: d.call_time ? d.call_time.substring(0, 5) : "",
+                setup_time: d.setup_time ? d.setup_time.substring(0, 5) : "",
+                status: d.status,
+                notes: d.notes || ""
+              }));
+              setDays(loadedDays);
+            } else {
+              loadedDays = [{
+                date: initialData.date || "",
+                time: initialData.time || "10:00",
+                end_time: initialData.end_time || "18:00",
+                call_time: initialData.call_time || "",
+                setup_time: initialData.setup_time || "",
+                status: initialData.status || "Planificado",
+                notes: ""
+              }];
+              setDays(loadedDays);
             }
+
+            // Sync values to form
+            if (loadedDays[0]) {
+              setValue("date", loadedDays[0].date || "");
+              setValue("time", loadedDays[0].time || "");
+            }
+
+            // Fetch assignments
+            supabase.from('event_assignments').select('staff_id, event_day_id, custom_rate').eq('event_id', targetIdForAssignments).then(({ data: assignData }) => {
+              if (assignData) {
+                setValue("staffIds", [...new Set(assignData.map(a => a.staff_id))]);
+                const rates = {};
+                const sDays = {};
+                
+                assignData.forEach(a => {
+                  if (a.custom_rate !== null && a.custom_rate !== undefined) {
+                    rates[a.staff_id] = String(a.custom_rate);
+                  }
+                  if (a.event_day_id) {
+                    const dayIdx = loadedDays.findIndex(d => d.id === a.event_day_id);
+                    if (dayIdx !== -1) {
+                      if (!sDays[a.staff_id]) sDays[a.staff_id] = [];
+                      sDays[a.staff_id].push(dayIdx);
+                    }
+                  }
+                });
+                
+                setCustomRates(rates);
+                setStaffDays(sDays);
+              }
+            });
           });
         }
       } else {
         prevInitialClientRef.current = "";
         setCustomRates({});
+        setStaffDays({});
+        const defaultDay = {
+          date: "", time: "10:00", end_time: "18:00", call_time: "", setup_time: "", status: "Planificado", notes: ""
+        };
+        setDays([defaultDay]);
         reset({
           name: "", client: "", date: "", time: "", location: "",
           requiredStaff: 1, description: "", status: "Planificado", staffIds: [],
@@ -388,6 +509,8 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
     eventData.staffIds = data.staffIds || [];
     eventData.customRates = customRates;
     eventData.isAdvancedActive = showAdvanced;
+    eventData.days = days;
+    eventData.staffDays = staffDays;
 
     setIsSubmittingForm(true);
     try {
@@ -584,25 +707,82 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
                       {errors.location && <span className="text-red-400 text-xs mt-1">{errors.location.message}</span>}
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="flex flex-col">
-                        <DatePicker
-                          value={watch("date")}
-                          onChange={(val) => setValue("date", val, { shouldDirty: true })}
-                          label="Fecha"
-                          id="date"
-                          error={errors.date}
-                        />
+                    {/* JORNADAS / DIAS DEL EVENTO */}
+                    <div className="col-span-full bg-black/10 border border-white/5 rounded-2xl p-4 mt-2 space-y-4 shadow-xl backdrop-blur-md">
+                      <div className="flex items-center justify-between border-b border-white/5 pb-2.5">
+                        <div className="flex items-center gap-2">
+                          <Calendar className="w-4 h-4 text-amber-400" />
+                          <h4 className="text-xs font-black text-amber-300 uppercase tracking-wider">Jornadas / Días del Evento</h4>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={addDay}
+                          className="px-3 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/20 rounded-xl text-xs font-bold transition-all shadow-md"
+                        >
+                          + Agregar Jornada
+                        </button>
                       </div>
 
-                      <div className="flex flex-col">
-                        <ClockPicker
-                          value={watch("time")}
-                          onChange={(val) => setValue("time", val, { shouldDirty: true })}
-                          label="Hora Inicio"
-                          id="time"
-                          error={errors.time}
-                        />
+                      <div className="space-y-4 pr-1">
+                        {days.map((day, idx) => (
+                          <div key={idx} className="bg-white/[0.02] border border-white/5 rounded-xl p-3.5 relative space-y-3">
+                            <div className="flex items-center justify-between border-b border-white/5 pb-2">
+                              <span className="text-xs font-black text-amber-400 uppercase tracking-wider">
+                                Jornada {idx + 1}
+                              </span>
+                              {days.length > 1 && (
+                                <button
+                                  type="button"
+                                  onClick={() => removeDay(idx)}
+                                  className="text-red-400 hover:text-red-300 text-xs font-bold transition-colors"
+                                >
+                                  Eliminar Día
+                                </button>
+                              )}
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <DatePicker
+                                value={day.date}
+                                onChange={(val) => handleDayChange(idx, "date", val)}
+                                label={`Fecha Jornada ${idx + 1}`}
+                                id={`day-date-${idx}`}
+                              />
+                              <div className="grid grid-cols-2 gap-3">
+                                <ClockPicker
+                                  value={day.time}
+                                  onChange={(val) => handleDayChange(idx, "time", val)}
+                                  label="Hora Inicio"
+                                  id={`day-time-${idx}`}
+                                />
+                                <ClockPicker
+                                  value={day.end_time}
+                                  onChange={(val) => handleDayChange(idx, "end_time", val)}
+                                  label="Hora Término"
+                                  id={`day-endtime-${idx}`}
+                                  align="right"
+                                />
+                              </div>
+                            </div>
+
+                            {showAdvanced && (
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-white/[0.02]">
+                                <ClockPicker
+                                  value={day.setup_time}
+                                  onChange={(val) => handleDayChange(idx, "setup_time", val)}
+                                  label="Montaje Técnico"
+                                  id={`day-setuptime-${idx}`}
+                                />
+                                <ClockPicker
+                                  value={day.call_time}
+                                  onChange={(val) => handleDayChange(idx, "call_time", val)}
+                                  label="Citación / Presentación"
+                                  id={`day-calltime-${idx}`}
+                                />
+                              </div>
+                            )}
+                          </div>
+                        ))}
                       </div>
                     </div>
 
@@ -803,50 +983,6 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
                       >
                         <div className="pt-5 space-y-6">
 
-                          {/* Subsección: Tiempos operacionales */}
-                          <div className="bg-black/20 p-4 rounded-2xl border border-white/5 space-y-4">
-                            <h4 className="text-[10px] font-extrabold text-amber-400 uppercase tracking-widest flex items-center gap-1.5">
-                              <Clock className="w-3.5 h-3.5" /> Cronograma de Horarios
-                            </h4>
-
-                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                              {showSetupField ? (
-                                <div className="flex flex-col">
-                                  <ClockPicker
-                                    value={watch("setup_time")}
-                                    onChange={(val) => setValue("setup_time", val, { shouldDirty: true })}
-                                    label="Hora Montaje Técnico"
-                                    id="setup_time"
-                                    error={errors.setup_time}
-                                  />
-                                </div>
-                              ) : (
-                                <div className="hidden" />
-                              )}
-
-                              <div className="flex flex-col">
-                                <ClockPicker
-                                  value={watch("call_time")}
-                                  onChange={(val) => setValue("call_time", val, { shouldDirty: true })}
-                                  label="Hora Presentación (Citación)"
-                                  id="call_time"
-                                  error={errors.call_time}
-                                />
-                              </div>
-
-                              <div className="flex flex-col">
-                                <ClockPicker
-                                  value={watch("end_time")}
-                                  onChange={(val) => setValue("end_time", val, { shouldDirty: true })}
-                                  label="Hora Finalización Estimada"
-                                  id="end_time"
-                                  error={errors.end_time}
-                                  align="right"
-                                />
-                              </div>
-                            </div>
-                          </div>
-
                           {/* Subsección: Estado, Prioridad y Supervisor */}
                           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
 
@@ -1026,35 +1162,74 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
                   {selectedStaffIds.length > 0 && (
                     <div className="mt-4 p-3.5 bg-black/40 rounded-xl border border-white/5">
                       <h4 className="text-[11px] font-extrabold text-amber-400 uppercase tracking-widest mb-3 flex items-center gap-1.5">
-                        <Sliders className="w-3.5 h-3.5 text-amber-400" /> Tarifas de Turno para este Evento
+                        <Sliders className="w-3.5 h-3.5 text-amber-400" /> Detalle de Asignación y Tarifas
                       </h4>
-                      <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
+                      <div className="space-y-3 max-h-56 overflow-y-auto pr-1">
                         {selectedStaffIds.map(id => {
                           const staff = dbStaff.find(s => s.id === id);
                           if (!staff) return null;
                           const baseline = staff.monto_transferencia ? parseInt(staff.monto_transferencia) : 25000;
+                          const assigned = staffDays[id] || [];
+
+                          const toggleDayForStaff = (dayIdx) => {
+                            setStaffDays(prev => {
+                              const curr = prev[id] || [];
+                              const next = curr.includes(dayIdx)
+                                ? curr.filter(x => x !== dayIdx)
+                                : [...curr, dayIdx];
+                              return { ...prev, [id]: next };
+                            });
+                          };
+
                           return (
-                            <div key={id} className="flex items-center justify-between gap-3 bg-gray-900/40 p-2 rounded-lg border border-white/5">
-                              <div className="flex items-center gap-2 min-w-0">
-                                <img src={staff.avatar || "https://ui-avatars.com/api/?name=" + staff.name} alt="" className="w-5 h-5 rounded-full shrink-0" />
-                                <div className="flex flex-col min-w-0">
-                                  <span className="text-[11px] font-semibold text-gray-200 truncate">{staff.name}</span>
-                                  <span className="text-[9px] text-gray-400 font-medium">Tarifa base: ${baseline.toLocaleString('es-CL')}</span>
+                            <div key={id} className="bg-gray-900/40 p-3 rounded-lg border border-white/5 space-y-3">
+                              <div className="flex items-center justify-between gap-3">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <img src={staff.avatar || "https://ui-avatars.com/api/?name=" + staff.name} alt="" className="w-5 h-5 rounded-full shrink-0" />
+                                  <div className="flex flex-col min-w-0">
+                                    <span className="text-[11px] font-semibold text-gray-200 truncate">{staff.name}</span>
+                                    <span className="text-[9px] text-gray-400 font-medium">Tarifa base: ${baseline.toLocaleString('es-CL')}</span>
+                                  </div>
+                                </div>
+                                <div className="flex items-center shrink-0">
+                                  <CurrencyInputCLP
+                                    compact
+                                    placeholder={String(baseline)}
+                                    value={customRates[id] || ""}
+                                    onChange={(val) => {
+                                      setCustomRates(prev => ({
+                                        ...prev,
+                                        [id]: val
+                                      }));
+                                    }}
+                                  />
                                 </div>
                               </div>
-                              <div className="flex items-center shrink-0">
-                                <CurrencyInputCLP
-                                  compact
-                                  placeholder={String(baseline)}
-                                  value={customRates[id] || ""}
-                                  onChange={(val) => {
-                                    setCustomRates(prev => ({
-                                      ...prev,
-                                      [id]: val
-                                    }));
-                                  }}
-                                />
-                              </div>
+
+                              {days.length > 1 && (
+                                <div className="space-y-1">
+                                  <div className="text-[9px] font-bold text-gray-400 uppercase tracking-wide">Jornadas Asignadas:</div>
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {days.map((day, dayIdx) => {
+                                      const isAssigned = assigned.length === 0 || assigned.includes(dayIdx);
+                                      return (
+                                        <button
+                                          key={dayIdx}
+                                          type="button"
+                                          onClick={() => toggleDayForStaff(dayIdx)}
+                                          className={`px-2 py-1 rounded text-[9px] font-bold transition-all border ${
+                                            isAssigned
+                                              ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                                              : 'bg-white/5 text-gray-500 border-white/5 hover:bg-white/10'
+                                          }`}
+                                        >
+                                          Día {dayIdx + 1} ({day.date ? day.date.substring(5) : "?"})
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           );
                         })}

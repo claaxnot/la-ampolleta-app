@@ -804,7 +804,8 @@ export default function WorkerDashboard({ user }) {
       if (data) {
         const logsMap = {};
         data.forEach(log => {
-          logsMap[log.event_id] = log;
+          const key = log.event_day_id || log.event_id;
+          logsMap[key] = log;
         });
         setAttendanceLogs(logsMap);
       }
@@ -841,9 +842,9 @@ export default function WorkerDashboard({ user }) {
 
   const handleMarkCheckIn = async (eventId, assignmentId) => {
     if (!eventId || !assignmentId) return;
-    setLoadingAttendanceId(`in-${eventId}`);
+    setLoadingAttendanceId(`in-${assignmentId}`);
     try {
-      const eventObj = assignedEvents.find(e => e.id === eventId);
+      const eventObj = assignedEvents.find(e => e.assignment_id === assignmentId);
       const hasCoordinates = eventObj && eventObj.latitude !== null && eventObj.longitude !== null && eventObj.latitude !== "";
       
       let lat = null;
@@ -883,6 +884,15 @@ export default function WorkerDashboard({ user }) {
       if (error) {
         toast.error(error.message || "Error al registrar la entrada.");
       } else {
+        // Autocorrección / Auto-healing para guardar el event_day_id en el log de asistencia
+        if (eventObj && eventObj.event_day_id) {
+          await supabase
+            .from('event_attendance_logs')
+            .update({ event_day_id: eventObj.event_day_id })
+            .eq('event_id', eventId)
+            .eq('worker_id', user.id);
+        }
+
         if (showWarning) {
           toast("Entrada registrada con éxito, pero tu marca quedará registrada sin verificación GPS debido a un error de ubicación.", {
             icon: "⚠️",
@@ -915,9 +925,9 @@ export default function WorkerDashboard({ user }) {
 
   const handleMarkCheckOut = async (eventId, assignmentId) => {
     if (!eventId || !assignmentId) return;
-    setLoadingAttendanceId(`out-${eventId}`);
+    setLoadingAttendanceId(`out-${assignmentId}`);
     try {
-      const eventObj = assignedEvents.find(e => e.id === eventId);
+      const eventObj = assignedEvents.find(e => e.assignment_id === assignmentId);
       const hasCoordinates = eventObj && eventObj.latitude !== null && eventObj.longitude !== null && eventObj.latitude !== "";
       
       let lat = null;
@@ -957,6 +967,15 @@ export default function WorkerDashboard({ user }) {
       if (error) {
         toast.error(error.message || "Error al registrar la salida.");
       } else {
+        // Autocorrección / Auto-healing para guardar el event_day_id en el log de asistencia
+        if (eventObj && eventObj.event_day_id) {
+          await supabase
+            .from('event_attendance_logs')
+            .update({ event_day_id: eventObj.event_day_id })
+            .eq('event_id', eventId)
+            .eq('worker_id', user.id);
+        }
+
         if (showWarning) {
           toast("Salida registrada con éxito, pero tu marca quedará registrada sin verificación GPS debido a un error de ubicación.", {
             icon: "⚠️",
@@ -1036,11 +1055,22 @@ export default function WorkerDashboard({ user }) {
         payment_status,
         custom_rate,
         event_id,
+        event_day_id,
         invoice_required,
         invoice_received,
         invoice_number,
         invoice_received_at,
         invoice_amount,
+        event_days (
+          id,
+          date,
+          start_time,
+          end_time,
+          call_time,
+          setup_time,
+          status,
+          notes
+        ),
         events (
           id, name, date, time, location, client, status, description,
           call_time, setup_time, end_time, priority, operational_notes,
@@ -1055,18 +1085,49 @@ export default function WorkerDashboard({ user }) {
 
     if (data) {
       const formattedEvents = data
-        .map(assignment => ({
-          assignment_id: assignment.id,
-          assignment_status: assignment.status,
-          payment_status: assignment.payment_status,
-          custom_rate: assignment.custom_rate,
-          invoice_required: assignment.invoice_required !== undefined ? assignment.invoice_required : true,
-          invoice_received: assignment.invoice_received !== undefined ? assignment.invoice_received : false,
-          invoice_number: assignment.invoice_number || null,
-          invoice_received_at: assignment.invoice_received_at || null,
-          invoice_amount: assignment.invoice_amount ? parseFloat(assignment.invoice_amount) : null,
-          ...assignment.events
-        }))
+        .map(assignment => {
+          const day = assignment.event_days;
+          const parent = assignment.events || {};
+          
+          return {
+            assignment_id: assignment.id,
+            assignment_status: assignment.status,
+            payment_status: assignment.payment_status,
+            custom_rate: assignment.custom_rate,
+            event_day_id: assignment.event_day_id,
+            invoice_required: assignment.invoice_required !== undefined ? assignment.invoice_required : true,
+            invoice_received: assignment.invoice_received !== undefined ? assignment.invoice_received : false,
+            invoice_number: assignment.invoice_number || null,
+            invoice_received_at: assignment.invoice_received_at || null,
+            invoice_amount: assignment.invoice_amount ? parseFloat(assignment.invoice_amount) : null,
+            
+            // Parent info
+            id: parent.id,
+            name: parent.name,
+            location: parent.location,
+            client: parent.client,
+            description: parent.description,
+            priority: parent.priority,
+            supervisor_id: parent.supervisor_id,
+            profiles: parent.profiles,
+            type: parent.type,
+            operational_info_pending: parent.operational_info_pending,
+            attendance_control_enabled: parent.attendance_control_enabled,
+            attendance_require_confirmed: parent.attendance_require_confirmed,
+            latitude: parent.latitude,
+            longitude: parent.longitude,
+            allowed_radius_meters: parent.allowed_radius_meters,
+
+            // Dynamic day values with parent fallback
+            date: day ? day.date : parent.date,
+            time: day ? (day.start_time ? day.start_time.substring(0, 5) : parent.time) : parent.time,
+            end_time: day ? (day.end_time ? day.end_time.substring(0, 5) : parent.end_time) : parent.end_time,
+            call_time: day ? (day.call_time ? day.call_time.substring(0, 5) : parent.call_time) : parent.call_time,
+            setup_time: day ? (day.setup_time ? day.setup_time.substring(0, 5) : parent.setup_time) : parent.setup_time,
+            status: day ? day.status : parent.status,
+            notes: day ? day.notes : parent.operational_notes
+          };
+        })
         .filter(e => e.status?.toLowerCase() !== "cancelado" && e.status?.toLowerCase() !== "cancelled");
         
       setAssignedEvents(formattedEvents);
@@ -1506,7 +1567,7 @@ export default function WorkerDashboard({ user }) {
                 const isConfirmed = event.assignment_status === 'Confirmado';
                 const isRejected = event.assignment_status === 'Rechazado';
 
-                const log = attendanceLogs[event.id];
+                const log = attendanceLogs[event.event_day_id || event.id];
                 const checkInDisabled = event.attendance_require_confirmed && !isConfirmed;
 
                 const isEventSimpleType = event.type === "Anfitrionas" || event.type === "Promotoría";
@@ -1558,7 +1619,7 @@ export default function WorkerDashboard({ user }) {
 
                 return (
                   <motion.div
-                    key={event.id}
+                    key={event.assignment_id}
                     whileHover={{ y: -4, scale: 1.01 }}
                     transition={{ duration: 0.2 }}
                     layout
@@ -1581,6 +1642,11 @@ export default function WorkerDashboard({ user }) {
                           <div className="flex items-center justify-between flex-wrap gap-2">
                             <div className="flex items-center gap-2 flex-wrap">
                               <h3 className={`text-xl font-bold tracking-wide transition-all ${isEventCompleted ? 'text-gray-400 line-through decoration-gray-500/50' : 'text-white'}`}>{event.name}</h3>
+                              {event.event_day_id && (
+                                <span className="text-[10px] px-2 py-0.5 rounded border border-amber-500/20 bg-amber-500/10 text-amber-300 font-extrabold uppercase tracking-wider">
+                                  Jornada
+                                </span>
+                              )}
                               <span className="text-[10px] px-2 py-0.5 rounded border border-white/10 bg-white/5 text-gray-400 font-semibold uppercase tracking-wider">
                                 {event.type || "Producción técnica"}
                               </span>
@@ -1657,9 +1723,9 @@ export default function WorkerDashboard({ user }) {
                           </div>
 
                           {/* Notas operativas si existen */}
-                          {event.operational_notes && (
+                          {event.notes && (
                             <div className="text-xs bg-amber-500/5 text-amber-300 border border-amber-500/10 p-3 rounded-xl leading-relaxed">
-                              <strong>⚠️ Notas de Operación:</strong> {event.operational_notes}
+                              <strong>⚠️ Notas de Operación:</strong> {event.notes}
                             </div>
                           )}
 
@@ -1690,14 +1756,14 @@ export default function WorkerDashboard({ user }) {
                                     whileHover={!checkInDisabled ? { scale: 1.02 } : {}}
                                     whileTap={!checkInDisabled ? { scale: 0.98 } : {}}
                                     onClick={() => handleMarkCheckIn(event.id, event.assignment_id)}
-                                    disabled={checkInDisabled || loadingAttendanceId === `in-${event.id}`}
+                                    disabled={checkInDisabled || loadingAttendanceId === `in-${event.assignment_id}`}
                                     className={`flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-extrabold transition-all duration-300 shrink-0 select-none ${
                                       checkInDisabled
                                         ? "bg-gray-800/40 text-gray-500 border border-gray-700/50 cursor-not-allowed"
                                         : "bg-amber-500/20 text-amber-300 hover:bg-amber-500 hover:text-gray-900 border border-amber-500/50 shadow-md"
                                     }`}
                                   >
-                                    {loadingAttendanceId === `in-${event.id}` ? (
+                                    {loadingAttendanceId === `in-${event.assignment_id}` ? (
                                       <span className="w-4 h-4 border-2 border-amber-300 border-t-transparent rounded-full animate-spin" />
                                     ) : (
                                       <>⚡ Marcar Entrada</>
@@ -1717,10 +1783,10 @@ export default function WorkerDashboard({ user }) {
                                     whileHover={{ scale: 1.02 }}
                                     whileTap={{ scale: 0.98 }}
                                     onClick={() => handleMarkCheckOut(event.id, event.assignment_id)}
-                                    disabled={loadingAttendanceId === `out-${event.id}`}
+                                    disabled={loadingAttendanceId === `out-${event.assignment_id}`}
                                     className="flex items-center justify-center gap-1.5 px-4 py-2.5 bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500 hover:text-gray-900 rounded-xl text-xs font-extrabold transition-all duration-300 border border-emerald-500/50 shadow-md shrink-0 select-none"
                                   >
-                                    {loadingAttendanceId === `out-${event.id}` ? (
+                                    {loadingAttendanceId === `out-${event.assignment_id}` ? (
                                       <span className="w-4 h-4 border-2 border-emerald-300 border-t-transparent rounded-full animate-spin" />
                                     ) : (
                                       <>📤 Marcar Salida</>

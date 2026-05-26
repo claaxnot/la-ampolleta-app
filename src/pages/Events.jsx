@@ -104,6 +104,34 @@ export default function Events({ user }) {
     const customRates = eventData.customRates || {};
     delete eventData.customRates;
 
+    const submittedDays = eventData.days || [];
+    delete eventData.days;
+
+    const staffDays = eventData.staffDays || {};
+    delete eventData.staffDays;
+
+    // Build default single-day array if no days were submitted
+    const finalDays = submittedDays.length > 0 
+      ? submittedDays 
+      : [{
+          date: eventData.date,
+          time: eventData.time,
+          end_time: eventData.end_time || '18:00:00',
+          call_time: eventData.call_time || null,
+          setup_time: eventData.setup_time || null,
+          status: eventData.status || 'Planificado',
+          notes: ''
+        }];
+
+    // Update parent event details with First Day values for backwards compatibility
+    const firstDay = finalDays[0];
+    eventData.date = firstDay.date;
+    eventData.time = firstDay.time;
+    eventData.end_time = firstDay.end_time;
+    eventData.call_time = firstDay.call_time;
+    eventData.setup_time = firstDay.setup_time;
+    eventData.status = firstDay.status;
+
     // Extraer y borrar bandera del panel avanzado
     const isAdvancedActive = eventData.isAdvancedActive;
     delete eventData.isAdvancedActive;
@@ -173,62 +201,6 @@ export default function Events({ user }) {
         const { error } = await supabase.from('events').update(eventData).eq('id', eventId);
         console.log("5️⃣ [UPDATE RESPONSE] - Error de actualización:", error);
         if (error) throw error;
-        
-        // Smart Sync for assignments to preserve worker confirmation and billing statuses
-        const { data: existingAssignments, error: fetchError } = await supabase
-          .from('event_assignments')
-          .select('*')
-          .eq('event_id', eventId);
-        if (fetchError) throw fetchError;
-
-        const existingMap = existingAssignments || [];
-        const existingStaffIds = existingMap.map(ea => ea.staff_id);
-
-        // 1. Delete removed staff assignments
-        const staffIdsToDelete = existingStaffIds.filter(id => !staffIds.includes(id));
-        if (staffIdsToDelete.length > 0) {
-          const { error: delError } = await supabase
-            .from('event_assignments')
-            .delete()
-            .eq('event_id', eventId)
-            .in('staff_id', staffIdsToDelete);
-          if (delError) throw delError;
-        }
-
-        // 2. Insert new staff assignments
-        const staffIdsToInsert = staffIds.filter(id => !existingStaffIds.includes(id));
-        if (staffIdsToInsert.length > 0) {
-          const newAssignments = staffIdsToInsert.map(id => {
-            const rateVal = customRates[id] ? parseFloat(customRates[id]) : null;
-            return { 
-              event_id: eventId, 
-              staff_id: id,
-              custom_rate: rateVal && !Number.isNaN(rateVal) ? rateVal : null
-            };
-          });
-          const { error: insError } = await supabase
-            .from('event_assignments')
-            .insert(newAssignments);
-          if (insError) throw insError;
-        }
-
-        // 3. Update existing staff custom rate if it changed
-        for (const existing of existingMap) {
-          if (staffIds.includes(existing.staff_id)) {
-            const newRateVal = customRates[existing.staff_id] ? parseFloat(customRates[existing.staff_id]) : null;
-            const oldRateVal = existing.custom_rate ? parseFloat(existing.custom_rate) : null;
-            if (newRateVal !== oldRateVal) {
-              const { error: updError } = await supabase
-                .from('event_assignments')
-                .update({
-                  custom_rate: newRateVal && !Number.isNaN(newRateVal) ? newRateVal : null
-                })
-                .eq('id', existing.id);
-              if (updError) throw updError;
-            }
-          }
-        }
-
       } else {
         // Insert new Event
         const { data, error } = await supabase.from('events').insert([eventData]).select();
@@ -237,19 +209,121 @@ export default function Events({ user }) {
         if (data && data.length > 0) {
           eventId = data[0].id;
         }
+      }
 
-        // Insert new assignments since event is brand new
-        if (eventId && staffIds.length > 0) {
-          const assignments = staffIds.map(id => {
-            const rateVal = customRates[id] ? parseFloat(customRates[id]) : null;
-            return { 
-              event_id: eventId, 
-              staff_id: id,
-              custom_rate: rateVal && !Number.isNaN(rateVal) ? rateVal : null
-            };
+      if (eventId) {
+        // --- SYNC JORNADAS (event_days) ---
+        // 1. Fetch current days for this event from database
+        const { data: dbDays, error: dbDaysErr } = await supabase
+          .from('event_days')
+          .select('id')
+          .eq('event_id', eventId);
+        if (dbDaysErr) throw dbDaysErr;
+
+        const dbDayIds = dbDays ? dbDays.map(d => d.id) : [];
+        const submittedDayIds = finalDays.map(d => d.id).filter(Boolean);
+
+        // Delete days that were removed
+        const dayIdsToDelete = dbDayIds.filter(id => !submittedDayIds.includes(id));
+        if (dayIdsToDelete.length > 0) {
+          const { error: delErr } = await supabase.from('event_days').delete().in('id', dayIdsToDelete);
+          if (delErr) throw delErr;
+        }
+
+        // Insert or Update submitted days
+        const savedDays = [];
+        for (let i = 0; i < finalDays.length; i++) {
+          const day = finalDays[i];
+          const dayPayload = {
+            event_id: eventId,
+            date: day.date,
+            start_time: day.time,
+            end_time: day.end_time || '18:00:00',
+            call_time: day.call_time || null,
+            setup_time: day.setup_time || null,
+            status: day.status || 'Planificado',
+            notes: day.notes || null
+          };
+
+          if (day.id) {
+            // Update
+            const { error: updErr } = await supabase.from('event_days').update(dayPayload).eq('id', day.id);
+            if (updErr) throw updErr;
+            savedDays.push({ ...dayPayload, id: day.id });
+          } else {
+            // Insert
+            const { data: insData, error: insErr } = await supabase.from('event_days').insert([dayPayload]).select();
+            if (insErr) throw insErr;
+            if (insData && insData[0]) {
+              savedDays.push(insData[0]);
+            }
+          }
+        }
+
+        // --- SYNC ASIGNACIONES (event_assignments) PER JORNADA ---
+        for (let i = 0; i < savedDays.length; i++) {
+          const savedDay = savedDays[i];
+          const dayId = savedDay.id;
+
+          // Find staff IDs assigned to this specific day index
+          const staffIdsForDay = staffIds.filter(id => {
+            const assignedDays = staffDays[id];
+            if (!assignedDays) return true; // Default: all days
+            return assignedDays.includes(i);
           });
-          const { error: assignError } = await supabase.from('event_assignments').insert(assignments);
-          if (assignError) throw assignError;
+
+          // Fetch current assignments for this event_day_id
+          const { data: existingAssigns, error: fetchErr } = await supabase
+            .from('event_assignments')
+            .select('*')
+            .eq('event_day_id', dayId);
+          if (fetchErr) throw fetchErr;
+
+          const existingStaffIds = existingAssigns ? existingAssigns.map(ea => ea.staff_id) : [];
+
+          // Delete removed assignments
+          const staffIdsToDelete = existingStaffIds.filter(id => !staffIdsForDay.includes(id));
+          if (staffIdsToDelete.length > 0) {
+            const { error: delError } = await supabase
+              .from('event_assignments')
+              .delete()
+              .eq('event_day_id', dayId)
+              .in('staff_id', staffIdsToDelete);
+            if (delError) throw delError;
+          }
+
+          // Insert new assignments
+          const staffIdsToInsert = staffIdsForDay.filter(id => !existingStaffIds.includes(id));
+          if (staffIdsToInsert.length > 0) {
+            const newAssigns = staffIdsToInsert.map(id => {
+              const rateVal = customRates[id] ? parseFloat(customRates[id]) : null;
+              return {
+                event_id: eventId,
+                event_day_id: dayId,
+                staff_id: id,
+                custom_rate: rateVal && !Number.isNaN(rateVal) ? rateVal : null
+              };
+            });
+            const { error: assignError } = await supabase.from('event_assignments').insert(newAssigns);
+            if (assignError) throw assignError;
+          }
+
+          // Update existing custom rates if they changed
+          for (const existing of existingAssigns || []) {
+            if (staffIdsForDay.includes(existing.staff_id)) {
+              const newRateVal = customRates[existing.staff_id] ? parseFloat(customRates[existing.staff_id]) : null;
+              const oldRateVal = existing.custom_rate ? parseFloat(existing.custom_rate) : null;
+              if (newRateVal !== oldRateVal) {
+                const { error: updError } = await supabase
+                  .from('event_assignments')
+                  .update({
+                    custom_rate: newRateVal && !Number.isNaN(newRateVal) ? newRateVal : null
+                  })
+                  .eq('id', existing.id);
+                if (updError) throw updError;
+              }
+            }
+          }
         }
       }
 
