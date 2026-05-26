@@ -1905,7 +1905,7 @@ export default function WorkerDashboard({ user }) {
                           <div className="relative pl-6 border-l border-white/10 space-y-4">
 
                             {/* 1. Montaje */}
-                            {(!isEventSimpleType || isPlanPending) && (
+                            {(event.setup_time || isPlanPending) && (!isEventSimpleType || isPlanPending) && (
                               <div className="relative group">
                                 <div className={`absolute -left-[30px] top-1.5 w-4 h-4 rounded-full border-4 border-gray-950 group-hover:scale-125 transition-transform duration-300 ${event.setup_time ? 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]' : 'bg-gray-700'
                                   }`} />
@@ -1922,19 +1922,21 @@ export default function WorkerDashboard({ user }) {
                             )}
 
                             {/* 2. Presentación (Llegada) */}
-                            <div className="relative group">
-                              <div className={`absolute -left-[30px] top-1.5 w-4 h-4 rounded-full border-4 border-gray-950 group-hover:scale-125 transition-transform duration-300 ${event.call_time ? 'bg-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.5)]' : 'bg-gray-700'
-                                }`} />
-                              <div className="flex items-center justify-between text-xs md:text-sm">
-                                <span className={`font-bold font-mono ${event.call_time ? 'text-amber-300' : 'text-gray-500 italic animate-pulse'}`}>
-                                  {event.call_time ? event.call_time.slice(0, 5) : 'Por definir'}
-                                </span>
-                                <span className={event.call_time ? 'text-gray-200' : 'text-gray-500 italic'}>
-                                  {event.call_time ? 'Hora de presentación en recinto (Call Time)' : 'Hora de citación por definir'}
-                                </span>
-                                <span className="text-[10px] bg-amber-500/10 text-amber-400 px-2 py-0.5 rounded border border-amber-500/20 font-medium">Llegada</span>
+                            {(event.call_time || isPlanPending) && (
+                              <div className="relative group">
+                                <div className={`absolute -left-[30px] top-1.5 w-4 h-4 rounded-full border-4 border-gray-950 group-hover:scale-125 transition-transform duration-300 ${event.call_time ? 'bg-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.5)]' : 'bg-gray-700'
+                                  }`} />
+                                <div className="flex items-center justify-between text-xs md:text-sm">
+                                  <span className={`font-bold font-mono ${event.call_time ? 'text-amber-300' : 'text-gray-500 italic animate-pulse'}`}>
+                                    {event.call_time ? event.call_time.slice(0, 5) : 'Por definir'}
+                                  </span>
+                                  <span className={event.call_time ? 'text-gray-200' : 'text-gray-500 italic'}>
+                                    {event.call_time ? 'Hora de presentación en recinto (Call Time)' : 'Hora de citación por definir'}
+                                  </span>
+                                  <span className="text-[10px] bg-amber-500/10 text-amber-400 px-2 py-0.5 rounded border border-amber-500/20 font-medium">Llegada</span>
+                                </div>
                               </div>
-                            </div>
+                            )}
 
                             {/* 3. Showtime (Siempre visible) */}
                             <div className="relative group">
@@ -1947,7 +1949,7 @@ export default function WorkerDashboard({ user }) {
                             </div>
 
                             {/* 4. Término */}
-                            {(!isEventSimpleType || isPlanPending) && (
+                            {(event.end_time || isPlanPending) && (!isEventSimpleType || isPlanPending) && (
                               <div className="relative group">
                                 <div className={`absolute -left-[30px] top-1.5 w-4 h-4 rounded-full border-4 border-gray-950 group-hover:scale-125 transition-transform duration-300 ${event.end_time ? 'bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.5)]' : 'bg-gray-700'
                                   }`} />
