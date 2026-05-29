@@ -132,5 +132,10 @@
 - [x] **Corrección de Desplazamiento de Fecha de Emisión:** Reemplazar el formateador del objeto Date local de JS por manipulación directa de string reversible `DD-MM-YYYY`, solucionando el desfase de -1 día causado por zonas horarias del navegador.
 - [x] **Optimización de Ventana de Sincronización IMAP:** Restablecer la ventana de escaneo automático de correos a 30 días en el script de sincronización `sync-sii-invoices.js` y en la función Deno de Supabase.
 - [x] **Generación de Respaldo Failsafe Pre-3.5:** Crear el archivo comprimido `backup_pre_finanzas_3_5.zip` basado en el último commit estable de Git antes del despliegue contable de la versión 3.5.
+- [x] **Rediseño Responsivo de Botones de Confirmación:** Distribución automática por breakpoints (`flex-col` en móvil, `sm:flex-row` en tablets y `lg:flex-col` en desktop) para evitar desbordamientos y cortes de bordes en pantallas móviles pequeñas.
+- [x] **Simplificación Visual de Asistencia Confirmada:** Ocultar el gran botón verde redundante de confirmación una vez que la asistencia está dada, dejando una visual ultra limpia con el enlace de cancelación y los detalles del evento.
+- [x] **Bloqueo Operacional Horario (Check-In/Out):** Restringir el botón "Marcar Entrada" estrictamente al día del evento (con mensaje dinámico preventivo en ámbar) y el "Marcar Salida" a un plazo de hasta 24h tras el check-in (con advertencia en rojo por expiración).
+- [x] **Depuración de Errores de Inicialización:** Corregir el error de referencia temporal (`ReferenceError`) en la inicialización de `todayStr` reubicando su declaración de forma segura al inicio del callback.
+
 
 
