@@ -136,6 +136,7 @@
 - [x] **Simplificación Visual de Asistencia Confirmada:** Ocultar el gran botón verde redundante de confirmación una vez que la asistencia está dada, dejando una visual ultra limpia con el enlace de cancelación y los detalles del evento.
 - [x] **Bloqueo Operacional Horario (Check-In/Out):** Restringir el botón "Marcar Entrada" estrictamente al día del evento (con mensaje dinámico preventivo en ámbar) y el "Marcar Salida" a un plazo de hasta 24h tras el check-in (con advertencia en rojo por expiración).
 - [x] **Depuración de Errores de Inicialización:** Corregir el error de referencia temporal (`ReferenceError`) en la inicialización de `todayStr` reubicando su declaración de forma segura al inicio del callback.
+- [x] **Reportes del Sistema en Excel General:** Integrar en el panel de control administrativo (`Dashboard.jsx`) un generador de reportes en Excel de 3 hojas (Resumen de KPIs, Listado completo detallado de eventos, y Registro completo de auditoría de actividad reciente) mediante SheetJS (XLSX).
 
 
 
