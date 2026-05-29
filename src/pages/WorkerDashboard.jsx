@@ -1822,14 +1822,14 @@ export default function WorkerDashboard({ user }) {
                           )}
                         </div>
 
-                        <div className="flex flex-row lg:flex-col justify-end items-center gap-3 mt-4 lg:mt-0 lg:self-center w-full lg:w-auto">
+                        <div className="flex flex-col sm:flex-row lg:flex-col justify-end items-stretch sm:items-center gap-2.5 mt-4 lg:mt-0 lg:self-center w-full lg:w-auto">
                           {!isEventCompleted && isPending && (
                             <>
                               <motion.button
                                 whileHover={{ scale: 1.03 }}
                                 whileTap={{ scale: 0.97 }}
                                 onClick={() => handleStatusChange(event.assignment_id, 'Confirmado')}
-                                className="flex items-center justify-center gap-2 px-5 py-2.5 bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500 hover:text-gray-900 rounded-xl transition-all duration-300 border border-emerald-500/50 shadow-md font-bold text-sm w-full lg:w-44"
+                                className="flex items-center justify-center gap-2 px-5 py-2.5 bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500 hover:text-gray-900 rounded-xl transition-all duration-300 border border-emerald-500/50 shadow-md font-bold text-sm w-full sm:flex-1 lg:flex-none lg:w-44"
                               >
                                 <CheckCircle className="w-4 h-4" /> Confirmar
                               </motion.button>
@@ -1837,7 +1837,7 @@ export default function WorkerDashboard({ user }) {
                                 whileHover={{ scale: 1.03 }}
                                 whileTap={{ scale: 0.97 }}
                                 onClick={() => handleStatusChange(event.assignment_id, 'Rechazado')}
-                                className="flex items-center justify-center gap-2 px-5 py-2.5 bg-red-500/20 text-red-300 hover:bg-red-500 hover:text-white rounded-xl transition-all duration-300 border border-red-500/50 shadow-md font-bold text-sm w-full lg:w-44"
+                                className="flex items-center justify-center gap-2 px-5 py-2.5 bg-red-500/20 text-red-300 hover:bg-red-500 hover:text-white rounded-xl transition-all duration-300 border border-red-500/50 shadow-md font-bold text-sm w-full sm:flex-1 lg:flex-none lg:w-44"
                               >
                                 <XCircle className="w-4 h-4" /> Rechazar
                               </motion.button>
@@ -1845,7 +1845,7 @@ export default function WorkerDashboard({ user }) {
                           )}
 
                           {!isEventCompleted && isConfirmed && (
-                            <div className="flex flex-col gap-2 w-full lg:w-44">
+                            <div className="flex flex-col gap-2 w-full sm:flex-1 lg:flex-none lg:w-44">
                               <span className="flex items-center justify-center gap-1.5 px-4 py-2.5 bg-emerald-500/10 text-emerald-400 rounded-xl border border-emerald-500/30 font-bold text-sm shadow-inner text-center">
                                 ✓ Confirmada
                               </span>
@@ -1860,7 +1860,7 @@ export default function WorkerDashboard({ user }) {
                           )}
 
                           {!isEventCompleted && isRejected && (
-                            <div className="flex flex-col gap-2 w-full lg:w-44">
+                            <div className="flex flex-col gap-2 w-full sm:flex-1 lg:flex-none lg:w-44">
                               <span className="flex items-center justify-center gap-1.5 px-4 py-2.5 bg-red-500/10 text-red-400 rounded-xl border border-red-500/30 font-bold text-sm shadow-inner text-center">
                                 ✗ Rechazado
                               </span>
@@ -1875,7 +1875,7 @@ export default function WorkerDashboard({ user }) {
                           )}
 
                           {isEventCompleted && (
-                            <div className="flex flex-col gap-1 w-full lg:w-44">
+                            <div className="flex flex-col gap-1 w-full sm:flex-1 lg:flex-none lg:w-44">
                               <span className={`flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl border font-extrabold text-xs shadow-inner text-center tracking-wide ${isConfirmed ? 'bg-emerald-500/5 text-emerald-400/60 border-emerald-500/10' :
                                   isRejected ? 'bg-red-500/5 text-red-400/60 border-red-500/10' :
                                     'bg-gray-500/5 text-gray-400/60 border-gray-500/10'
@@ -1889,7 +1889,7 @@ export default function WorkerDashboard({ user }) {
                             whileHover={{ scale: 1.03 }}
                             whileTap={{ scale: 0.97 }}
                             onClick={() => setSelectedDetailedEvent(event)}
-                            className="flex items-center justify-center gap-1.5 px-5 py-2.5 bg-white/5 text-gray-300 hover:bg-white/10 rounded-xl border border-white/10 text-sm font-semibold transition-all duration-300 w-full lg:w-44"
+                            className="flex items-center justify-center gap-1.5 px-5 py-2.5 bg-white/5 text-gray-300 hover:bg-white/10 rounded-xl border border-white/10 text-sm font-semibold transition-all duration-300 w-full sm:flex-1 lg:flex-none lg:w-44"
                           >
                             Ver detalles
                           </motion.button>
