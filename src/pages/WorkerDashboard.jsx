@@ -1561,6 +1561,7 @@ export default function WorkerDashboard({ user }) {
               </GlassCard>
             ) : (
               displayedEvents.map(event => {
+                const todayStr = new Date().toLocaleDateString("en-CA");
                 const isPending = event.assignment_status === 'Pendiente';
                 const isConfirmed = event.assignment_status === 'Confirmado';
                 const isRejected = event.assignment_status === 'Rechazado';
@@ -1601,7 +1602,6 @@ export default function WorkerDashboard({ user }) {
 
                 // Determinar si el evento ya está completado/finalizado
                 const eventStatus = event.status ? event.status.toLowerCase() : "";
-                const todayStr = new Date().toLocaleDateString("en-CA");
                 const isFinished = event.date ? event.date < todayStr : false;
                 const isEventCompleted = eventStatus === "completado" || eventStatus === "finalizado" || isFinished;
 
