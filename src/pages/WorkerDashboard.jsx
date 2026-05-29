@@ -1566,7 +1566,23 @@ export default function WorkerDashboard({ user }) {
                 const isRejected = event.assignment_status === 'Rechazado';
 
                 const log = attendanceLogs[event.event_day_id || event.id];
-                const checkInDisabled = event.attendance_require_confirmed && !isConfirmed;
+                // Validación de Asistencia: check-in permitido solo el día del evento
+                const isEventToday = event.date === todayStr;
+                const isConfirmedForAttendance = !event.attendance_require_confirmed || isConfirmed;
+                const checkInDisabled = !isConfirmedForAttendance || !isEventToday;
+
+                // Validación de Asistencia: check-out permitido hoy o mañana
+                const checkInLocalDateStr = log?.check_in_at ? new Date(log.check_in_at).toLocaleDateString("en-CA") : null;
+                let isCheckOutAllowed = true;
+                if (checkInLocalDateStr) {
+                  const parts = checkInLocalDateStr.split('-').map(Number);
+                  const checkInDateObj = new Date(parts[0], parts[1] - 1, parts[2]);
+                  const nextDayDateObj = new Date(checkInDateObj);
+                  nextDayDateObj.setDate(checkInDateObj.getDate() + 1);
+                  const nextDayLocalDateStr = nextDayDateObj.toLocaleDateString("en-CA");
+                  isCheckOutAllowed = todayStr === checkInLocalDateStr || todayStr === nextDayLocalDateStr;
+                }
+                const checkOutDisabled = !isCheckOutAllowed;
 
                 const isEventSimpleType = event.type === "Anfitrionas" || event.type === "Promotoría";
 
@@ -1746,9 +1762,11 @@ export default function WorkerDashboard({ user }) {
                                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-black/30 p-3 rounded-xl border border-white/5">
                                   <div className="flex flex-col">
                                     <span className="text-xs text-gray-400">Registra tu ingreso al recinto del evento.</span>
-                                    {checkInDisabled && (
+                                    {!isConfirmedForAttendance ? (
                                       <span className="text-[10px] text-amber-500 italic mt-0.5">⚠️ Requiere confirmar asistencia primero</span>
-                                    )}
+                                    ) : !isEventToday ? (
+                                      <span className="text-[10px] text-amber-500 italic mt-0.5">⚠️ Entrada disponible solo el día del evento ({event.date.split('-').reverse().join('/')})</span>
+                                    ) : null}
                                   </div>
                                   <motion.button
                                     whileHover={!checkInDisabled ? { scale: 1.02 } : {}}
@@ -1776,13 +1794,20 @@ export default function WorkerDashboard({ user }) {
                                     <span className="text-xs text-amber-300 font-bold flex items-center gap-1.5">
                                       📥 {formatChileDateTime(log.check_in_at)}
                                     </span>
+                                    {!isCheckOutAllowed && (
+                                      <span className="text-[10px] text-red-400 italic mt-1 font-semibold">⚠️ Plazo de salida vencido (máx. 24h). Contacta a soporte.</span>
+                                    )}
                                   </div>
                                   <motion.button
                                     whileHover={{ scale: 1.02 }}
                                     whileTap={{ scale: 0.98 }}
                                     onClick={() => handleMarkCheckOut(event.id, event.assignment_id)}
-                                    disabled={loadingAttendanceId === `out-${event.assignment_id}`}
-                                    className="flex items-center justify-center gap-1.5 px-4 py-2.5 bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500 hover:text-gray-900 rounded-xl text-xs font-extrabold transition-all duration-300 border border-emerald-500/50 shadow-md shrink-0 select-none"
+                                    disabled={checkOutDisabled || loadingAttendanceId === `out-${event.assignment_id}`}
+                                    className={`flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-extrabold transition-all duration-300 border shadow-md shrink-0 select-none ${
+                                      checkOutDisabled
+                                        ? "bg-gray-800/40 text-gray-500 border-gray-700/50 cursor-not-allowed"
+                                        : "bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500 hover:text-gray-900 border-emerald-500/50"
+                                    }`}
                                   >
                                     {loadingAttendanceId === `out-${event.assignment_id}` ? (
                                       <span className="w-4 h-4 border-2 border-emerald-300 border-t-transparent rounded-full animate-spin" />
