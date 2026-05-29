@@ -7,7 +7,6 @@ import StatCard from "../components/StatCard.jsx";
 import GlassCard from "../components/GlassCard.jsx";
 import EventDetails from "../components/EventDetails.jsx";
 import { toast } from "react-hot-toast";
-import * as XLSX from "xlsx";
 
 // Variants for framer-motion staggered animations
 const containerVariants = {
@@ -90,86 +89,6 @@ export default function Dashboard() {
     setIsLoading(false);
   };
 
-  // Generador de Reporte General en Excel (3 Hojas: Resumen, Eventos, Actividad)
-  const handleExportDashboardExcel = () => {
-    const loadingToast = toast.loading("Generando Reporte General de Dashboard...");
-    try {
-      const workbook = XLSX.utils.book_new();
-
-      // 1. Hoja 1: Resumen General (KPIs)
-      const dataResumen = [
-        { "Métrica": "Total de Eventos Registrados", "Valor": totalEvents },
-        { "Métrica": "Eventos del Mes Actual", "Valor": currentMonthEvents },
-        { "Métrica": "Personal / Staff Registrado", "Valor": totalStaff },
-        { "Métrica": "Próximos Eventos Planificados", "Valor": upcomingEvents },
-        { "Métrica": "Fecha de Generación del Reporte", "Valor": new Date().toLocaleString() }
-      ];
-      const worksheetResumen = XLSX.utils.json_to_sheet(dataResumen);
-      
-      // Auto-fit column widths
-      worksheetResumen["!cols"] = [
-        { wch: 35 }, // Métrica
-        { wch: 25 }  // Valor
-      ];
-      XLSX.utils.book_append_sheet(workbook, worksheetResumen, "Resumen General");
-
-      // 2. Hoja 2: Listado Completo de Eventos
-      const dataEventos = events.map(e => ({
-        "Nombre Evento": e.name || "Sin Nombre",
-        "Cliente": e.client || "Sin Cliente",
-        "Fecha Evento": e.date ? e.date.split('-').reverse().join('/') : "Sin Fecha",
-        "Estado": e.status || "Sin Estado",
-        "Recinto/Dirección": e.location || "Sin Especificar",
-        "Hora de Inicio (Showtime)": e.showtime || "Sin Especificar",
-        "Tipo de Producción": e.type || "General",
-        "Creado En": e.created_at ? new Date(e.created_at).toLocaleString() : "N/A"
-      }));
-      
-      const worksheetEventos = XLSX.utils.json_to_sheet(dataEventos);
-      const maxColWidthsEventos = [];
-      dataEventos.forEach(row => {
-        Object.keys(row).forEach((key, colIndex) => {
-          const value = row[key] ? String(row[key]) : "";
-          const length = Math.max(value.length, key.length) + 3;
-          maxColWidthsEventos[colIndex] = Math.max(maxColWidthsEventos[colIndex] || 10, length);
-        });
-      });
-      worksheetEventos["!cols"] = maxColWidthsEventos.map(w => ({ wch: w }));
-      XLSX.utils.book_append_sheet(workbook, worksheetEventos, "Listado de Eventos");
-
-      // 3. Hoja 3: Actividad Reciente
-      const dataActividades = activities.map(act => ({
-        "Descripción del Movimiento / Actividad": act.text,
-        "Fecha y Hora": act.date ? new Date(act.date).toLocaleString() : act.time
-      }));
-      const worksheetActividades = XLSX.utils.json_to_sheet(dataActividades);
-      worksheetActividades["!cols"] = [
-        { wch: 60 }, // Descripción
-        { wch: 25 }  // Fecha y Hora
-      ];
-      XLSX.utils.book_append_sheet(workbook, worksheetActividades, "Actividad Reciente");
-
-      // Escribir el buffer de Excel
-      const excelBuffer = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
-      const blob = new Blob([excelBuffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-
-      const fileName = `REPORTE_GENERAL_AMPOLLETA_${new Date().toISOString().slice(0, 10)}.xlsx`;
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = fileName;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-
-      toast.success("¡Reporte General en Excel (3 Hojas) descargado con éxito!", { id: loadingToast });
-    } catch (error) {
-      console.error("Error al exportar reporte general en Excel:", error);
-      toast.error(`Error al generar reporte: ${error.message || "Error desconocido"}`, { id: loadingToast });
-    }
-  };
-
   const totalEvents = events.length;
   const totalStaff = Math.max(0, staffCount - 1);
 
@@ -219,21 +138,13 @@ export default function Dashboard() {
           </h1>
           <p className="text-gray-400 mt-1">Resumen general de La Ampolleta Producciones</p>
         </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <button
-            onClick={() => window.print()}
-            className="flex items-center gap-2 px-5 py-2.5 bg-white/5 text-gray-300 border border-white/10 hover:bg-white/10 rounded-xl font-medium transition-all text-sm cursor-pointer"
-          >
-            Imprimir Pantalla
-          </button>
-          <button
-            onClick={handleExportDashboardExcel}
-            className="flex items-center gap-2 px-5 py-2.5 bg-amber-500/20 text-amber-300 border border-amber-500/50 hover:bg-amber-500 hover:text-gray-900 rounded-xl font-semibold transition-all shadow-[0_0_15px_rgba(245,158,11,0.15)] text-sm cursor-pointer group"
-          >
-            <Download className="w-4 h-4" />
-            Exportar Excel General
-          </button>
-        </div>
+        <button
+          onClick={() => window.print()}
+          className="flex items-center gap-2 px-5 py-2.5 bg-amber-500/20 text-amber-300 border border-amber-500/50 hover:bg-amber-500 hover:text-gray-900 rounded-xl font-medium transition-all shadow-[0_0_15px_rgba(245,158,11,0.15)] group"
+        >
+          <Download className="w-4 h-4" />
+          Descargar Reporte
+        </button>
       </motion.header>
 
       {/* Stat cards */}
