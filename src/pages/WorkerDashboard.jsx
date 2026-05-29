@@ -1845,14 +1845,11 @@ export default function WorkerDashboard({ user }) {
                           )}
 
                           {!isEventCompleted && isConfirmed && (
-                            <div className="flex flex-col gap-2 w-full sm:flex-1 lg:flex-none lg:w-44">
-                              <span className="flex items-center justify-center gap-1.5 px-4 py-2.5 bg-emerald-500/10 text-emerald-400 rounded-xl border border-emerald-500/30 font-bold text-sm shadow-inner text-center">
-                                ✓ Confirmada
-                              </span>
+                            <div className="flex flex-col justify-center items-center py-1 w-full sm:flex-1 lg:flex-none lg:w-44">
                               <motion.button
                                 whileTap={{ scale: 0.95 }}
                                 onClick={() => handleStatusChange(event.assignment_id, 'Rechazado')}
-                                className="text-xs text-red-400 hover:text-red-300 transition-colors py-1 hover:underline text-center"
+                                className="text-[11px] text-red-400/80 hover:text-red-400 transition-colors hover:underline text-center cursor-pointer font-semibold"
                               >
                                 Cancelar Asistencia
                               </motion.button>
