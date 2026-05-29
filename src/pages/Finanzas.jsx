@@ -18,7 +18,14 @@ import {
   EyeOff,
   FileText,
   XCircle,
-  MessageSquare
+  MessageSquare,
+  Mail,
+  Inbox,
+  RefreshCw,
+  Trash2,
+  History,
+  Sparkles,
+  ExternalLink
 } from "lucide-react";
 import GlassCard from "../components/GlassCard.jsx";
 import Button from "../components/Button.jsx";
@@ -59,6 +66,15 @@ const containerVariants = {
 const itemVariants = {
   hidden: { opacity: 0, y: 20 },
   show: { opacity: 1, y: 0, transition: { duration: 0.4 } }
+};
+
+const toTitleCase = (str) => {
+  if (!str) return "";
+  return str
+    .toLowerCase()
+    .split(/\s+/)
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
 };
 
 export default function Finanzas() {
@@ -111,6 +127,214 @@ export default function Finanzas() {
   const [inputRate, setInputRate] = useState("15.25");
   const [inputTolerance, setInputTolerance] = useState("10");
   const [isSavingSettings, setIsSavingSettings] = useState(false);
+
+  // Estados de Finanzas 3.5 (Detección de Boletas IMAP)
+  const [detectedInvoices, setDetectedInvoices] = useState([]);
+  const [loadingDetected, setLoadingDetected] = useState(false);
+  const [isSearchingInvoices, setIsSearchingInvoices] = useState(false);
+  const [selectedDetectedInvoice, setSelectedDetectedInvoice] = useState(null);
+  const [showSummaryModal, setShowSummaryModal] = useState(false);
+  const [executionSummary, setExecutionSummary] = useState(null);
+  const [showManualMatchModal, setShowManualMatchModal] = useState(false);
+  const [matchCandidateBatchId, setMatchCandidateBatchId] = useState("");
+  const [detectedFilter, setDetectedFilter] = useState("all"); // "all" | "auto_verified" | "matched" | "needs_review" | "rejected"
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  const [selectedDetailInvoice, setSelectedDetailInvoice] = useState(null);
+  const [showRejectConfirmModal, setShowRejectConfirmModal] = useState(false);
+  const [invoiceToReject, setInvoiceToReject] = useState(null);
+  const [rejectionReason, setRejectionReason] = useState("");
+  const [isSubmittingRejection, setIsSubmittingRejection] = useState(false);
+
+  const fetchDetectedInvoices = async () => {
+    setLoadingDetected(true);
+    try {
+      const { data, error } = await supabase
+        .from("detected_invoices")
+        .select("*")
+        .order("received_at", { ascending: false });
+      if (error) throw error;
+
+      setDetectedInvoices(data || []);
+    } catch (err) {
+      console.error("Error fetching detected invoices:", err);
+      toast.error("Error al cargar la bandeja de boletas detectadas.");
+    } finally {
+      setLoadingDetected(false);
+    }
+  };
+
+  const triggerInvoiceSearch = async () => {
+    if (isSearchingInvoices) return; // Prevent double trigger
+    setIsSearchingInvoices(true);
+    const searchToast = toast.loading("Conectando con correo tributario contacto@laampolleta.tv mediante IMAP...");
+    try {
+      const { data, error } = await supabase.functions.invoke("fetch-sii-invoices", {
+        body: {}
+      });
+
+      if (error) throw error;
+
+      if (data && data.success) {
+        setExecutionSummary(data.summary);
+        setShowSummaryModal(true);
+        toast.success("Bandeja tributaria sincronizada con éxito.", { id: searchToast });
+        fetchDetectedInvoices();
+        fetchPayments();
+      } else {
+        throw new Error(data?.error || "Error en procesamiento");
+      }
+    } catch (err) {
+      console.warn("Deno Edge Function IMAP direct connection fallback to CLI guide...", err);
+      toast.dismiss(searchToast);
+      
+      // Mostrar una notificación de ayuda limpia e informativa al usuario sin contaminar con datos de prueba
+      toast(
+        (t) => (
+          <span style={{ fontSize: '12.5px', lineHeight: '1.6' }}>
+            <b style={{ color: '#FBBF24', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13.5px' }}>
+              ⚡ Sincronizador Local de Boletas Real:
+            </b>
+            <span style={{ color: '#E5E7EB', display: 'block', marginTop: '4px' }}>
+              Las conexiones de correo directas IMAP en la nube de Supabase están limitadas por el sandbox de red (firewall TCP de Deno Deploy).
+            </span>
+            <span style={{ color: '#9CA3AF', display: 'block', marginTop: '6px' }}>
+              Para procesar tu bandeja real de forma segura y 100% privada, ejecuta en tu terminal local:
+            </span>
+            <code style={{ background: '#111', color: '#10B981', padding: '6px 10px', borderRadius: '8px', display: 'block', marginTop: '8px', fontFamily: 'monospace', fontWeight: 'extrabold', border: '1px solid rgba(16, 185, 129, 0.2)', textAlign: 'center' }}>
+              npm run sync-invoices
+            </code>
+          </span>
+        ),
+        { duration: 12000, icon: '💡' }
+      );
+      
+      // Refrescar los registros reales existentes sincronizados por la terminal local
+      fetchDetectedInvoices();
+      fetchPayments();
+    } finally {
+      setIsSearchingInvoices(false);
+    }
+  };
+
+  const handleManualMatch = async (detectedInvoice, batchId) => {
+    if (!batchId) {
+      toast.error("Por favor, selecciona un lote tributario de la lista.");
+      return;
+    }
+    const loadingToast = toast.loading("Vinculando boleta al lote seleccionado...");
+    try {
+      const { data: batch, error: batchErr } = await supabase
+        .from("worker_invoice_batches")
+        .select("*")
+        .eq("id", batchId)
+        .single();
+      if (batchErr) throw batchErr;
+
+      // 1. Update detected_invoices status to matched
+      const { error: invError } = await supabase
+        .from("detected_invoices")
+        .update({
+          match_status: "matched",
+          matched_batch_id: batchId,
+          confidence_score: 100,
+          match_reason: `Vinculado manualmente por administrador a lote de ${batch.period_label}`
+        })
+        .eq("id", detectedInvoice.id);
+      if (invError) throw invError;
+
+      // 2. Update worker_invoice_batches to verified
+      const { error: batchUpdateErr } = await supabase
+        .from("worker_invoice_batches")
+        .update({
+          invoice_number: detectedInvoice.invoice_number,
+          invoice_amount: detectedInvoice.invoice_amount,
+          invoice_received_at: new Date().toISOString(),
+          invoice_notes: `Validación manual desde bandeja de boletas detectadas (Folio ${detectedInvoice.invoice_number})`,
+          status: "verified"
+        })
+        .eq("id", batchId);
+      if (batchUpdateErr) throw batchUpdateErr;
+
+      // 3. Update individual assignments
+      const { data: batchItems } = await supabase
+        .from("worker_invoice_batch_items")
+        .select("assignment_id")
+        .eq("batch_id", batchId);
+
+      if (batchItems && batchItems.length > 0) {
+        const assignmentIds = batchItems.map(item => item.assignment_id);
+        await supabase
+          .from("event_assignments")
+          .update({
+            invoice_received: true,
+            invoice_number: detectedInvoice.invoice_number,
+            invoice_amount: detectedInvoice.invoice_amount,
+            invoice_received_at: new Date().toISOString(),
+            invoice_notes: `Validación manual agrupada (Lote ${batch.period_label})`
+          })
+          .in("id", assignmentIds);
+      }
+
+      toast.success("¡Boleta vinculada y lote verificado con éxito!", { id: loadingToast });
+      fetchDetectedInvoices();
+      fetchPayments();
+      setShowManualMatchModal(false);
+      setSelectedDetectedInvoice(null);
+      setMatchCandidateBatchId("");
+    } catch (err) {
+      console.error("Error in manual match:", err);
+      toast.error("Error al vincular la boleta al lote.", { id: loadingToast });
+    }
+  };
+
+  const handleRejectInvoice = (invoice) => {
+    setInvoiceToReject(invoice);
+    setRejectionReason("");
+    setShowRejectConfirmModal(true);
+  };
+
+  const handleRejectSubmit = async (e) => {
+    if (e) e.preventDefault();
+    if (!invoiceToReject) return;
+    setIsSubmittingRejection(true);
+    const loadingToast = toast.loading("Marcando boleta como rechazada...");
+    try {
+      const reasonText = rejectionReason.trim() || "Rechazado manualmente por el administrador.";
+      const { error } = await supabase
+        .from("detected_invoices")
+        .update({
+          match_status: "rejected",
+          match_reason: reasonText,
+          confidence_score: 0
+        })
+        .eq("id", invoiceToReject.id);
+      if (error) throw error;
+      toast.success("Boleta marcada como rechazada con éxito.", { id: loadingToast });
+      fetchDetectedInvoices();
+      setShowRejectConfirmModal(false);
+      setInvoiceToReject(null);
+      setRejectionReason("");
+    } catch (err) {
+      console.error("Error rejecting invoice:", err);
+      toast.error("Error al rechazar la boleta.", { id: loadingToast });
+    } finally {
+      setIsSubmittingRejection(false);
+    }
+  };
+
+  const handleCleanInvoices = async () => {
+    if (!window.confirm("¿Deseas ejecutar la limpieza segura de boletas en la base de datos?\nSe eliminarán registros resueltos (auto_verified, matched, rejected) con más de 60 días de antigüedad.")) return;
+    const cleanToast = toast.loading("Ejecutando limpieza de registros antiguos (más de 60 días)...");
+    try {
+      const { data, error } = await supabase.rpc("clean_old_detected_invoices");
+      if (error) throw error;
+      toast.success(`Limpieza completada. Se eliminaron ${data || 0} registros obsoletos de la base de datos.`, { id: cleanToast });
+      fetchDetectedInvoices();
+    } catch (err) {
+      console.error("Error executing database clean RPC:", err);
+      toast.error("Error al ejecutar la limpieza automática en la base de datos.", { id: cleanToast });
+    }
+  };
 
   const toggleRevealAccount = (id) => {
     setRevealedAccounts(prev => ({ ...prev, [id]: !prev[id] }));
@@ -1027,7 +1251,14 @@ export default function Finanzas() {
 
   useEffect(() => {
     fetchPayments();
+    fetchDetectedInvoices();
   }, []);
+
+  useEffect(() => {
+    if (adminTab === "boletas_detectadas") {
+      fetchDetectedInvoices();
+    }
+  }, [adminTab]);
 
   const handleSelectAll = () => {
     // Only select pending payments that do not have a missing invoice
@@ -1854,24 +2085,36 @@ export default function Finanzas() {
       </motion.header>
 
       {/* Tabs Administrador de Finanzas */}
-      <div className="relative z-10 flex items-center gap-2 bg-gray-900/60 p-1.5 rounded-xl border border-white/5 w-full max-w-sm sm:max-w-md mb-6">
+      <div className="relative z-10 flex items-center gap-2 bg-gray-900/60 p-1.5 rounded-xl border border-white/5 w-full max-w-lg mb-6">
         <button
           onClick={() => setAdminTab("nominas")}
-          className={`flex-1 py-3 px-4 rounded-lg text-xs sm:text-sm font-extrabold transition-all duration-150 flex items-center justify-center gap-1.5 cursor-pointer active:bg-amber-500/30 active:opacity-90 ${
+          className={`flex-1 py-2.5 px-3 rounded-lg text-xs font-extrabold transition-all duration-150 flex items-center justify-center gap-1.5 cursor-pointer active:bg-amber-500/30 active:opacity-90 ${
             adminTab === "nominas" ? "bg-amber-500/20 text-amber-300 border border-amber-500/20 shadow-[0_0_12px_rgba(245,158,11,0.15)]" : "text-gray-400 hover:text-gray-200"
           }`}
         >
-          <DollarSign className="w-4 h-4 sm:w-3.5 sm:h-3.5 text-amber-400" />
+          <DollarSign className="w-3.5 h-3.5 text-amber-400" />
           Nóminas y Pagos
         </button>
         <button
           onClick={() => setAdminTab("viaticos")}
-          className={`flex-1 py-3 px-4 rounded-lg text-xs sm:text-sm font-extrabold transition-all duration-150 flex items-center justify-center gap-1.5 cursor-pointer active:bg-amber-500/30 active:opacity-90 ${
+          className={`flex-1 py-2.5 px-3 rounded-lg text-xs font-extrabold transition-all duration-150 flex items-center justify-center gap-1.5 cursor-pointer active:bg-amber-500/30 active:opacity-90 ${
             adminTab === "viaticos" ? "bg-amber-500/20 text-amber-300 border border-amber-500/20 shadow-[0_0_12px_rgba(245,158,11,0.15)]" : "text-gray-400 hover:text-gray-200"
           }`}
         >
-          <FileText className="w-4 h-4 sm:w-3.5 sm:h-3.5 text-amber-400" />
+          <FileText className="w-3.5 h-3.5 text-amber-400" />
           Aprobación Viáticos
+        </button>
+        <button
+          onClick={() => setAdminTab("boletas_detectadas")}
+          className={`flex-1 py-2.5 px-3 rounded-lg text-xs font-extrabold transition-all duration-150 flex items-center justify-center gap-1.5 cursor-pointer active:bg-amber-500/30 active:opacity-90 ${
+            adminTab === "boletas_detectadas" ? "bg-amber-500/20 text-amber-300 border border-amber-500/20 shadow-[0_0_12px_rgba(245,158,11,0.15)]" : "text-gray-400 hover:text-gray-200"
+          }`}
+        >
+          <Inbox className="w-3.5 h-3.5 text-amber-400" />
+          Boletas SII
+          <span className="px-1 py-0.5 rounded bg-amber-500/20 border border-amber-500/30 text-amber-300 text-[9px] font-black tracking-tighter">
+            {detectedInvoices.filter(i => i.match_status === 'needs_review').length}
+          </span>
         </button>
       </div>
 
@@ -1940,7 +2183,7 @@ export default function Finanzas() {
         </GlassCard>
       </motion.div>
 
-      {adminTab === "nominas" ? (
+      {adminTab === "nominas" && (
         <>
           {/* Acciones de Lote y Filtros */}
           <motion.div variants={itemVariants} className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
@@ -2546,7 +2789,9 @@ export default function Finanzas() {
             </GlassCard>
           </motion.div>
         </>
-      ) : (
+      )}
+
+      {adminTab === "viaticos" && (
         <div className="space-y-6">
           {/* Barra de Filtros de Gastos */}
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-gray-900/40 p-4 rounded-2xl border border-white/5 backdrop-blur-md">
@@ -2796,6 +3041,277 @@ export default function Finanzas() {
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {adminTab === "boletas_detectadas" && (
+        <div className="space-y-6">
+          {/* Fila de Título y Sincronización IMAP */}
+          <motion.div
+            variants={itemVariants}
+            className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 bg-gray-900/40 p-5 rounded-2xl border border-white/5 backdrop-blur-md"
+          >
+            <div className="text-left">
+              <h3 className="text-base font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-amber-200 to-amber-400 flex items-center gap-2 uppercase tracking-wider">
+                📨 Bandeja Tributaria IMAP — SII
+              </h3>
+              <p className="text-2xs text-gray-400 mt-0.5 leading-normal">
+                Detección automática de Boletas de Honorarios recibidas en el correo tributario <strong>contacto@laampolleta.tv</strong>.
+                Las boletas válidas se auto-validan y liberan los lotes de pago correspondientes.
+              </p>
+            </div>
+            
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={triggerInvoiceSearch}
+                disabled={isSearchingInvoices}
+                className="px-4 py-2.5 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-black text-xs font-black rounded-xl transition-all shadow-md flex items-center gap-2 cursor-pointer hover:scale-[1.02] active:scale-98"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isSearchingInvoices ? "animate-spin" : ""}`} />
+                <span>{isSearchingInvoices ? "Buscando..." : "Buscar boletas nuevas"}</span>
+              </button>
+              
+              <button
+                onClick={handleCleanInvoices}
+                className="px-3.5 py-2.5 bg-gray-800/80 hover:bg-gray-700 text-gray-300 hover:text-white text-xs font-bold rounded-xl transition-all border border-white/5 flex items-center gap-1.5 cursor-pointer"
+                title="Limpiar registros resueltos antiguos (+60 días)"
+              >
+                <History className="w-3.5 h-3.5" />
+                <span>Limpieza DB</span>
+              </button>
+            </div>
+          </motion.div>
+
+          {/* Mini KPIs de la Bandeja */}
+          <motion.div variants={itemVariants} className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <GlassCard className="p-4 relative overflow-hidden bg-gray-900/20">
+              <span className="text-[10px] text-gray-500 uppercase tracking-wider font-extrabold block">Revisadas Recientemente</span>
+              <span className="text-xl sm:text-2xl font-extrabold text-white mt-1 block">
+                {detectedInvoices.length}
+              </span>
+            </GlassCard>
+            <GlassCard className="p-4 relative overflow-hidden bg-gray-900/20">
+              <span className="text-[10px] text-gray-500 uppercase tracking-wider font-extrabold block">Auto Verificadas (SII)</span>
+              <span className="text-xl sm:text-2xl font-extrabold text-emerald-400 mt-1 block flex items-center gap-1">
+                <Sparkles className="w-4 h-4 text-emerald-400" />
+                {detectedInvoices.filter(i => i.match_status === "auto_verified").length}
+              </span>
+            </GlassCard>
+            <GlassCard className="p-4 relative overflow-hidden bg-gray-900/20">
+              <span className="text-[10px] text-gray-500 uppercase tracking-wider font-extrabold block">Vinculadas Manualmente</span>
+              <span className="text-xl sm:text-2xl font-extrabold text-indigo-400 mt-1 block">
+                {detectedInvoices.filter(i => i.match_status === "matched").length}
+              </span>
+            </GlassCard>
+            <GlassCard className={`p-4 relative overflow-hidden transition-all duration-300 ${detectedInvoices.filter(i => i.match_status === "needs_review").length > 0 ? "bg-red-500/5 border border-red-500/20" : "bg-gray-900/20"}`}>
+              <span className="text-[10px] text-gray-500 uppercase tracking-wider font-extrabold block">Requieren Atención</span>
+              <span className={`text-xl sm:text-2xl font-extrabold mt-1 block flex items-center gap-1.5 ${detectedInvoices.filter(i => i.match_status === "needs_review").length > 0 ? "text-red-400 animate-pulse font-black" : "text-gray-400"}`}>
+                <AlertTriangle className="w-4 h-4" />
+                {detectedInvoices.filter(i => i.match_status === "needs_review").length}
+              </span>
+            </GlassCard>
+          </motion.div>
+
+          {/* Filtros de Estado y Buscador */}
+          <motion.div
+            variants={itemVariants}
+            className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-gray-900/40 p-4 rounded-xl border border-white/5"
+          >
+            <div className="flex flex-wrap gap-1.5">
+              {[
+                { value: "all", label: "Todas" },
+                { value: "needs_review", label: "Atención Requerida" },
+                { value: "auto_verified", label: "Auto Verificadas" },
+                { value: "matched", label: "Vinculadas" },
+                { value: "rejected", label: "Rechazadas" }
+              ].map(f => {
+                const count = detectedInvoices.filter(i => f.value === "all" || i.match_status === f.value).length;
+                return (
+                  <button
+                    key={f.value}
+                    onClick={() => setDetectedFilter(f.value)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all duration-150 cursor-pointer ${
+                      detectedFilter === f.value
+                        ? "bg-amber-500 text-black font-extrabold shadow-md shadow-amber-500/10"
+                        : "bg-gray-800/50 text-gray-400 hover:text-white border border-transparent hover:border-white/5"
+                    }`}
+                  >
+                    {f.label} ({count})
+                  </button>
+                );
+              })}
+            </div>
+            
+            <div className="text-[11px] text-gray-500 font-medium">
+              Mostrando {detectedInvoices.filter(i => detectedFilter === "all" || i.match_status === detectedFilter).length} boletas detectadas
+            </div>
+          </motion.div>
+
+          {/* Listado Principal de Boletas */}
+          <motion.div variants={itemVariants}>
+            <GlassCard className="overflow-hidden">
+              {loadingDetected ? (
+                <div className="py-16 text-center text-gray-500 font-bold flex flex-col items-center justify-center gap-2">
+                  <RefreshCw className="w-8 h-8 text-amber-500 animate-spin" />
+                  <span>Cargando bandeja de boletas detectadas...</span>
+                </div>
+              ) : detectedInvoices.filter(i => detectedFilter === "all" || i.match_status === detectedFilter).length === 0 ? (
+                <div className="py-16 text-center text-gray-500 italic flex flex-col items-center justify-center gap-2">
+                  <Inbox className="w-10 h-10 text-gray-600" />
+                  <span>No hay boletas registradas bajo el filtro actual.</span>
+                  <p className="text-3xs text-gray-600 mt-1 font-sans">Prueba haciendo clic en "Buscar boletas nuevas" para sincronizar con el correo oficial.</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="border-b border-white/5 text-gray-400 font-extrabold uppercase bg-white/5">
+                        <th className="py-3 px-4">Boleta / Emisión</th>
+                        <th className="py-3 px-4">Emisor (Staff)</th>
+                        <th className="py-3 px-4 text-right">Importes (CLP)</th>
+                        <th className="py-3 px-4 text-center">Score Confianza</th>
+                        <th className="py-3 px-4 text-left">Motivo / Estado Match</th>
+                        <th className="py-3 px-4 text-center">Acciones</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/5">
+                      {detectedInvoices
+                        .filter(i => detectedFilter === "all" || i.match_status === detectedFilter)
+                        .map(invoice => {
+                          const scoreColor = invoice.confidence_score >= 90 
+                            ? "text-emerald-400 bg-emerald-500/10 border-emerald-500/20" 
+                            : invoice.confidence_score >= 60 
+                            ? "text-amber-400 bg-amber-500/10 border-amber-500/20" 
+                            : "text-red-400 bg-red-500/10 border-red-500/20";
+                          
+                          return (
+                            <tr key={invoice.id} className="hover:bg-white/5 transition-colors">
+                              <td className="py-3.5 px-4">
+                                <div className="flex flex-col text-left">
+                                  <span className="font-extrabold text-sm text-gray-200">Folio Nº {invoice.invoice_number}</span>
+                                  <span className="text-[10px] text-gray-400 font-mono mt-0.5">
+                                    Emisión: {invoice.invoice_date ? invoice.invoice_date.split('T')[0].split('-').reverse().join('-') : "N/A"}
+                                  </span>
+                                  <span className="text-[9px] text-gray-500 font-mono">
+                                    Recibido: {invoice.received_at ? new Date(invoice.received_at).toLocaleDateString("es-CL") : "N/A"}
+                                  </span>
+                                </div>
+                              </td>
+                              
+                              <td className="py-3.5 px-4 text-left">
+                                <div className="flex flex-col">
+                                  <span className="font-extrabold text-gray-200 text-sm">{toTitleCase(invoice.issuer_name) || "Desconocido"}</span>
+                                  <span className="text-2xs text-gray-400 font-mono mt-0.5">RUT: {invoice.issuer_rut}</span>
+                                  <span className="text-[10px] text-gray-500 font-mono truncate max-w-[200px]" title={invoice.sender_email}>
+                                    Desde: {invoice.sender_email}
+                                  </span>
+                                </div>
+                              </td>
+
+                              <td className="py-3.5 px-4 text-right">
+                                <div className="flex flex-col font-mono text-left items-end">
+                                  <span className="font-extrabold text-amber-300 text-sm">
+                                    Bruto: ${Math.round(invoice.invoice_amount || 0).toLocaleString("es-CL")}
+                                  </span>
+                                  <span className="text-2xs text-gray-400">
+                                    Líq: ${Math.round(invoice.liquid_amount || 0).toLocaleString("es-CL")}
+                                  </span>
+                                  <span className="text-[9px] text-gray-500">
+                                    Ret: ${Math.round(invoice.withheld_tax || 0).toLocaleString("es-CL")} ({invoice.tax_rate}%)
+                                  </span>
+                                </div>
+                              </td>
+
+                              <td className="py-3.5 px-4 text-center">
+                                <span className={`px-2.5 py-1 rounded-full text-2xs font-extrabold border ${scoreColor}`}>
+                                  {invoice.confidence_score}%
+                                </span>
+                              </td>
+
+                              <td className="py-3.5 px-4 text-left max-w-xs">
+                                <div className="space-y-1">
+                                  <div className="flex items-center gap-1.5">
+                                    {invoice.match_status === "auto_verified" && (
+                                      <span className="px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-3xs font-extrabold uppercase flex items-center gap-1">
+                                        <Sparkles className="w-2.5 h-2.5" /> Auto Verificado
+                                      </span>
+                                    )}
+                                    {invoice.match_status === "matched" && (
+                                      <span className="px-2 py-0.5 rounded bg-indigo-500/10 border border-indigo-500/30 text-indigo-400 text-3xs font-extrabold uppercase">
+                                        Vinculada (Manual)
+                                      </span>
+                                    )}
+                                    {invoice.match_status === "needs_review" && (
+                                      <span className="px-2 py-0.5 rounded bg-red-500/10 border border-red-500/30 text-red-400 text-3xs font-extrabold uppercase animate-pulse">
+                                        Revisión Manual
+                                      </span>
+                                    )}
+                                    {invoice.match_status === "rejected" && (
+                                      <span className="px-2 py-0.5 rounded bg-gray-800 border border-white/10 text-gray-400 text-3xs font-extrabold uppercase">
+                                        Rechazada
+                                      </span>
+                                    )}
+                                  </div>
+                                  <p className="text-[10px] text-gray-400 leading-normal font-medium">
+                                    {invoice.match_reason || "Boleta pendiente de evaluación."}
+                                  </p>
+                                </div>
+                              </td>
+
+                              <td className="py-3.5 px-4 text-center">
+                                <div className="flex items-center justify-center gap-2">
+                                  {invoice.match_status === "needs_review" && (
+                                    <>
+                                      <button
+                                        onClick={() => {
+                                          setSelectedDetectedInvoice(invoice);
+                                          const matched = workerInvoiceGroups.find(
+                                            g => g.staff_rut === invoice.issuer_rut && g.batchStatus !== "verified"
+                                          );
+                                          if (matched) {
+                                            setMatchCandidateBatchId(matched.activeBatch?.id || "");
+                                          } else {
+                                            setMatchCandidateBatchId("");
+                                          }
+                                          setShowManualMatchModal(true);
+                                        }}
+                                        className="px-2.5 py-1.5 bg-amber-500/10 hover:bg-amber-500 hover:text-black border border-amber-500/20 rounded-lg text-amber-300 font-extrabold text-3xs uppercase tracking-wide cursor-pointer transition-all"
+                                      >
+                                        Vincular
+                                      </button>
+                                      
+                                      <button
+                                        onClick={() => handleRejectInvoice(invoice)}
+                                        className="p-1.5 bg-red-500/10 hover:bg-red-500 text-red-400 hover:text-white border border-red-500/20 hover:border-transparent rounded-lg cursor-pointer transition-all"
+                                        title="Rechazar y archivar boleta"
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                      </button>
+                                    </>
+                                  )}
+                                  
+                                  <button
+                                    onClick={() => {
+                                      setSelectedDetailInvoice(invoice);
+                                      setShowDetailModal(true);
+                                    }}
+                                    className="px-2.5 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white border border-white/5 rounded-lg font-bold text-3xs uppercase cursor-pointer transition-all flex items-center gap-1"
+                                    title="Ver detalle de XML y previsualización"
+                                  >
+                                    <ExternalLink className="w-3 h-3 text-amber-400" />
+                                    <span>Ver XML</span>
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </GlassCard>
+          </motion.div>
         </div>
       )}
 
@@ -3086,6 +3602,377 @@ export default function Finanzas() {
                   className="flex-1 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-black text-xs font-black py-2.5 rounded-xl transition-all shadow-md flex items-center justify-center cursor-pointer"
                 >
                   {isSavingSettings ? "Guardando..." : "Guardar Ajustes"}
+                </button>
+              </div>
+            </form>
+          </motion.div>
+        </div>
+      )}
+      {/* Modal de Resumen de Ejecución de Sincronización IMAP */}
+      {showSummaryModal && executionSummary && (
+        <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-[100] flex items-center justify-center p-4">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="w-full max-w-md bg-gray-900/90 border border-white/10 backdrop-blur-xl rounded-2xl p-6 shadow-2xl space-y-5 text-left"
+          >
+            <div>
+              <h3 className="text-lg font-black text-transparent bg-clip-text bg-gradient-to-r from-amber-200 to-amber-400 flex items-center gap-2">
+                📊 Resumen de Detección e IMAP
+              </h3>
+              <p className="text-2xs text-gray-400 mt-1">
+                Resultados del procesamiento inteligente de boletas desde contacto@laampolleta.tv.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 text-xs">
+              <div className="bg-white/5 p-3 rounded-xl border border-white/5">
+                <span className="text-gray-400 font-semibold block text-2xs uppercase">Correos Analizados</span>
+                <span className="text-lg font-extrabold text-white block mt-0.5">{executionSummary.emailsReviewed}</span>
+              </div>
+              <div className="bg-white/5 p-3 rounded-xl border border-white/5">
+                <span className="text-gray-400 font-semibold block text-2xs uppercase">Nuevas Detectadas</span>
+                <span className="text-lg font-extrabold text-amber-300 block mt-0.5">{executionSummary.newInvoices}</span>
+              </div>
+              <div className="bg-emerald-500/5 p-3 rounded-xl border border-emerald-500/10">
+                <span className="text-emerald-400 font-semibold block text-2xs uppercase">Auto Verificadas</span>
+                <span className="text-lg font-extrabold text-emerald-400 block mt-0.5">{executionSummary.autoVerified}</span>
+              </div>
+              <div className="bg-red-500/5 p-3 rounded-xl border border-red-500/10">
+                <span className="text-red-400 font-semibold block text-2xs uppercase">Para Revisión</span>
+                <span className="text-lg font-extrabold text-red-400 block mt-0.5">{executionSummary.needsReview}</span>
+              </div>
+              <div className="bg-gray-800/40 p-3 rounded-xl border border-white/5">
+                <span className="text-gray-500 font-semibold block text-2xs uppercase">Rechazadas / RUT</span>
+                <span className="text-lg font-extrabold text-gray-400 block mt-0.5">{executionSummary.rejected}</span>
+              </div>
+              <div className="bg-yellow-500/5 p-3 rounded-xl border border-yellow-500/10">
+                <span className="text-yellow-400 font-semibold block text-2xs uppercase">Errores XML</span>
+                <span className="text-lg font-extrabold text-yellow-400 block mt-0.5">{executionSummary.xmlErrors}</span>
+              </div>
+            </div>
+
+            <button
+              onClick={() => {
+                setShowSummaryModal(false);
+                setExecutionSummary(null);
+              }}
+              className="w-full bg-amber-500 hover:bg-amber-600 text-black text-xs font-black py-2.5 rounded-xl transition-all shadow-md text-center cursor-pointer uppercase tracking-wider"
+            >
+              Entendido
+            </button>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Modal de Vinculación Manual de Boletas */}
+      {showManualMatchModal && selectedDetectedInvoice && (
+        <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-[100] flex items-center justify-center p-4">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="w-full max-w-md bg-gray-900/90 border border-white/10 backdrop-blur-xl rounded-2xl p-6 shadow-2xl space-y-5 text-left"
+          >
+            <div>
+              <h3 className="text-lg font-black text-transparent bg-clip-text bg-gradient-to-r from-amber-200 to-amber-400 flex items-center gap-2">
+                🔗 Vinculación Manual de Boleta
+              </h3>
+              <p className="text-2xs text-gray-400 mt-1">
+                Conecta esta boleta con el lote tributario correspondiente del mes para su validación definitiva.
+              </p>
+            </div>
+
+            <div className="bg-black/40 p-4 rounded-xl border border-white/5 space-y-2.5 text-xs text-left">
+              <div>
+                <span className="text-gray-500 font-semibold uppercase text-[10px]">Emisor (Técnico)</span>
+                <p className="font-extrabold text-gray-200 text-sm mt-0.5">
+                  {toTitleCase(selectedDetectedInvoice.issuer_name)}
+                </p>
+                <p className="text-2xs text-gray-400 font-mono">RUT: {selectedDetectedInvoice.issuer_rut}</p>
+              </div>
+              <div className="grid grid-cols-2 gap-2 pt-2 border-t border-white/5">
+                <div>
+                  <span className="text-gray-500 font-semibold uppercase text-[10px]">Folio Boleta</span>
+                  <p className="font-extrabold text-gray-200 text-sm mt-0.5">Nº {selectedDetectedInvoice.invoice_number}</p>
+                </div>
+                <div>
+                  <span className="text-gray-500 font-semibold uppercase text-[10px]">Importe Bruto</span>
+                  <p className="font-black text-amber-400 text-sm mt-0.5">
+                    ${Math.round(selectedDetectedInvoice.invoice_amount || 0).toLocaleString("es-CL")} CLP
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="block text-2xs font-extrabold text-gray-300 uppercase tracking-wide">
+                Selecciona Lote Tributario Pendiente
+              </label>
+              
+              {workerInvoiceGroups.filter(
+                g => g.staff_rut === selectedDetectedInvoice.issuer_rut && g.batchStatus !== "verified"
+              ).length === 0 ? (
+                <div className="p-3 bg-red-500/5 border border-red-500/10 rounded-xl text-red-400 text-xs text-center font-bold">
+                  No se encontraron lotes tributarios pendientes de este trabajador en el sistema.
+                </div>
+              ) : (
+                <select
+                  value={matchCandidateBatchId}
+                  onChange={(e) => setMatchCandidateBatchId(e.target.value)}
+                  className="w-full bg-gray-950/85 border border-gray-800 rounded-xl py-2 px-3 text-xs text-white focus:outline-none focus:border-amber-500 font-medium cursor-pointer"
+                >
+                  <option value="">-- Seleccionar Lote --</option>
+                  {workerInvoiceGroups
+                    .filter(g => g.staff_rut === selectedDetectedInvoice.issuer_rut && g.batchStatus !== "verified")
+                    .map(g => (
+                      <option key={g.activeBatch?.id || `${g.staff_id}_${g.period_key}`} value={g.activeBatch?.id || ""}>
+                        📅 Lote {formatPeriod(g.period_label)} | Monto Esperado: ${Math.round(g.totalGrossAmount || 0).toLocaleString("es-CL")} ({g.eventsCount} eventos)
+                      </option>
+                    ))}
+                </select>
+              )}
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowManualMatchModal(false);
+                  setSelectedDetectedInvoice(null);
+                  setMatchCandidateBatchId("");
+                }}
+                className="flex-1 bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs font-bold py-2.5 rounded-xl transition-all border border-white/5 text-center cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => handleManualMatch(selectedDetectedInvoice, matchCandidateBatchId)}
+                disabled={!matchCandidateBatchId}
+                className="flex-1 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed text-black text-xs font-black py-2.5 rounded-xl transition-all shadow-md flex items-center justify-center cursor-pointer"
+              >
+                Liberar Lote
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Modal de Detalle Completo de la Boleta SII y XML */}
+      {showDetailModal && selectedDetailInvoice && (
+        <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-[100] flex items-center justify-center p-4">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="w-full max-w-lg bg-gray-900/95 border border-white/10 backdrop-blur-xl rounded-2xl p-6 shadow-2xl space-y-5 text-left max-h-[90vh] overflow-y-auto scrollbar-thin scrollbar-thumb-white/10"
+          >
+            <div className="flex items-start justify-between pb-3 border-b border-white/5">
+              <div>
+                <h3 className="text-base font-black text-transparent bg-clip-text bg-gradient-to-r from-amber-200 to-amber-400 flex items-center gap-2">
+                  🧾 Detalle de Documento Tributario (DTE)
+                </h3>
+                <p className="text-3xs text-gray-400 mt-0.5 uppercase tracking-wider font-mono">
+                  ID: {selectedDetailInvoice.message_id}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowDetailModal(false);
+                  setSelectedDetailInvoice(null);
+                }}
+                className="text-gray-400 hover:text-white bg-white/5 p-1 rounded-full transition-colors cursor-pointer"
+              >
+                <XCircle className="w-5 h-5 text-red-400" />
+              </button>
+            </div>
+
+            {/* Fila de Datos Generales */}
+            <div className="grid grid-cols-2 gap-4 text-xs">
+              <div className="bg-black/35 p-3 rounded-xl border border-white/5 space-y-1">
+                <span className="text-gray-500 font-bold block text-3xs uppercase">Folio Boleta</span>
+                <span className="text-sm font-extrabold text-white block">Folio Nº {selectedDetailInvoice.invoice_number}</span>
+                <span className="text-gray-400 block text-3xs font-mono">SII Copia Oficial</span>
+              </div>
+              <div className="bg-black/35 p-3 rounded-xl border border-white/5 space-y-1">
+                <span className="text-gray-500 font-bold block text-3xs uppercase">Fecha Emisión</span>
+                <span className="text-sm font-extrabold text-white block">
+                  {selectedDetailInvoice.invoice_date ? selectedDetailInvoice.invoice_date.split('T')[0].split('-').reverse().join('-') : "N/A"}
+                </span>
+                <span className="text-gray-400 block text-3xs font-mono">
+                  Recibido: {selectedDetailInvoice.received_at ? new Date(selectedDetailInvoice.received_at).toLocaleDateString("es-CL") : "N/A"}
+                </span>
+              </div>
+            </div>
+
+            {/* Datos de Emisor y Receptor */}
+            <div className="bg-black/35 p-4 rounded-xl border border-white/5 space-y-3 text-xs">
+              <div>
+                <span className="text-gray-500 font-bold uppercase block text-3xs tracking-wider">Emisor (Trabajador)</span>
+                <p className="font-extrabold text-gray-200 mt-0.5">{toTitleCase(selectedDetailInvoice.issuer_name) || "Nombre no registrado"}</p>
+                <p className="text-3xs text-gray-400 font-mono mt-0.5">RUT: {selectedDetailInvoice.issuer_rut} | Correo: {selectedDetailInvoice.sender_email}</p>
+              </div>
+              <div className="pt-2.5 border-t border-white/5">
+                <span className="text-gray-500 font-bold uppercase block text-3xs tracking-wider">Receptor (Empresa)</span>
+                <p className="font-extrabold text-gray-300 mt-0.5">{selectedDetailInvoice.receiver_name || "LA AMPOLLETA PRODUCCIONES"}</p>
+                <p className="text-3xs text-gray-400 font-mono mt-0.5">RUT: {selectedDetailInvoice.receiver_rut || "76.666.197-1"}</p>
+              </div>
+            </div>
+
+            {/* Desglose de Montos */}
+            <div className="bg-black/35 p-4 rounded-xl border border-white/5 space-y-2.5 text-xs">
+              <span className="text-gray-500 font-bold uppercase block text-3xs tracking-wider">Cálculo de Honorarios (Pesos Chilenos)</span>
+              <div className="grid grid-cols-3 gap-2 text-center">
+                <div className="bg-white/5 p-2 rounded-lg">
+                  <span className="text-gray-400 block text-3xs font-bold">Líquido</span>
+                  <p className="text-white font-extrabold text-xs mt-0.5">
+                    ${Math.round(selectedDetailInvoice.liquid_amount || 0).toLocaleString("es-CL")}
+                  </p>
+                </div>
+                <div className="bg-white/5 p-2 rounded-lg">
+                  <span className="text-gray-400 block text-3xs font-bold">Retención ({selectedDetailInvoice.tax_rate}%)</span>
+                  <p className="text-white font-extrabold text-xs mt-0.5">
+                    ${Math.round(selectedDetailInvoice.withheld_tax || 0).toLocaleString("es-CL")}
+                  </p>
+                </div>
+                <div className="bg-amber-500/10 p-2 rounded-lg border border-amber-500/20">
+                  <span className="text-amber-400 block text-3xs font-extrabold">Total Bruto</span>
+                  <p className="text-amber-300 font-black text-xs mt-0.5">
+                    ${Math.round(selectedDetailInvoice.invoice_amount || 0).toLocaleString("es-CL")}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Previsualización del XML / Correo */}
+            <div className="space-y-1.5 text-xs">
+              <span className="text-gray-400 font-bold uppercase block text-3xs tracking-wider">
+                Previsualización de Contenido XML & Correo
+              </span>
+              <div className="bg-gray-950/80 border border-gray-800 rounded-xl p-3.5 font-mono text-[10px] text-gray-300 max-h-40 overflow-y-auto leading-relaxed">
+                {selectedDetailInvoice.raw_text_preview || "No hay texto disponible para previsualizar."}
+              </div>
+            </div>
+
+            {/* Estado del Match y Puntuación */}
+            <div className="p-3.5 bg-black/25 rounded-xl border border-white/5 flex items-center justify-between gap-4 text-xs">
+              <div className="space-y-1">
+                <span className="text-gray-500 font-bold block text-3xs uppercase">Estado del Sistema</span>
+                <span className="text-gray-300 font-extrabold text-3xs">{selectedDetailInvoice.match_reason}</span>
+              </div>
+              <div className="text-right shrink-0">
+                <span className="text-gray-500 font-bold block text-3xs uppercase">Confianza</span>
+                <span className={`px-2.5 py-1 rounded-full text-2xs font-extrabold border mt-1 inline-block ${
+                  selectedDetailInvoice.confidence_score >= 90 
+                    ? "text-emerald-400 bg-emerald-500/10 border-emerald-500/20" 
+                    : selectedDetailInvoice.confidence_score >= 60 
+                    ? "text-amber-400 bg-amber-500/10 border-amber-500/20" 
+                    : "text-red-400 bg-red-500/10 border-red-500/20"
+                }`}>
+                  {selectedDetailInvoice.confidence_score}%
+                </span>
+              </div>
+            </div>
+
+            <button
+              onClick={() => {
+                setShowDetailModal(false);
+                setSelectedDetailInvoice(null);
+              }}
+              className="w-full bg-amber-500 hover:bg-amber-600 text-black text-xs font-black py-2.5 rounded-xl transition-all shadow-md text-center cursor-pointer uppercase tracking-wider"
+            >
+              Cerrar Detalle
+            </button>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Modal Premium de Confirmación de Rechazo */}
+      {showRejectConfirmModal && invoiceToReject && (
+        <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-[100] flex items-center justify-center p-4">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="w-full max-w-sm bg-gray-900/90 border border-white/10 backdrop-blur-xl rounded-2xl p-6 shadow-2xl space-y-5 text-left"
+          >
+            <div className="flex items-start justify-between pb-2">
+              <div>
+                <h3 className="text-base font-black text-red-400 flex items-center gap-2">
+                  ⚠️ Confirmar Rechazo de Boleta
+                </h3>
+                <p className="text-2xs text-gray-400 mt-1">
+                  Estás a punto de descartar físicamente esta boleta en el sistema.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowRejectConfirmModal(false);
+                  setInvoiceToReject(null);
+                  setRejectionReason("");
+                }}
+                className="text-gray-400 hover:text-white bg-white/5 p-1 rounded-full transition-colors cursor-pointer"
+              >
+                <XCircle className="w-5 h-5 text-red-400" />
+              </button>
+            </div>
+
+            {/* Tarjeta de Resumen */}
+            <div className="bg-red-500/5 border border-red-500/10 p-3.5 rounded-xl space-y-2 text-xs">
+              <div className="flex justify-between items-start">
+                <div>
+                  <span className="text-gray-500 block text-3xs uppercase font-bold">Emisor</span>
+                  <span className="font-extrabold text-gray-200">{toTitleCase(invoiceToReject.issuer_name)}</span>
+                </div>
+                <div className="text-right">
+                  <span className="text-gray-500 block text-3xs uppercase font-bold">Folio</span>
+                  <span className="font-extrabold text-gray-200">Nº {invoiceToReject.invoice_number}</span>
+                </div>
+              </div>
+              <div className="pt-2 border-t border-red-500/10 flex justify-between items-center">
+                <span className="text-gray-400 font-semibold">Monto Bruto:</span>
+                <span className="font-black text-amber-400 text-sm">
+                  ${Math.round(invoiceToReject.invoice_amount || 0).toLocaleString("es-CL")} CLP
+                </span>
+              </div>
+            </div>
+
+            {/* Input de Comentarios de Rechazo */}
+            <form onSubmit={handleRejectSubmit} className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="block text-2xs font-extrabold text-gray-300 uppercase tracking-wide">
+                  Motivo / Observación del Rechazo *
+                </label>
+                <textarea
+                  value={rejectionReason}
+                  onChange={(e) => setRejectionReason(e.target.value)}
+                  placeholder="Ej: El monto líquido de la boleta no coincide con el pactado..."
+                  className="w-full bg-gray-950/85 border border-gray-800 rounded-xl py-2 px-3 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-red-500 min-h-[70px] resize-none leading-relaxed"
+                  required
+                />
+                <span className="text-[10px] text-gray-500 block leading-tight">
+                  Este comentario quedará registrado de forma permanente en el historial de trazabilidad del match tributario.
+                </span>
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowRejectConfirmModal(false);
+                    setInvoiceToReject(null);
+                    setRejectionReason("");
+                  }}
+                  className="flex-1 bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs font-bold py-2.5 rounded-xl transition-all border border-white/5 text-center cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingRejection || !rejectionReason.trim()}
+                  className="flex-1 bg-red-500 hover:bg-red-600 disabled:opacity-50 text-white text-xs font-black py-2.5 rounded-xl transition-all shadow-md flex items-center justify-center cursor-pointer uppercase tracking-wider"
+                >
+                  {isSubmittingRejection ? "Rechazando..." : "Rechazar Boleta"}
                 </button>
               </div>
             </form>

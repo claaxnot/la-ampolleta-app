@@ -128,3 +128,9 @@
 - [x] **Acceso Híbrido a Portal Trabajador para Administradores:** Habilitar de manera sutil el acceso al WorkerDashboard para roles directivos (`admin` / `viewer`) sin alterar permisos principales en la BD. Integrar el agrupador `"MENÚ TRABAJADOR"` en la barra lateral (`Sidebar.jsx`) y aislar las finanzas individuales y boletas por el identificador del usuario autenticado.
 - [x] **Clima Resiliente y Autorreparable de Alta Velocidad:** Diseñar un sistema de doble endpoint que aborta en 2.0 segundos mediante `AbortController` si la API primaria (Open-Meteo) está caída (502 Bad Gateway), saltando automáticamente al fallback de `wttr.in` de manera completamente imperceptible para el usuario y con logs limpios en consola.
 
+## 14. Validación Automática de Boletas y Sincronización SII (Finanzas 3.5)
+- [x] **Corrección de Desplazamiento de Fecha de Emisión:** Reemplazar el formateador del objeto Date local de JS por manipulación directa de string reversible `DD-MM-YYYY`, solucionando el desfase de -1 día causado por zonas horarias del navegador.
+- [x] **Optimización de Ventana de Sincronización IMAP:** Restablecer la ventana de escaneo automático de correos a 30 días en el script de sincronización `sync-sii-invoices.js` y en la función Deno de Supabase.
+- [x] **Generación de Respaldo Failsafe Pre-3.5:** Crear el archivo comprimido `backup_pre_finanzas_3_5.zip` basado en el último commit estable de Git antes del despliegue contable de la versión 3.5.
+
+
