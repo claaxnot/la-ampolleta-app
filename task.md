@@ -137,5 +137,14 @@
 - [x] **Bloqueo Operacional Horario (Check-In/Out):** Restringir el botón "Marcar Entrada" estrictamente al día del evento (con mensaje dinámico preventivo en ámbar) y el "Marcar Salida" a un plazo de hasta 24h tras el check-in (con advertencia en rojo por expiración).
 - [x] **Depuración de Errores de Inicialización:** Corregir el error de referencia temporal (`ReferenceError`) en la inicialización de `todayStr` reubicando su declaración de forma segura al inicio del callback.
 
+## 15. Sistema de Notificaciones en Tiempo Real y UX Financiero Móvil (Finanzas 3.6)
+- [x] **Notificaciones en Tiempo Real para Trabajadores:** Implementación de inserciones en la tabla `notifications` al validar boletas manualmente en el panel administrativo (`Finanzas.jsx`) tanto a nivel individual como en lotes de validación consolidada.
+- [x] **Notificaciones Automáticas SII en Edge Functions:** Actualización de la Cloud Function de Supabase (`fetch-sii-invoices`) para disparar alertas automáticas al trabajador cuando su boleta sea verificada automáticamente o cuando se cree un lote al vuelo.
+- [x] **Optimización de UI/UX Móvil en Tarjetas de Boletas:** Rediseño responsivo de las tarjetas de boletas detectadas en `Finanzas.jsx` mediante flujo flexible (`flex-col sm:flex-row`), evitando desbordamientos de texto e iconos.
+- [x] **Estilización de Historial de Pagos y Scroll Fluidos:** Scroll horizontal fluido (`min-w-[550px]`) e indicadores CSS circulares animados en `WorkerDashboard.jsx`.
+- [x] **Estado "En Proceso de Pago" Dinámico:** Vinculación en tiempo real del historial de pagos individuales de los trabajadores para que reflejen dinámicamente el estado `"En Proceso de Pago"` (con badge Teal estilizado) cuando su lote mensual correspondiente se encuentre verificado por administración.
+- [x] **Depuración Estricta de TypeScript en Edge Functions:** Corrección de todas las advertencias locales y remotas del compilador TS, incluyendo tipado explícito de parámetros callbacks (`(p: any)`, `(b: any)`), manejo de excepciones `unknown` (`err as any`), y silenciamiento elegante de imports de módulos de Deno (`npm:`) y global de `Deno` usando comentarios de control `// @ts-ignore`.
+
+
 
 
