@@ -700,4 +700,45 @@ CREATE TRIGGER trg_on_event_update
 -- ALTER PUBLICATION supabase_realtime ADD TABLE public.notifications;
 
 
+-- ==========================================================
+-- V3.7.2 - FASE 2: TABLA PUSH_SUBSCRIPTIONS Y POLÍTICAS DE RLS
+-- ==========================================================
+
+CREATE TABLE IF NOT EXISTS public.push_subscriptions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  endpoint TEXT NOT NULL,
+  p256dh TEXT NOT NULL,
+  auth TEXT NOT NULL,
+  platform TEXT NULL,
+  browser TEXT NULL,
+  device_label TEXT NULL,
+  active BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  last_seen_at TIMESTAMPTZ DEFAULT now(),
+  revoked_at TIMESTAMPTZ NULL,
+  
+  CONSTRAINT unique_user_endpoint UNIQUE(user_id, endpoint)
+);
+
+-- Habilitar Row Level Security (RLS)
+ALTER TABLE public.push_subscriptions ENABLE ROW LEVEL SECURITY;
+
+-- Indexación óptima
+CREATE INDEX IF NOT EXISTS idx_push_subs_user_active 
+  ON public.push_subscriptions(user_id) 
+  WHERE active = true;
+
+-- Eliminar políticas previas si existen
+DROP POLICY IF EXISTS "Users can manage their own subscriptions" ON public.push_subscriptions;
+
+-- Crear políticas robustas
+CREATE POLICY "Users can manage their own subscriptions"
+  ON public.push_subscriptions
+  FOR ALL
+  TO authenticated
+  USING ( (select auth.uid()) = user_id )
+  WITH CHECK ( (select auth.uid()) = user_id );
+
+
 

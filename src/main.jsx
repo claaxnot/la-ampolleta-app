@@ -21,4 +21,17 @@ ReactDOM.createRoot(document.getElementById('root')).render(
             <App />
         </AuthProvider>
     </React.StrictMode>,
-)
+);
+
+// Registrar Service Worker para soporte PWA y notificaciones Push
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js')
+            .then((reg) => {
+                console.log('🔌 [Service Worker] - Registrado con éxito en ámbito:', reg.scope);
+            })
+            .catch((err) => {
+                console.warn('❌ [Service Worker] - Fallo en el registro:', err);
+            });
+    });
+}

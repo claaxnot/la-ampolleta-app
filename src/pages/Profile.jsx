@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Camera, Lock, Save, User as UserIcon, Upload, Eye, EyeOff, Building } from "lucide-react";
+import { Camera, Lock, Save, User as UserIcon, Upload, Eye, EyeOff, Building, Bell, BellOff, Smartphone, Send, Info } from "lucide-react";
 import { useLocation } from "react-router-dom";
 import GlassCard from "../components/GlassCard.jsx";
 import Button from "../components/Button.jsx";
@@ -34,6 +34,180 @@ export default function Profile({ user, onUpdateUser }) {
   const [showPasswords, setShowPasswords] = useState(false);
 
   const [message, setMessage] = useState("");
+
+  // --- PUSH NOTIFICATIONS STATES & HANDLERS ---
+  const [pushSupported, setPushSupported] = useState(false);
+  const [pushPermission, setPushPermission] = useState('default');
+  const [isSubscribed, setIsSubscribed] = useState(false);
+  const [isIos, setIsIos] = useState(false);
+  const [isStandalone, setIsStandalone] = useState(false);
+  const [pushLoading, setPushLoading] = useState(false);
+  const [testPushLoading, setTestPushLoading] = useState(false);
+
+  // Clave pública VAPID generada
+  const VAPID_PUBLIC_KEY = "BK6xAJN2En_UF2GqhoXB_UPpt_lKy__dlpOSOb7nYnhRiOv_tvGZ_NqlcqfXkGQjADrRJzxVYKLhVDcPv7ceFT0";
+
+  useEffect(() => {
+    // Detectar iOS y modo PWA instalado (standalone)
+    const ua = window.navigator.userAgent.toLowerCase();
+    const isIphone = ua.indexOf('iphone') > -1 || ua.indexOf('ipad') > -1;
+    setIsIos(isIphone);
+
+    const standalone = window.navigator.standalone || window.matchMedia('(display-mode: standalone)').matches;
+    setIsStandalone(standalone);
+
+    // Compatibilidad nativa
+    const isSupported = 'serviceWorker' in navigator && 'PushManager' in window;
+    setPushSupported(isSupported);
+
+    if (isSupported) {
+      setPushPermission(Notification.permission);
+      checkCurrentSubscription();
+    }
+  }, [currentUser.id]);
+
+  const checkCurrentSubscription = async () => {
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      const sub = await reg.pushManager.getSubscription();
+      setIsSubscribed(!!sub);
+    } catch (err) {
+      console.warn("⚠️ Error al verificar suscripción push:", err);
+    }
+  };
+
+  const subscribePush = async () => {
+    if (!currentUser.id) return;
+    setPushLoading(true);
+    try {
+      const permission = await Notification.requestPermission();
+      setPushPermission(permission);
+
+      if (permission !== 'granted') {
+        throw new Error("El permiso de notificaciones fue denegado.");
+      }
+
+      const reg = await navigator.serviceWorker.ready;
+
+      // Convertir llave VAPID a array binario para PushManager
+      const urlBase64ToUint8Array = (base64String) => {
+        const padding = '='.repeat((4 - base64String.length % 4) % 4);
+        const base64 = (base64String + padding)
+          .replace(/\-/g, '+')
+          .replace(/_/g, '/');
+        const rawData = window.atob(base64);
+        const outputArray = new Uint8Array(rawData.length);
+        for (let i = 0; i < rawData.length; ++i) {
+          outputArray[i] = rawData.charCodeAt(i);
+        }
+        return outputArray;
+      };
+
+      const subscribeOptions = {
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+      };
+
+      const subscription = await reg.pushManager.subscribe(subscribeOptions);
+      console.log("🔌 Suscripción Web Push obtenida con éxito:", subscription);
+
+      const subscriptionJson = subscription.toJSON();
+
+      const ua = window.navigator.userAgent;
+      let browserName = "Otro";
+      if (ua.indexOf("Chrome") > -1) browserName = "Chrome";
+      else if (ua.indexOf("Safari") > -1) browserName = "Safari";
+      else if (ua.indexOf("Firefox") > -1) browserName = "Firefox";
+      else if (ua.indexOf("Edge") > -1) browserName = "Edge";
+
+      let platformName = "Desktop";
+      if (ua.indexOf("Android") > -1) platformName = "Android";
+      else if (ua.indexOf("iPhone") > -1 || ua.indexOf("iPad") > -1) platformName = "iOS";
+
+      const payload = {
+        user_id: currentUser.id,
+        endpoint: subscription.endpoint,
+        p256dh: subscriptionJson.keys.p256dh,
+        auth: subscriptionJson.keys.auth,
+        platform: platformName,
+        browser: browserName,
+        device_label: `${browserName} en ${platformName}`,
+        active: true,
+        last_seen_at: new Date().toISOString(),
+        revoked_at: null
+      };
+
+      // Guardar/Actualizar en Supabase
+      const { error } = await supabase
+        .from('push_subscriptions')
+        .upsert(payload, { onConflict: 'user_id, endpoint' });
+
+      if (error) throw error;
+
+      setIsSubscribed(true);
+      setMessage("✅ ¡Notificaciones push activadas correctamente!");
+    } catch (err) {
+      console.error("❌ Error activando push:", err);
+      setMessage(`❌ Error al activar push: ${err.message || err}`);
+    } finally {
+      setPushLoading(false);
+      setTimeout(() => setMessage(""), 5000);
+    }
+  };
+
+  const unsubscribePush = async () => {
+    if (!currentUser.id) return;
+    setPushLoading(true);
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      const sub = await reg.pushManager.getSubscription();
+
+      if (sub) {
+        await sub.unsubscribe();
+
+        // Marcar inactiva en Supabase
+        const { error } = await supabase
+          .from('push_subscriptions')
+          .update({ active: false, revoked_at: new Date().toISOString() })
+          .eq('user_id', currentUser.id)
+          .eq('endpoint', sub.endpoint);
+
+        if (error) console.error("⚠️ Error marcando suscripción inactiva:", error);
+      }
+
+      setIsSubscribed(false);
+      setMessage("✅ Notificaciones push desactivadas en este dispositivo.");
+    } catch (err) {
+      console.error("❌ Error desactivando push:", err);
+      setMessage("❌ Error al intentar desactivar las notificaciones push.");
+    } finally {
+      setPushLoading(false);
+      setTimeout(() => setMessage(""), 5000);
+    }
+  };
+
+  const sendTestPush = async () => {
+    setTestPushLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('send-test-push', {
+        body: {}
+      });
+
+      if (error) throw error;
+
+      if (data && data.success === false) {
+        setMessage(`⚠️ Alerta de envío: ${data.message || 'Error de envío'}`);
+      } else {
+        setMessage("✅ Notificación de prueba enviada con éxito.");
+      }
+    } catch (err) {
+      console.error("❌ Error en send-test-push:", err);
+      setMessage("❌ Error de comunicación con la Edge Function. Verifica que esté desplegada.");
+    } finally {
+      setTestPushLoading(false);
+      setTimeout(() => setMessage(""), 5000);
+    }
+  };
 
   const handlePasswordChange = (e) => {
     setPasswords({ ...passwords, [e.target.name]: e.target.value });
@@ -356,6 +530,95 @@ export default function Profile({ user, onUpdateUser }) {
                 </Button>
               </div>
             </form>
+          </GlassCard>
+
+          <GlassCard className="p-6 md:p-8 mt-6">
+            <h2 className="text-xl font-semibold text-white mb-4 flex items-center gap-2">
+              <Bell className="w-5 h-5 text-amber-400" />
+              Notificaciones Push
+            </h2>
+
+            <p className="text-xs text-gray-400 mb-6 leading-relaxed">
+              Las notificaciones push te permiten enterarte al instante de nuevos eventos asignados, cambios importantes en tus jornadas o actualizaciones de tus pagos, incluso si tienes la aplicación cerrada o el dispositivo bloqueado.
+            </p>
+
+            <div className="space-y-4">
+              {!pushSupported ? (
+                <div className="p-4 rounded-xl border border-red-500/10 bg-red-500/5 text-red-400 text-xs flex gap-2.5">
+                  <BellOff className="w-4 h-4 shrink-0 mt-0.5" />
+                  <div>
+                    <strong className="font-bold block mb-1">Navegador no compatible</strong>
+                    Tu navegador o dispositivo actual no soporta notificaciones push.
+                  </div>
+                </div>
+              ) : isIos && !isStandalone ? (
+                <div className="p-4 rounded-xl border border-amber-500/20 bg-amber-500/10 text-amber-400 text-xs flex flex-col gap-2">
+                  <div className="flex gap-2.5">
+                    <Smartphone className="w-4 h-4 shrink-0 mt-0.5" />
+                    <div>
+                      <strong className="font-bold block mb-1">Instalación PWA Requerida en iOS</strong>
+                      Para activar notificaciones en iPhone, debes agregar la app a tu pantalla de inicio primero.
+                    </div>
+                  </div>
+                  <div className="mt-2 text-[11px] text-gray-300 bg-black/40 p-3 rounded-lg border border-white/5 space-y-1.5 leading-normal">
+                    <p className="font-semibold text-amber-400">Pasos para instalar:</p>
+                    <p>1. Pulsa el botón de <strong>Compartir</strong> (icono de cuadrado con flecha hacia arriba) en Safari.</p>
+                    <p>2. Desplázate hacia abajo y selecciona <strong>"Agregar a pantalla de inicio"</strong>.</p>
+                    <p>3. Abre la app desde tu pantalla de inicio y vuelve aquí para activar las notificaciones.</p>
+                  </div>
+                </div>
+              ) : isSubscribed ? (
+                <div className="space-y-4">
+                  <div className="p-4 rounded-xl border border-emerald-500/10 bg-emerald-500/5 text-emerald-400 text-xs flex gap-2.5">
+                    <Bell className="w-4 h-4 shrink-0 mt-0.5 animate-bounce" />
+                    <div>
+                      <strong className="font-bold block mb-1">✅ Notificaciones activas</strong>
+                      Las notificaciones push están activas en este dispositivo.
+                    </div>
+                  </div>
+                  <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                    <Button 
+                      type="button" 
+                      onClick={sendTestPush} 
+                      variant="secondary" 
+                      className="text-xs py-2 px-4 justify-center border-amber-500/20 hover:bg-amber-500/5 text-amber-400 flex items-center gap-2"
+                      disabled={testPushLoading}
+                    >
+                      <Send className="w-3.5 h-3.5" />
+                      {testPushLoading ? "Enviando..." : "Enviar notificación de prueba"}
+                    </Button>
+                    <Button 
+                      type="button" 
+                      onClick={unsubscribePush} 
+                      variant="secondary" 
+                      className="text-xs py-2 px-4 justify-center border-red-500/20 hover:bg-red-500/5 text-red-400"
+                      disabled={pushLoading}
+                    >
+                      {pushLoading ? "Procesando..." : "Desactivar en este dispositivo"}
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {pushPermission === 'denied' && (
+                    <div className="p-3 rounded-lg border border-red-500/10 bg-red-500/5 text-red-400 text-xs flex gap-2">
+                      <Info className="w-4 h-4 shrink-0" />
+                      <span>El permiso de notificaciones está bloqueado. Por favor restablece los permisos en los ajustes del sitio web de tu navegador para poder activarlo.</span>
+                    </div>
+                  )}
+                  <Button 
+                    type="button" 
+                    onClick={subscribePush} 
+                    variant="primary" 
+                    className="w-full sm:w-auto text-xs py-2.5 px-5 justify-center flex items-center gap-2"
+                    disabled={pushLoading || pushPermission === 'denied'}
+                  >
+                    <Bell className="w-4 h-4" />
+                    {pushLoading ? "Activando..." : "Activar notificaciones en este dispositivo"}
+                  </Button>
+                </div>
+              )}
+            </div>
           </GlassCard>
 
         </motion.section>
