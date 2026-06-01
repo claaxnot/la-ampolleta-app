@@ -223,10 +223,62 @@ export default function Finanzas() {
     }
     const loadingToast = toast.loading("Vinculando boleta al lote seleccionado...");
     try {
+      let finalBatchId = batchId;
+
+      if (batchId.startsWith("new_")) {
+        const parts = batchId.split("_");
+        const workerId = parts[1];
+        const periodKey = parts[2];
+
+        const matchedGroup = allWorkerInvoiceGroups.find(
+          g => g.staff_id === workerId && g.period_key === periodKey
+        );
+
+        if (!matchedGroup) {
+          throw new Error("No se pudo encontrar la información de cobros para el lote seleccionado.");
+        }
+
+        const rateVal = parseFloat(retentionRateSetting || 15.25);
+        const totalPendingLiquid = matchedGroup.total_liquid;
+        const brutoEsperado = Math.round(totalPendingLiquid / (1 - (rateVal / 100)));
+
+        // Crear el lote en la base de datos
+        const { data: newBatch, error: createErr } = await supabase
+          .from("worker_invoice_batches")
+          .insert({
+            worker_id: workerId,
+            period_label: periodKey,
+            total_liquid_amount: totalPendingLiquid,
+            retention_rate: rateVal,
+            expected_gross_amount: brutoEsperado,
+            estimated_retention: brutoEsperado - totalPendingLiquid,
+            status: "pending"
+          })
+          .select()
+          .single();
+
+        if (createErr) throw createErr;
+        finalBatchId = newBatch.id;
+
+        // Crear los items del lote
+        const batchItems = matchedGroup.payments.map(p => ({
+          batch_id: finalBatchId,
+          assignment_id: p.id,
+          liquid_amount: parseFloat(p.monto) || 0
+        }));
+
+        const { error: itemsErr } = await supabase
+          .from("worker_invoice_batch_items")
+          .insert(batchItems);
+
+        if (itemsErr) throw itemsErr;
+      }
+
+      // Obtener detalles del lote final
       const { data: batch, error: batchErr } = await supabase
         .from("worker_invoice_batches")
         .select("*")
-        .eq("id", batchId)
+        .eq("id", finalBatchId)
         .single();
       if (batchErr) throw batchErr;
 
@@ -235,7 +287,7 @@ export default function Finanzas() {
         .from("detected_invoices")
         .update({
           match_status: "matched",
-          matched_batch_id: batchId,
+          matched_batch_id: finalBatchId,
           confidence_score: 100,
           match_reason: `Vinculado manualmente por administrador a lote de ${batch.period_label}`
         })
@@ -252,14 +304,14 @@ export default function Finanzas() {
           invoice_notes: `Validación manual desde bandeja de boletas detectadas (Folio ${detectedInvoice.invoice_number})`,
           status: "verified"
         })
-        .eq("id", batchId);
+        .eq("id", finalBatchId);
       if (batchUpdateErr) throw batchUpdateErr;
 
       // 3. Update individual assignments
       const { data: batchItems } = await supabase
         .from("worker_invoice_batch_items")
         .select("assignment_id")
-        .eq("batch_id", batchId);
+        .eq("batch_id", finalBatchId);
 
       if (batchItems && batchItems.length > 0) {
         const assignmentIds = batchItems.map(item => item.assignment_id);
@@ -402,10 +454,10 @@ export default function Finanzas() {
       const pendingAssignments = (assignments || []).filter(a => {
         const dayDate = a.event_days ? a.event_days.date : (a.events ? a.events.date : "");
         const assignmentPeriod = dayDate ? dayDate.substring(0, 7) : "";
-        
+
         const isPeriodMatch = assignmentPeriod === periodKey;
         const isPending = a.invoice_required && !a.invoice_received && a.status !== "Pagado" && (a.status === "Confirmado" || a.status === "Aceptado");
-        
+
         return isPeriodMatch && isPending;
       });
 
@@ -572,7 +624,7 @@ export default function Finanzas() {
   };
 
   // React.useMemo: Agrupar pagos de eventos pendientes por trabajador y mes (Versión 3.2)
-  const workerInvoiceGroups = React.useMemo(() => {
+  const allWorkerInvoiceGroups = React.useMemo(() => {
     const pendingEvents = payments.filter(p => !p.is_expense && p.status !== "Pagado");
 
     const groups = {};
@@ -670,11 +722,15 @@ export default function Finanzas() {
       };
     });
 
+    return list;
+  }, [payments, retentionRateSetting, invoiceBatches]);
+
+  const workerInvoiceGroups = React.useMemo(() => {
     if (monthFilter === "all") {
-      return list;
+      return allWorkerInvoiceGroups;
     }
-    return list.filter(g => g.period_key === monthFilter);
-  }, [payments, retentionRateSetting, invoiceBatches, monthFilter]);
+    return allWorkerInvoiceGroups.filter(g => g.period_key === monthFilter);
+  }, [allWorkerInvoiceGroups, monthFilter]);
 
   const handleToggleInvoiceRequired = async (assignmentId, currentValue) => {
     const loadingToast = toast.loading("Actualizando requerimiento de boleta...");
@@ -2513,7 +2569,7 @@ export default function Finanzas() {
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-5 pb-4 border-b border-white/5">
                 <div>
                   <h3 className="text-base font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-amber-200 to-amber-400 flex items-center gap-2 uppercase tracking-wide">
-                    📋 Control de Boletas por Trabajador (SII Lotes V3.6)
+                    📋 Control de Boletas por Trabajador (SII Lotes V3.7)
                   </h3>
                   <p className="text-2xs text-gray-400 mt-0.5">
                     Toda la app trabaja visualmente en líquidos, pero aquí puedes verificar la boleta combinada emitida por el total de eventos de cada staff.
@@ -3515,7 +3571,7 @@ export default function Finanzas() {
                                       <button
                                         onClick={() => {
                                           setSelectedDetectedInvoice(invoice);
-                                          const matched = workerInvoiceGroups.find(
+                                          const matched = allWorkerInvoiceGroups.find(
                                             g => g.staff_rut === invoice.issuer_rut && g.batchStatus !== "verified"
                                           );
                                           if (matched) {
@@ -3979,7 +4035,7 @@ export default function Finanzas() {
                 Selecciona Lote Tributario Pendiente
               </label>
 
-              {workerInvoiceGroups.filter(
+              {allWorkerInvoiceGroups.filter(
                 g => g.staff_rut === selectedDetectedInvoice.issuer_rut && g.batchStatus !== "verified"
               ).length === 0 ? (
                 <div className="p-3 bg-red-500/5 border border-red-500/10 rounded-xl text-red-400 text-xs text-center font-bold">
@@ -3992,11 +4048,11 @@ export default function Finanzas() {
                   className="w-full bg-gray-950/85 border border-gray-800 rounded-xl py-2 px-3 text-xs text-white focus:outline-none focus:border-amber-500 font-medium cursor-pointer"
                 >
                   <option value="">-- Seleccionar Lote --</option>
-                  {workerInvoiceGroups
+                  {allWorkerInvoiceGroups
                     .filter(g => g.staff_rut === selectedDetectedInvoice.issuer_rut && g.batchStatus !== "verified")
                     .map(g => (
-                      <option key={g.activeBatch?.id || `${g.staff_id}_${g.period_key}`} value={g.activeBatch?.id || ""}>
-                        📅 Lote {formatPeriod(g.period_label)} | Monto Esperado: ${Math.round(g.totalGrossAmount || 0).toLocaleString("es-CL")} ({g.eventsCount} eventos)
+                      <option key={g.activeBatch?.id || `${g.staff_id}_${g.period_key}`} value={g.activeBatch?.id || `new_${g.staff_id}_${g.period_key}`}>
+                        📅 Lote {g.period_label} | Monto Esperado: ${Math.round(g.expected_gross || 0).toLocaleString("es-CL")} ({g.payments.length} eventos)
                       </option>
                     ))}
                 </select>

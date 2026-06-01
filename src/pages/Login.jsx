@@ -83,10 +83,10 @@ export default function Login({ onLogin }) {
 
     } catch (err) {
       console.log("Auth Error Details:", err);
-      
+
       const errMessage = err?.message || "";
       let elegantErrorMessage = "Credenciales incorrectas. Verifica tu correo y contraseña.";
-      
+
       if (errMessage.toLowerCase().includes("confirm")) {
         elegantErrorMessage = "Tu cuenta de correo electrónico aún no ha sido confirmada. Revisa tu bandeja de entrada.";
         toast.error("📧 " + elegantErrorMessage, { duration: 6000 });
@@ -100,7 +100,7 @@ export default function Login({ onLogin }) {
         elegantErrorMessage = errMessage;
         toast.error("🚨 " + elegantErrorMessage, { duration: 4000 });
       }
-      
+
       setError(elegantErrorMessage);
     } finally {
       setIsLoading(false);
@@ -140,11 +140,11 @@ export default function Login({ onLogin }) {
         <div className="flex flex-col items-center mb-8">
           <div className="w-20 h-20 bg-white/5 backdrop-blur-xl rounded-2xl flex items-center justify-center mb-4 shadow-xl border border-white/10 hover:border-accent/30 transition-all duration-300">
             {!logoError ? (
-              <img 
-                src="/logo.png" 
-                alt="Logo" 
+              <img
+                src="/logo.png"
+                alt="Logo"
                 onError={() => setLogoError(true)}
-                className="w-14 h-14 object-contain drop-shadow-[0_0_12px_rgba(245,158,11,0.4)]" 
+                className="w-14 h-14 object-contain drop-shadow-[0_0_12px_rgba(245,158,11,0.4)]"
               />
             ) : (
               <Lightbulb className="w-8 h-8 text-accent animate-pulse" />
@@ -181,8 +181,8 @@ export default function Login({ onLogin }) {
           <div className="space-y-1.5">
             <div className="flex items-center justify-between ml-1">
               <label className="text-sm font-medium text-gray-300">Contraseña</label>
-              <button 
-                type="button" 
+              <button
+                type="button"
                 onClick={handleResetPassword}
                 className="text-xs text-primary hover:text-primary/80 transition-colors bg-transparent border-none p-0 cursor-pointer"
               >
@@ -219,7 +219,7 @@ export default function Login({ onLogin }) {
       {/* Sutil Footer Creds */}
       <div className="mt-6 flex flex-col items-center gap-0.5 text-center pointer-events-none select-none opacity-30 hover:opacity-60 transition-opacity duration-300">
         <span className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">
-          La Ampolleta Platform v3.6
+          La Ampolleta Platform v3.7
         </span>
         <span className="text-[8px] text-gray-500 font-medium tracking-wider">
           Engineered by Cristopher Vidal

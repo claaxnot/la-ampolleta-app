@@ -1774,8 +1774,8 @@ export default function WorkerDashboard({ user }) {
                                     onClick={() => handleMarkCheckIn(event.id, event.assignment_id)}
                                     disabled={checkInDisabled || loadingAttendanceId === `in-${event.assignment_id}`}
                                     className={`flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-extrabold transition-all duration-300 shrink-0 select-none ${checkInDisabled
-                                        ? "bg-gray-800/40 text-gray-500 border border-gray-700/50 cursor-not-allowed"
-                                        : "bg-amber-500/20 text-amber-300 hover:bg-amber-500 hover:text-gray-900 border border-amber-500/50 shadow-md"
+                                      ? "bg-gray-800/40 text-gray-500 border border-gray-700/50 cursor-not-allowed"
+                                      : "bg-amber-500/20 text-amber-300 hover:bg-amber-500 hover:text-gray-900 border border-amber-500/50 shadow-md"
                                       }`}
                                   >
                                     {loadingAttendanceId === `in-${event.assignment_id}` ? (
@@ -1803,8 +1803,8 @@ export default function WorkerDashboard({ user }) {
                                     onClick={() => handleMarkCheckOut(event.id, event.assignment_id)}
                                     disabled={checkOutDisabled || loadingAttendanceId === `out-${event.assignment_id}`}
                                     className={`flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-extrabold transition-all duration-300 border shadow-md shrink-0 select-none ${checkOutDisabled
-                                        ? "bg-gray-800/40 text-gray-500 border-gray-700/50 cursor-not-allowed"
-                                        : "bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500 hover:text-gray-900 border-emerald-500/50"
+                                      ? "bg-gray-800/40 text-gray-500 border-gray-700/50 cursor-not-allowed"
+                                      : "bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500 hover:text-gray-900 border-emerald-500/50"
                                       }`}
                                   >
                                     {loadingAttendanceId === `out-${event.assignment_id}` ? (
@@ -2399,7 +2399,7 @@ export default function WorkerDashboard({ user }) {
                     <div>
                       <h3 className="text-lg font-bold text-white flex items-center gap-2">
                         <Layers className="w-5 h-5 text-amber-400" />
-                        Control de Boletas SII (Lotes de Validación Consolidada V3.6)
+                        Control de Boletas SII (Lotes de Validación Consolidada V3.7)
                       </h3>
                       <p className="text-xs text-gray-400">
                         Administración agrupa tus eventos completados en un solo período para validación ágil y transferencias masivas.
@@ -2542,14 +2542,14 @@ export default function WorkerDashboard({ user }) {
                           <GlassCard
                             key={period.period_key}
                             className={`p-6 border relative overflow-hidden bg-gradient-to-br shadow-sm transition-all duration-300 ${isVerified
-                                ? 'border-teal-500/20 from-teal-500/[0.03] to-transparent shadow-[0_0_24px_rgba(20,184,166,0.02)]'
-                                : 'border-indigo-500/20 from-indigo-500/[0.03] to-transparent shadow-[0_0_24px_rgba(99,102,241,0.02)]'
+                              ? 'border-teal-500/20 from-teal-500/[0.03] to-transparent shadow-[0_0_24px_rgba(20,184,166,0.02)]'
+                              : 'border-indigo-500/20 from-indigo-500/[0.03] to-transparent shadow-[0_0_24px_rgba(99,102,241,0.02)]'
                               }`}
                           >
                             <div className="absolute top-0 right-0 p-4">
                               <span className={`px-2.5 py-1 rounded text-[10px] font-black uppercase tracking-wider flex items-center gap-1 ${isVerified
-                                  ? 'bg-teal-500/15 border border-teal-500/30 text-teal-300'
-                                  : 'bg-indigo-500/15 border border-indigo-500/30 text-indigo-300'
+                                ? 'bg-teal-500/15 border border-teal-500/30 text-teal-300'
+                                : 'bg-indigo-500/15 border border-indigo-500/30 text-indigo-300'
                                 }`}>
                                 <span className={`w-1.5 h-1.5 rounded-full ${isVerified ? 'bg-teal-400 animate-pulse' : 'bg-indigo-400 animate-pulse'}`} />
                                 {isVerified ? "En Proceso de Pago" : "Boleta Recibida"}

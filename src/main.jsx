@@ -6,13 +6,13 @@ import './index.css';
 
 // Premium Developer Console Signature
 console.log(
-  "%c⚡ LA AMPOLLETA PLATFORM v3.6 %c\n%cEngineered with ♥ by Cristopher Vidal%c\n%cEnvironment: Production | Build: 2026.06%c",
-  "color:#f5b301;font-size:13px;font-weight:900;font-family:system-ui;text-transform:uppercase;letter-spacing:1px;text-shadow:0 0 10px rgba(245,158,11,0.3);",
-  "",
-  "color:#e2e8f0;font-size:11px;font-family:system-ui;font-weight:600;",
-  "",
-  "color:#64748b;font-size:9px;font-family:system-ui;font-weight:bold;letter-spacing:0.5px;",
-  ""
+    "%c⚡ LA AMPOLLETA PLATFORM v3.7 %c\n%cEngineered with ♥ by Cristopher Vidal%c\n%cEnvironment: Production | Build: 2026.06%c",
+    "color:#f5b301;font-size:13px;font-weight:900;font-family:system-ui;text-transform:uppercase;letter-spacing:1px;text-shadow:0 0 10px rgba(245,158,11,0.3);",
+    "",
+    "color:#e2e8f0;font-size:11px;font-family:system-ui;font-weight:600;",
+    "",
+    "color:#64748b;font-size:9px;font-family:system-ui;font-weight:bold;letter-spacing:0.5px;",
+    ""
 );
 
 ReactDOM.createRoot(document.getElementById('root')).render(

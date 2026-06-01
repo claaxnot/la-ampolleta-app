@@ -167,7 +167,7 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
         nextDateStr = `${y}-${m}-${dayVal}`;
       }
     }
-    
+
     setDays(prev => [
       ...prev,
       {
@@ -462,7 +462,7 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
                 setValue("staffIds", [...new Set(assignData.map(a => a.staff_id))]);
                 const rates = {};
                 const sDays = {};
-                
+
                 assignData.forEach(a => {
                   if (a.custom_rate !== null && a.custom_rate !== undefined) {
                     rates[a.staff_id] = String(a.custom_rate);
@@ -475,7 +475,7 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
                     }
                   }
                 });
-                
+
                 setCustomRates(rates);
                 setStaffDays(sDays);
               }
@@ -514,7 +514,7 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
     eventData.staffIds = data.staffIds || [];
     eventData.customRates = customRates;
     eventData.isAdvancedActive = showAdvanced;
-    
+
     // Sincronizar el estado operacional seleccionado con todas las jornadas del evento
     const mainStatus = data.status || "Planificado";
     eventData.days = days.map(d => ({ ...d, status: mainStatus }));
@@ -1225,11 +1225,10 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
                                           key={dayIdx}
                                           type="button"
                                           onClick={() => toggleDayForStaff(dayIdx)}
-                                          className={`px-2 py-1 rounded text-[9px] font-bold transition-all border ${
-                                            isAssigned
+                                          className={`px-2 py-1 rounded text-[9px] font-bold transition-all border ${isAssigned
                                               ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
                                               : 'bg-white/5 text-gray-500 border-white/5 hover:bg-white/10'
-                                          }`}
+                                            }`}
                                         >
                                           Día {dayIdx + 1} ({day.date ? day.date.substring(5) : "?"})
                                         </button>
