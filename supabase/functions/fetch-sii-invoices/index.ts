@@ -4,7 +4,10 @@
 // Servidor IMAP: Detección, comparación y auto-validación de Boletas SII
 // =========================================================================
 
+
+// @ts-ignore
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+// @ts-ignore
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0";
 // @ts-ignore
 import { ImapFlow } from "npm:imapflow@1.0.155";
@@ -40,7 +43,7 @@ serve(async (req: Request) => {
   let requestData: any = {};
   try {
     requestData = await req.json();
-  } catch (_) {}
+  } catch (_) { }
 
   // Estructura de Resumen de Ejecución
   const summary = {
@@ -94,7 +97,7 @@ serve(async (req: Request) => {
       emailsToProcess = requestData.emails;
     } else {
       summary.logs.push("Estableciendo conexión segura con servidor de correo...");
-      
+
       // Conectarse con Timeout Defensivo
       await Promise.race([client.connect(), timeoutPromise]);
       summary.logs.push("Conexión IMAP establecida con éxito.");
@@ -125,20 +128,20 @@ serve(async (req: Request) => {
         if (msgDate < thirtyDaysAgo) continue;
 
         const senderEmail = (msg.envelope.from?.[0]?.address || "").toLowerCase();
-        
-        const isOfficialSender = senderEmail === "siichile@sii.cl" || 
-                                 senderEmail === "boleta.honorarios@sii.cl" ||
-                                 senderEmail === "noreply@sii.cl";
-                                 
+
+        const isOfficialSender = senderEmail === "siichile@sii.cl" ||
+          senderEmail === "boleta.honorarios@sii.cl" ||
+          senderEmail === "noreply@sii.cl";
+
         if (!isOfficialSender) {
           continue;
         }
 
         const subject = msg.envelope.subject || "Copia de Boleta de Honorarios Electrónica";
-        const isAnulada = subject.toLowerCase().includes("anulada") || 
-                          subject.toLowerCase().includes("anulación") || 
-                          subject.toLowerCase().includes("anulacion");
-                          
+        const isAnulada = subject.toLowerCase().includes("anulada") ||
+          subject.toLowerCase().includes("anulación") ||
+          subject.toLowerCase().includes("anulacion");
+
         if (isAnulada) {
           summary.logs.push(`🛑 Omitiendo correo de boleta anulada: "${subject}"`);
           continue;
@@ -168,9 +171,9 @@ serve(async (req: Request) => {
         const sender = m.senderEmail || "siichile@sii.cl";
         const receivedAt = parsedMail.date || new Date();
         const rawText = parsedMail.text || parsedMail.textAsHtml || "";
-        
-        const xmlAttachment = parsedMail.attachments.find((att: any) => 
-          att.contentType?.includes("xml") || 
+
+        const xmlAttachment = parsedMail.attachments.find((att: any) =>
+          att.contentType?.includes("xml") ||
           att.filename?.toLowerCase().endsWith(".xml")
         );
         let xmlContent = "";
@@ -537,7 +540,7 @@ serve(async (req: Request) => {
 
         // MATCH PERFECTO ENCONTRADO (Score 100% -> Auto Verified con lote existente)
         const finalBatch = matchingBatches[0];
-        
+
         // Ejecutar la auto-verificación atómica del lote pre-existente mediante RPC
         const { error: verifyRpcError } = await supabase
           .rpc("auto_verify_existing_invoice_batch_v3", {
@@ -792,12 +795,12 @@ serve(async (req: Request) => {
   } catch (err) {
     const error = err as any;
     summary.logs.push(`Error crítico de ejecución: ${error.message}`);
-    const isTcpRestriction = error.message?.includes("connect") || 
-                             error.message?.includes("TLS") || 
-                             error.message?.includes("network") ||
-                             error.message?.includes("socket") ||
-                             error.message?.includes("IMAP");
-                             
+    const isTcpRestriction = error.message?.includes("connect") ||
+      error.message?.includes("TLS") ||
+      error.message?.includes("network") ||
+      error.message?.includes("socket") ||
+      error.message?.includes("IMAP");
+
     return new Response(
       JSON.stringify({
         success: false,
@@ -810,7 +813,7 @@ serve(async (req: Request) => {
   } finally {
     try {
       await client.logout();
-    } catch (_) {}
+    } catch (_) { }
   }
 
   return new Response(
