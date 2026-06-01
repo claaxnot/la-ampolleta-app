@@ -704,7 +704,10 @@ CREATE TRIGGER trg_on_event_update
 -- V3.7.2 - FASE 2: TABLA PUSH_SUBSCRIPTIONS Y POLÍTICAS DE RLS
 -- ==========================================================
 
-CREATE TABLE IF NOT EXISTS public.push_subscriptions (
+-- Limpiar tabla previa si existía en un estado incompleto
+DROP TABLE IF EXISTS public.push_subscriptions CASCADE;
+
+CREATE TABLE public.push_subscriptions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
   endpoint TEXT NOT NULL,
