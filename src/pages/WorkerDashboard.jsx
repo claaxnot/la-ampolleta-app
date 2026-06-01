@@ -2638,6 +2638,14 @@ export default function WorkerDashboard({ user }) {
                                 const rate = event.custom_rate ? parseFloat(event.custom_rate) : baselineRate;
                                 const isPaid = event.payment_status === "Pagado";
 
+                                // Determinar si el período/lote de este evento ya está verificado ("En proceso de pago")
+                                const periodKey = event.date ? event.date.substring(0, 7) : "";
+                                const activeBatch = workerInvoiceBatches?.find(b => {
+                                  const bPeriod = b.period_label || (b.created_at ? b.created_at.substring(0, 7) : "");
+                                  return bPeriod === periodKey;
+                                });
+                                const isVerified = activeBatch?.status === "verified";
+
                                 return (
                                   <tr key={event.id} className="hover:bg-white/5 transition-colors">
                                     <td className="py-3.5 px-4 font-bold text-gray-200">{event.name}</td>
@@ -2671,9 +2679,11 @@ export default function WorkerDashboard({ user }) {
                                     <td className="py-3.5 px-4 text-center">
                                       <span className={`px-2.5 py-1 rounded-full text-2xs font-extrabold border ${isPaid
                                         ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
-                                        : 'bg-red-500/10 border-red-500/30 text-red-400'
+                                        : isVerified
+                                          ? 'bg-teal-500/10 border-teal-500/30 text-teal-300'
+                                          : 'bg-red-500/10 border-red-500/30 text-red-400'
                                         }`}>
-                                        {isPaid ? "Pagado" : "Pendiente"}
+                                        {isPaid ? "Pagado" : isVerified ? "En Proceso de Pago" : "Pendiente"}
                                       </span>
                                     </td>
                                   </tr>
