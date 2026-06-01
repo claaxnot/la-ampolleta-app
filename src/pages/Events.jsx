@@ -199,13 +199,19 @@ export default function Events({ user }) {
       if (eventId) {
         // Update Event
         const { error } = await supabase.from('events').update(eventData).eq('id', eventId);
-        console.log("5️⃣ [UPDATE RESPONSE] - Error de actualización:", error);
-        if (error) throw error;
+        if (error) {
+          console.error("5️⃣ [UPDATE RESPONSE] - Error de actualización:", error);
+          throw error;
+        }
+        console.log("5️⃣ [UPDATE RESPONSE] - Evento actualizado con éxito en Supabase.");
       } else {
         // Insert new Event
         const { data, error } = await supabase.from('events').insert([eventData]).select();
-        console.log("5️⃣ [INSERT RESPONSE] - Datos recibidos:", data, "Error:", error);
-        if (error) throw error;
+        if (error) {
+          console.error("5️⃣ [INSERT RESPONSE] - Error al insertar:", error);
+          throw error;
+        }
+        console.log("5️⃣ [INSERT RESPONSE] - Evento insertado con éxito en Supabase. Datos recibidos:", data);
         if (data && data.length > 0) {
           eventId = data[0].id;
         }
