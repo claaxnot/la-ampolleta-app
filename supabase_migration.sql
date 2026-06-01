@@ -319,3 +319,117 @@ USING (
 WITH CHECK (
   (select auth.uid()) = user_id
 );
+
+
+-- ==========================================================
+-- V3.7.1 - FASE 2: EXTENSIÓN DEL MODELO DE DATOS DE NOTIFICACIONES
+-- ==========================================================
+
+-- Agregar campos avanzados para soporte operativo y futuro push
+ALTER TABLE public.notifications 
+  ADD COLUMN IF NOT EXISTS read_at TIMESTAMP WITH TIME ZONE NULL,
+  ADD COLUMN IF NOT EXISTS expires_at TIMESTAMP WITH TIME ZONE NULL,
+  ADD COLUMN IF NOT EXISTS priority VARCHAR(20) DEFAULT 'normal' CHECK (priority IN ('low', 'normal', 'high', 'critical')),
+  ADD COLUMN IF NOT EXISTS related_event_id UUID NULL REFERENCES public.events(id) ON DELETE CASCADE,
+  ADD COLUMN IF NOT EXISTS related_event_day_id UUID NULL,
+  ADD COLUMN IF NOT EXISTS related_assignment_id UUID NULL REFERENCES public.event_assignments(id) ON DELETE CASCADE,
+  ADD COLUMN IF NOT EXISTS related_payment_id UUID NULL,
+  ADD COLUMN IF NOT EXISTS metadata JSONB NULL;
+
+-- Índices optimizados para lecturas rápidas de notificaciones no leídas y purga
+CREATE INDEX IF NOT EXISTS idx_notifications_user_unread 
+  ON public.notifications(user_id, read) 
+  WHERE read = false;
+
+CREATE INDEX IF NOT EXISTS idx_notifications_expires 
+  ON public.notifications(expires_at) 
+  WHERE expires_at IS NOT NULL;
+
+-- ==========================================================
+-- V3.7.1 - FASE 3: LIMPIEZA AUTOMÁTICA Y EXPIRACIÓN (48 HORAS)
+-- ==========================================================
+
+-- Trigger para fijar expiración automática a las 48 horas de ser leída
+CREATE OR REPLACE FUNCTION public.trg_set_notification_expiration()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+BEGIN
+  IF NEW.read = true AND OLD.read = false THEN
+    NEW.read_at := pg_catalog.timezone('utc'::text, pg_catalog.now());
+    -- Expira en 48 horas solo si es prioridad regular (low o normal)
+    IF NEW.priority IN ('low', 'normal') THEN
+      NEW.expires_at := NEW.read_at + INTERVAL '48 hours';
+    ELSE
+      NEW.expires_at := NULL; -- Alertas críticas o altas no expiran automáticamente
+    END IF;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS on_notification_read ON public.notifications;
+CREATE TRIGGER on_notification_read
+  BEFORE UPDATE ON public.notifications
+  FOR EACH ROW
+  EXECUTE FUNCTION public.trg_set_notification_expiration();
+
+-- Función SQL para purgar las notificaciones expiradas (baja/normal prioridad)
+CREATE OR REPLACE FUNCTION public.clean_read_notifications()
+RETURNS integer
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  deleted_count integer;
+BEGIN
+  DELETE FROM public.notifications
+  WHERE read = true
+    AND expires_at IS NOT NULL
+    AND expires_at < pg_catalog.timezone('utc'::text, pg_catalog.now())
+    AND priority IN ('low', 'normal');
+    
+  GET DIAGNOSTICS deleted_count = ROW_COUNT;
+  RETURN deleted_count;
+END;
+$$;
+
+-- Revocar permisos públicos para evitar invocaciones RPC maliciosas
+REVOKE EXECUTE ON FUNCTION public.clean_read_notifications() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.clean_read_notifications() FROM anon;
+REVOKE EXECUTE ON FUNCTION public.clean_read_notifications() FROM authenticated;
+
+
+-- ==========================================================
+-- V3.7.1 - FASE 7: TABLA PREPARATORIA DE SUSCRIPCIONES PUSH
+-- ==========================================================
+
+CREATE TABLE IF NOT EXISTS public.push_subscriptions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+    token TEXT NOT NULL,
+    provider VARCHAR(50) DEFAULT 'web-push' NOT NULL,
+    platform VARCHAR(50) NULL,
+    browser VARCHAR(50) NULL,
+    device_label TEXT NULL,
+    active BOOLEAN DEFAULT true NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    last_seen_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    revoked_at TIMESTAMP WITH TIME ZONE NULL,
+    CONSTRAINT unique_user_token UNIQUE (user_id, token)
+);
+
+-- Habilitar RLS en suscripciones push
+ALTER TABLE public.push_subscriptions ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Users can manage own push subscriptions" ON public.push_subscriptions;
+CREATE POLICY "Users can manage own push subscriptions"
+ON public.push_subscriptions
+FOR ALL
+TO authenticated
+USING (auth.uid() = user_id)
+WITH CHECK (auth.uid() = user_id);
+

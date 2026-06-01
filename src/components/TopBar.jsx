@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { Bell, User as UserIcon, Menu } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "../lib/supabase.js";
+import toast from "react-hot-toast";
 
 export default function TopBar({ user, onToggleMenu }) {
   const [showNotifications, setShowNotifications] = useState(false);
@@ -26,55 +27,24 @@ export default function TopBar({ user, onToggleMenu }) {
     
     fetchNotifications();
 
-    console.log("🔌 [REALTIME] - Subscribiendo TopBar a notificaciones en vivo para:", user.systemRole);
+    console.log("🔌 [REALTIME] - Subscribiendo TopBar a notificaciones en vivo para el usuario:", user.id);
     
-    let channel;
-    
-    if (user.systemRole === 'admin') {
-      channel = supabase
-        .channel('topbar-realtime-admin')
-        .on(
-          'postgres_changes',
-          { event: '*', schema: 'public', table: 'event_assignments' },
-          () => {
-            console.log("🔔 [REALTIME] - Cambio detectado en asignaciones. Recargando...");
-            fetchNotifications();
-          }
-        )
-        .on(
-          'postgres_changes',
-          { event: '*', schema: 'public', table: 'events' },
-          () => {
-            console.log("🔔 [REALTIME] - Cambio detectado en eventos. Recargando...");
-            fetchNotifications();
-          }
-        )
-        .on(
-          'postgres_changes',
-          { event: '*', schema: 'public', table: 'profiles' },
-          () => {
-            console.log("🔔 [REALTIME] - Cambio detectado en perfiles. Recargando...");
-            fetchNotifications();
-          }
-        )
-        .subscribe((status) => {
-          console.log(`🔌 [REALTIME STATUS ADMIN]: ${status}`);
-        });
-    } else {
-      channel = supabase
-        .channel('topbar-realtime-worker')
-        .on(
-          'postgres_changes',
-          { event: '*', schema: 'public', table: 'event_assignments' },
-          () => {
-            console.log("🔔 [REALTIME] - Cambio detectado en asignaciones del trabajador. Recargando...");
-            fetchNotifications();
-          }
-        )
-        .subscribe((status) => {
-          console.log(`🔌 [REALTIME STATUS WORKER]: ${status}`);
-        });
-    }
+    const channel = supabase
+      .channel(`topbar-notifications-${user.id}`)
+      .on(
+        'postgres_changes',
+        { 
+          event: '*', 
+          schema: 'public', 
+          table: 'notifications', 
+          filter: `user_id=eq.${user.id}` 
+        },
+        (payload) => {
+          console.log("🔔 [REALTIME] - Cambio detectado en notificaciones de TopBar:", payload);
+          fetchNotifications();
+        }
+      )
+      .subscribe();
 
     return () => {
       if (channel) supabase.removeChannel(channel);
@@ -84,160 +54,74 @@ export default function TopBar({ user, onToggleMenu }) {
   const fetchNotifications = async () => {
     if (!user) return;
     
-    const readIds = JSON.parse(localStorage.getItem('readNotifs') || '[]');
-    let combinedNotifs = [];
+    try {
+      const { data, error } = await supabase
+        .from("notifications")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(10);
 
-    if (user.systemRole === 'admin') {
-      const { data: recentEventsData } = await supabase.from('events').select('id, name, created_at').order('created_at', { ascending: false }).limit(3);
-      const { data: recentStaffData } = await supabase.from('profiles').select('id, name, role, created_at').order('created_at', { ascending: false }).limit(3);
-      
-      // Consultar asignaciones recientes confirmadas o rechazadas de forma segura y retrocompatible
-      let recentAssignments = [];
-      const { data: dataWithUpdate, error: updateErr } = await supabase
-        .from('event_assignments')
-        .select(`
-          id,
-          status,
-          updated_at,
-          profiles:staff_id (name),
-          events:event_id (name)
-        `)
-        .neq('status', 'Pendiente')
-        .order('updated_at', { ascending: false })
-        .limit(5);
+      if (error) throw error;
 
-      if (!updateErr && dataWithUpdate) {
-        recentAssignments = dataWithUpdate.map(a => ({
-          ...a,
-          notification_date: a.updated_at
-        }));
-      } else {
-        const { data: dataWithCreate } = await supabase
-          .from('event_assignments')
-          .select(`
-            id,
-            status,
-            created_at,
-            profiles:staff_id (name),
-            events:event_id (name)
-          `)
-          .neq('status', 'Pendiente')
-          .order('created_at', { ascending: false })
-          .limit(5);
-        if (dataWithCreate) {
-          recentAssignments = dataWithCreate.map(a => ({
-            ...a,
-            notification_date: a.created_at
-          }));
-        }
-      }
-      
-      if (recentEventsData) {
-        recentEventsData.forEach(e => {
-          combinedNotifs.push({
-            id: `e-${e.id}`,
-            message: `Nuevo evento: ${e.name}`,
-            time: getTimeAgo(e.created_at),
-            date: new Date(e.created_at),
-            read: readIds.includes(`e-${e.id}`)
-          });
-        });
-      }
-      if (recentStaffData) {
-        recentStaffData.forEach(s => {
-          combinedNotifs.push({
-            id: `s-${s.id}`,
-            message: `Nuevo staff: ${s.name} (${s.role})`,
-            time: getTimeAgo(s.created_at),
-            date: new Date(s.created_at),
-            read: readIds.includes(`s-${s.id}`)
-          });
-        });
-      }
-      if (recentAssignments) {
-        recentAssignments.forEach(a => {
-          const staffName = a.profiles?.name || 'Un trabajador';
-          const eventName = a.events?.name || 'un evento';
-          const statusText = a.status === 'Confirmado' ? '✅ ACEPTÓ' : '❌ RECHAZÓ';
-          
-          combinedNotifs.push({
-            id: `a-status-${a.id}-${a.status}`,
-            message: `${staffName} ${statusText} la asignación para "${eventName}"`,
-            time: getTimeAgo(a.notification_date),
-            date: new Date(a.notification_date),
-            read: readIds.includes(`a-status-${a.id}-${a.status}`)
-          });
-        });
-      }
-    } else {
-      // Worker
-      const { data: assignments } = await supabase
-        .from('event_assignments')
-        .select('id, status, payment_status, created_at, updated_at, events(name)')
-        .eq('staff_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(5);
-        
-      if (assignments) {
-        assignments.forEach(a => {
-          let statusPrefix = "🔔 Has sido asignado a";
-          let notifTime = a.created_at;
+      const formatted = (data || []).map(n => ({
+        id: n.id,
+        title: n.title,
+        message: n.description || n.message || "",
+        time: getTimeAgo(n.created_at),
+        date: new Date(n.created_at),
+        read: n.read,
+        related_event_id: n.related_event_id,
+        related_assignment_id: n.related_assignment_id,
+        related_payment_id: n.related_payment_id
+      }));
 
-          if (a.status === 'Confirmado') {
-            statusPrefix = "✅ Confirmaste tu asistencia a";
-            notifTime = a.updated_at || a.created_at;
-          } else if (a.status === 'Rechazado') {
-            statusPrefix = "❌ Rechazaste la asignación a";
-            notifTime = a.updated_at || a.created_at;
-          }
-
-          combinedNotifs.push({
-            id: `a-${a.id}-${a.status}`,
-            message: `${statusPrefix}: ${a.events?.name || 'Un evento'}`,
-            time: getTimeAgo(notifTime),
-            date: new Date(notifTime),
-            read: readIds.includes(`a-${a.id}-${a.status}`)
-          });
-
-          // Si el pago ya fue realizado, agregamos la notificación de pago con la fecha de la última actualización (momento del pago)
-          if (a.payment_status === "Pagado") {
-            combinedNotifs.push({
-              id: `p-${a.id}-paid`,
-              message: `💰 Pago de Honorarios Realizado: Se liquidó tu pago para "${a.events?.name || 'Un evento'}"`,
-              time: getTimeAgo(a.updated_at || a.created_at),
-              date: new Date(a.updated_at || a.created_at),
-              read: readIds.includes(`p-${a.id}-paid`)
-            });
-          }
-        });
-      }
-
-      if (!user.avatar || !user.cuenta_destino) {
-        combinedNotifs.push({
-          id: 'sys-profile',
-          message: "⚠️ Recuerda completar tu perfil (Foto y Datos Bancarios).",
-          time: "Sistema",
-          date: new Date(),
-          read: readIds.includes('sys-profile')
-        });
-      }
+      setNotifications(formatted);
+    } catch (err) {
+      console.warn("⚠️ [TOPBAR - NOTIFICATIONS]: Error al obtener notificaciones físicas de Supabase:", err);
+      setNotifications([]);
     }
-
-    combinedNotifs.sort((a, b) => b.date - a.date);
-    setNotifications(combinedNotifs.slice(0, 5));
   };
 
   const unreadCount = notifications.filter(n => !n.read).length;
 
-  const markAllAsRead = () => {
-    const updatedNotifs = notifications.map(n => ({ ...n, read: true }));
-    setNotifications(updatedNotifs);
-    
-    const readIds = JSON.parse(localStorage.getItem('readNotifs') || '[]');
-    updatedNotifs.forEach(n => {
-      if (!readIds.includes(n.id)) readIds.push(n.id);
-    });
-    localStorage.setItem('readNotifs', JSON.stringify(readIds));
+  const handleMarkAsRead = async (notifId) => {
+    // Optimistic UI update
+    setNotifications(prev => prev.map(n => n.id === notifId ? { ...n, read: true } : n));
+    try {
+      const { error } = await supabase
+        .from("notifications")
+        .update({ read: true })
+        .eq("id", notifId);
+      if (error) throw error;
+    } catch (err) {
+      console.error("❌ [TOPBAR]: Error al marcar notificación como leída:", err);
+    }
+  };
+
+  const handleNotificationClick = async (notif) => {
+    if (!notif.read) {
+      await handleMarkAsRead(notif.id);
+    }
+    if (notif.related_event_id) {
+      console.log("🔗 [TOPBAR]: Navegando / Interactuando con evento ID:", notif.related_event_id);
+    }
+  };
+
+  const markAllAsRead = async () => {
+    // Optimistic UI update
+    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+    try {
+      const { error } = await supabase
+        .from("notifications")
+        .update({ read: true })
+        .eq("user_id", user.id)
+        .eq("read", false);
+      if (error) throw error;
+      toast.success("Notificaciones marcadas como leídas", { duration: 1500 });
+    } catch (err) {
+      console.error("❌ [TOPBAR]: Error al marcar todas las notificaciones como leídas:", err);
+    }
   };
 
   // Cerrar al hacer clic afuera
@@ -298,7 +182,11 @@ export default function TopBar({ user, onToggleMenu }) {
                     <div className="p-6 text-center text-sm text-gray-400">No hay notificaciones</div>
                   ) : (
                     notifications.map(notif => (
-                      <div key={notif.id} className={`p-4 border-b border-gray-700/50 hover:bg-white/5 transition-colors ${!notif.read ? 'bg-amber-500/5' : ''}`}>
+                      <div 
+                        key={notif.id} 
+                        onClick={() => handleNotificationClick(notif)}
+                        className={`p-4 border-b border-gray-700/50 hover:bg-white/5 transition-colors cursor-pointer ${!notif.read ? 'bg-amber-500/5' : ''}`}
+                      >
                         <div className="flex gap-3">
                           <div className="mt-1">
                             {!notif.read ? (
@@ -308,10 +196,13 @@ export default function TopBar({ user, onToggleMenu }) {
                             )}
                           </div>
                           <div>
-                            <p className={`text-sm ${!notif.read ? 'text-gray-200 font-medium' : 'text-gray-400'}`}>
+                            <span className={`text-xs block font-extrabold tracking-wide uppercase mb-0.5 ${!notif.read ? 'text-amber-400' : 'text-gray-500'}`}>
+                              {notif.title || "Notificación"}
+                            </span>
+                            <p className={`text-xs ${!notif.read ? 'text-gray-200 font-medium' : 'text-gray-400'}`}>
                               {notif.message}
                             </p>
-                            <span className="text-xs text-gray-500 mt-2 block">{notif.time}</span>
+                            <span className="text-[10px] text-gray-500 mt-1 block">{notif.time}</span>
                           </div>
                         </div>
                       </div>
