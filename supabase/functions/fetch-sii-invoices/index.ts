@@ -6,8 +6,12 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0";
+// @ts-ignore
 import { ImapFlow } from "npm:imapflow@1.0.155";
+// @ts-ignore
 import { simpleParser } from "npm:mailparser@3.6.5";
+
+declare const Deno: any;
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
