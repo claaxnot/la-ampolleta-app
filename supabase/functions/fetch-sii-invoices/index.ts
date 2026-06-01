@@ -430,7 +430,7 @@ serve(async (req) => {
       }
 
       // Si existe algún lote verificado o pagado en el período, esto requiere revisión o es un posible duplicado (Regla 6)
-      const verifiedOrPaidBatch = existingBatches?.find(b => b.status === "verified" || b.status === "paid");
+      const verifiedOrPaidBatch = existingBatches?.find((b: any) => b.status === "verified" || b.status === "paid");
       if (verifiedOrPaidBatch) {
         const isExactFolio = verifiedOrPaidBatch.invoice_number === invoiceNumber;
         await insertDetectedInvoice(supabase, {
