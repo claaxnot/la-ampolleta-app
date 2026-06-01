@@ -14,7 +14,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-serve(async (req) => {
+serve(async (req: Request) => {
   // Manejo de preflight CORS
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -416,7 +416,7 @@ serve(async (req) => {
         continue;
       }
 
-      const staffIds = staffProfiles.map(p => p.id);
+      const staffIds = staffProfiles.map((p: any) => p.id);
 
       // Buscar todos los lotes de este trabajador para el periodo, sin importar el estado
       const { data: existingBatches, error: batError } = await supabase
@@ -463,11 +463,11 @@ serve(async (req) => {
         continue;
       }
 
-      const candidateBatches = existingBatches ? existingBatches.filter(b => b.status === "pending" || b.status === "rejected") : [];
+      const candidateBatches = existingBatches ? existingBatches.filter((b: any) => b.status === "pending" || b.status === "rejected") : [];
 
       if (candidateBatches.length > 0) {
         // --- CASO A: SI YA EXISTE UN LOTE FÍSICO EN ESTADO PENDING/REJECTED ---
-        const matchingBatches = candidateBatches.filter(b => {
+        const matchingBatches = candidateBatches.filter((b: any) => {
           const diff = Math.abs((b.expected_gross_amount || 0) - invoiceAmount);
           return diff <= toleranceSetting;
         });
@@ -599,7 +599,8 @@ serve(async (req) => {
             retentionRate = parseFloat(settingsData.value.rate);
           }
         } catch (err) {
-          summary.logs.push(`⚠️ No se pudo cargar la tasa de retención de app_settings: ${err.message}. Usando fallback 15.25%.`);
+          const error = err as any;
+          summary.logs.push(`⚠️ No se pudo cargar la tasa de retención de app_settings: ${error.message}. Usando fallback 15.25%.`);
         }
 
         // Consultar asignaciones de eventos pendientes en tiempo real para este trabajador
@@ -783,21 +784,21 @@ serve(async (req) => {
         summary.newInvoices++;
       }
     }
-
     summary.logs.push("Sincronización IMAP y validación de boletas finalizada.");
   } catch (err) {
-    summary.logs.push(`Error crítico de ejecución: ${err.message}`);
-    const isTcpRestriction = err.message?.includes("connect") || 
-                             err.message?.includes("TLS") || 
-                             err.message?.includes("network") ||
-                             err.message?.includes("socket") ||
-                             err.message?.includes("IMAP");
+    const error = err as any;
+    summary.logs.push(`Error crítico de ejecución: ${error.message}`);
+    const isTcpRestriction = error.message?.includes("connect") || 
+                             error.message?.includes("TLS") || 
+                             error.message?.includes("network") ||
+                             error.message?.includes("socket") ||
+                             error.message?.includes("IMAP");
                              
     return new Response(
       JSON.stringify({
         success: false,
-        error: isTcpRestriction ? "IMAP_TCP_RESTRICTION" : `Error durante el procesamiento IMAP: ${err.message}`,
-        message: err.message,
+        error: isTcpRestriction ? "IMAP_TCP_RESTRICTION" : `Error durante el procesamiento IMAP: ${error.message}`,
+        message: error.message,
         summary
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -914,7 +915,8 @@ function parseSiiXml(xmlStr: string): ParseResult {
       }
     };
   } catch (err) {
-    return { success: false, error: err.message };
+    const error = err as any;
+    return { success: false, error: error.message };
   }
 }
 
