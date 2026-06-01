@@ -433,3 +433,159 @@ TO authenticated
 USING (auth.uid() = user_id)
 WITH CHECK (auth.uid() = user_id);
 
+
+-- ==========================================================
+-- V3.7.1 - FASE 6: DISPARADORES AUTOMÁTICOS EN BASE DE DATOS (TRIGGERS)
+-- ==========================================================
+
+-- 1. Notificar a todos los administradores/supervisores cuando se crea un nuevo evento
+CREATE OR REPLACE FUNCTION public.notify_on_new_event()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  admin_record record;
+BEGIN
+  FOR admin_record IN 
+    SELECT id FROM public.profiles 
+    WHERE system_role = 'admin' 
+       OR role IN ('Admin', 'Supervisor', 'Coordinador')
+  LOOP
+    INSERT INTO public.notifications (user_id, title, description, type, priority, related_event_id)
+    VALUES (
+      admin_record.id,
+      '📅 Nuevo Evento Creado',
+      'Se ha registrado el evento "' || NEW.name || '" programado para el ' || to_char(NEW.date, 'DD/MM/YYYY') || '.',
+      'info',
+      'normal',
+      NEW.id
+    );
+  END LOOP;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_on_new_event ON public.events;
+CREATE TRIGGER trg_on_new_event
+  AFTER INSERT ON public.events
+  FOR EACH ROW
+  EXECUTE FUNCTION public.notify_on_new_event();
+
+
+-- 2. Notificar a todos los administradores/supervisores cuando se registra nuevo staff
+CREATE OR REPLACE FUNCTION public.notify_on_new_staff()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  admin_record record;
+BEGIN
+  FOR admin_record IN 
+    SELECT id FROM public.profiles 
+    WHERE system_role = 'admin' 
+       OR role IN ('Admin', 'Supervisor', 'Coordinador')
+  LOOP
+    INSERT INTO public.notifications (user_id, title, description, type, priority)
+    VALUES (
+      admin_record.id,
+      '👤 Nuevo Personal Registrado',
+      'Se ha registrado un nuevo miembro del staff: ' || NEW.name || ' (' || COALESCE(NEW.role, 'Sin rol') || ').',
+      'success',
+      'normal'
+    );
+  END LOOP;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_on_new_staff ON public.profiles;
+CREATE TRIGGER trg_on_new_staff
+  AFTER INSERT ON public.profiles
+  FOR EACH ROW
+  EXECUTE FUNCTION public.notify_on_new_staff();
+
+
+-- 3. Notificar al trabajador cuando es asignado a un evento
+CREATE OR REPLACE FUNCTION public.notify_on_new_assignment()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  event_name text;
+  event_date date;
+BEGIN
+  SELECT name, date INTO event_name, event_date 
+  FROM public.events 
+  WHERE id = NEW.event_id;
+  
+  INSERT INTO public.notifications (user_id, title, description, type, priority, related_event_id, related_assignment_id)
+  VALUES (
+    NEW.staff_id,
+    '📅 Nueva Asignación de Evento',
+    'Has sido citado para participar en el evento "' || COALESCE(event_name, 'Sin nombre') || '" el ' || to_char(COALESCE(event_date, now()::date), 'DD/MM/YYYY') || '. Por favor confirma tu asistencia.',
+    'warning',
+    'normal',
+    NEW.event_id,
+    NEW.id
+  );
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_on_new_assignment ON public.event_assignments;
+CREATE TRIGGER trg_on_new_assignment
+  AFTER INSERT ON public.event_assignments
+  FOR EACH ROW
+  EXECUTE FUNCTION public.notify_on_new_assignment();
+
+
+-- 4. Notificar a los administradores cuando un trabajador acepta o rechaza una citación
+CREATE OR REPLACE FUNCTION public.notify_on_assignment_status_update()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  admin_record record;
+  staff_name text;
+  event_name text;
+BEGIN
+  IF NEW.status <> OLD.status AND NEW.status IN ('Confirmado', 'Rechazado') THEN
+    SELECT name INTO staff_name FROM public.profiles WHERE id = NEW.staff_id;
+    SELECT name INTO event_name FROM public.events WHERE id = NEW.event_id;
+    
+    FOR admin_record IN 
+      SELECT id FROM public.profiles 
+      WHERE system_role = 'admin' 
+         OR role IN ('Admin', 'Supervisor', 'Coordinador')
+    LOOP
+      INSERT INTO public.notifications (user_id, title, description, type, priority, related_event_id, related_assignment_id)
+      VALUES (
+        admin_record.id,
+        CASE WHEN NEW.status = 'Confirmado' THEN '✅ Asistencia Confirmada' ELSE '❌ Asignación Rechazada' END,
+        COALESCE(staff_name, 'Un trabajador') || ' ha ' || CASE WHEN NEW.status = 'Confirmado' THEN 'CONFIRMADO' ELSE 'RECHAZADO' END || ' su asistencia para "' || COALESCE(event_name, 'el evento') || '".',
+        CASE WHEN NEW.status = 'Confirmado' THEN 'success' ELSE 'danger' END,
+        'normal',
+        NEW.event_id,
+        NEW.id
+      );
+    END LOOP;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_on_assignment_status_update ON public.event_assignments;
+CREATE TRIGGER trg_on_assignment_status_update
+  AFTER UPDATE ON public.event_assignments
+  FOR EACH ROW
+  EXECUTE FUNCTION public.notify_on_assignment_status_update();
+
+
