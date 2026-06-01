@@ -514,7 +514,10 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
     eventData.staffIds = data.staffIds || [];
     eventData.customRates = customRates;
     eventData.isAdvancedActive = showAdvanced;
-    eventData.days = days;
+    
+    // Sincronizar el estado operacional seleccionado con todas las jornadas del evento
+    const mainStatus = data.status || "Planificado";
+    eventData.days = days.map(d => ({ ...d, status: mainStatus }));
     eventData.staffDays = staffDays;
 
     setIsSubmittingForm(true);
