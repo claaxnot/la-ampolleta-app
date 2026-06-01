@@ -36,12 +36,14 @@ export default function TopBar({ user, onToggleMenu }) {
         { 
           event: '*', 
           schema: 'public', 
-          table: 'notifications', 
-          filter: `user_id=eq.${user.id}` 
+          table: 'notifications'
         },
         (payload) => {
           console.log("🔔 [REALTIME] - Cambio detectado en notificaciones de TopBar:", payload);
-          fetchNotifications();
+          const affectedUserId = payload.new?.user_id || payload.old?.user_id;
+          if (affectedUserId === user.id) {
+            fetchNotifications();
+          }
         }
       )
       .subscribe();

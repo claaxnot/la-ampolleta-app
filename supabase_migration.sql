@@ -589,3 +589,12 @@ CREATE TRIGGER trg_on_assignment_status_update
   EXECUTE FUNCTION public.notify_on_assignment_status_update();
 
 
+-- ==========================================================
+-- V3.7.1 - FASE 5: REPLICACIÓN REALTIME EN TABLA NOTIFICATIONS
+-- ==========================================================
+
+-- Habilitar la transmisión en tiempo real de Supabase (Realtime Channel) para notificaciones
+ALTER PUBLICATION supabase_realtime ADD TABLE public.notifications;
+
+
+
