@@ -2381,7 +2381,7 @@ export default function Finanzas() {
           </motion.div>
 
           {/* SECCIÓN OPERACIONAL INFERIOR */}
-          <motion.div variants={itemVariants} className="mb-4 mt-6">
+          <motion.div variants={itemVariants} className="mb-4 mt-6 relative z-10">
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 p-1">
               <div>
                 <h4 className="text-xs font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-gray-300 to-gray-400 flex items-center gap-2 uppercase tracking-wider">
@@ -2394,7 +2394,7 @@ export default function Finanzas() {
 
               {/* Filtro de Estados e Inclusión de Eventos Futuros */}
               <div className="flex flex-col sm:flex-row items-center gap-3 w-full lg:w-auto">
-                <div className="flex items-center bg-gray-800/40 border border-gray-700/60 rounded-xl p-1 gap-1 overflow-x-auto scrollbar-none w-full lg:w-auto flex-nowrap shrink-0">
+                <div className="flex flex-wrap items-center bg-gray-800/40 border border-gray-700/60 rounded-xl p-1 gap-1 w-full lg:w-auto shrink-0">
                   <button
                     onClick={() => setStatusFilter("pending")}
                     className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all duration-150 cursor-pointer flex items-center gap-1.5 active:bg-white/10 active:opacity-90 shrink-0 ${statusFilter === "pending" ? "bg-red-500/20 text-red-300 border border-red-500/20 shadow-sm" : "text-gray-400 hover:text-gray-200"}`}
@@ -2437,15 +2437,19 @@ export default function Finanzas() {
                   </button>
                 </div>
 
-                <label className="flex items-center gap-2 cursor-pointer bg-gray-800/40 border border-gray-700/60 rounded-xl px-3.5 py-1.5 text-xs font-semibold text-gray-300 hover:text-white hover:border-amber-500/30 transition-all h-[38px] w-full lg:w-auto justify-center lg:justify-start shrink-0">
-                  <input
-                    type="checkbox"
-                    checked={includeFuture}
-                    onChange={(e) => setIncludeFuture(e.target.checked)}
-                    className="accent-amber-500 rounded cursor-pointer w-3.5 h-3.5"
-                  />
+                <button
+                  onClick={() => setIncludeFuture(!includeFuture)}
+                  className="flex items-center gap-2 cursor-pointer bg-gray-800/40 border border-gray-700/60 rounded-xl px-3.5 py-1.5 text-xs font-semibold text-gray-300 hover:text-white hover:border-amber-500/30 transition-all h-[38px] w-full lg:w-auto justify-center lg:justify-start shrink-0 active:bg-white/5"
+                >
+                  <div className="flex items-center justify-center shrink-0">
+                    {includeFuture ? (
+                      <CheckSquare className="w-4 h-4 text-amber-500" />
+                    ) : (
+                      <Square className="w-4 h-4 text-gray-400" />
+                    )}
+                  </div>
                   <span>Incluir Eventos Futuros</span>
-                </label>
+                </button>
               </div>
             </div>
           </motion.div>
