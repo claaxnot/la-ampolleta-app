@@ -168,7 +168,7 @@ export default function WorkerDashboard({ user }) {
           }
         } catch (openMeteoErr) {
           console.log("ℹ️ [WEATHER API] - Open-Meteo offline or timed out, executing fast fallback to wttr.in...");
-          
+
           try {
             const wttrRes = await fetch(`https://wttr.in/${encodeURIComponent(city || "Santiago")}?format=j1`);
             if (wttrRes.ok) {
@@ -176,10 +176,10 @@ export default function WorkerDashboard({ user }) {
               if (wttrData && wttrData.current_condition && wttrData.current_condition[0]) {
                 const cond = wttrData.current_condition[0];
                 const temp = Math.round(parseFloat(cond.temp_C));
-                const desc = (cond.weatherDesc && cond.weatherDesc[0] && cond.weatherDesc[0].value) 
-                  ? cond.weatherDesc[0].value.toLowerCase() 
+                const desc = (cond.weatherDesc && cond.weatherDesc[0] && cond.weatherDesc[0].value)
+                  ? cond.weatherDesc[0].value.toLowerCase()
                   : "sunny";
-                
+
                 let icon = "sun";
                 if (desc.includes("cloud") || desc.includes("overcast")) icon = "cloudy";
                 else if (desc.includes("fog") || desc.includes("mist")) icon = "fog";
@@ -345,7 +345,7 @@ export default function WorkerDashboard({ user }) {
     const list = Object.values(periods).map(p => {
       const activeBatch = p.activeBatch;
       let status = "Falta boleta";
-      
+
       const totalEvents = p.events.length;
       const paidEvents = p.events.filter(e => e.payment_status === "Pagado").length;
 
@@ -376,7 +376,7 @@ export default function WorkerDashboard({ user }) {
         status,
         paid_count: paidEvents
       };
-     });
+    });
 
     // 3.5 Filtrar según regla de negocio: período actual, o pasados pendientes. Excluir futuros.
     const today = new Date();
@@ -800,7 +800,7 @@ export default function WorkerDashboard({ user }) {
         .from('event_attendance_logs')
         .select('*')
         .eq('worker_id', workerId);
-      
+
       if (data) {
         const logsMap = {};
         data.forEach(log => {
@@ -846,7 +846,7 @@ export default function WorkerDashboard({ user }) {
     try {
       const eventObj = assignedEvents.find(e => e.assignment_id === assignmentId);
       const hasCoordinates = eventObj && eventObj.latitude !== null && eventObj.longitude !== null && eventObj.latitude !== "";
-      
+
       let lat = null;
       let lng = null;
       let accuracy = null;
@@ -858,7 +858,7 @@ export default function WorkerDashboard({ user }) {
           setLoadingAttendanceId(null);
           return;
         }
-        
+
         toast.loading("Obteniendo ubicación GPS...", { id: "gps-worker-loader" });
         const locResult = await getCurrentLocation();
         toast.dismiss("gps-worker-loader");
@@ -928,7 +928,7 @@ export default function WorkerDashboard({ user }) {
     try {
       const eventObj = assignedEvents.find(e => e.assignment_id === assignmentId);
       const hasCoordinates = eventObj && eventObj.latitude !== null && eventObj.longitude !== null && eventObj.latitude !== "";
-      
+
       let lat = null;
       let lng = null;
       let accuracy = null;
@@ -1086,7 +1086,7 @@ export default function WorkerDashboard({ user }) {
         .map(assignment => {
           const day = assignment.event_days;
           const parent = assignment.events || {};
-          
+
           return {
             assignment_id: assignment.id,
             assignment_status: assignment.status,
@@ -1098,7 +1098,7 @@ export default function WorkerDashboard({ user }) {
             invoice_number: assignment.invoice_number || null,
             invoice_received_at: assignment.invoice_received_at || null,
             invoice_amount: assignment.invoice_amount ? parseFloat(assignment.invoice_amount) : null,
-            
+
             // Parent info
             id: parent.id,
             name: parent.name,
@@ -1127,7 +1127,7 @@ export default function WorkerDashboard({ user }) {
           };
         })
         .filter(e => e.status?.toLowerCase() !== "cancelado" && e.status?.toLowerCase() !== "cancelled");
-        
+
       setAssignedEvents(formattedEvents);
       fetchMyInvoiceBatches(workerId);
       fetchMyDbNotifications(workerId, formattedEvents);
@@ -1184,7 +1184,7 @@ export default function WorkerDashboard({ user }) {
 
   const handleViewReceipt = async (filePath) => {
     if (!filePath) return;
-    
+
     // Open a blank window synchronously to bypass iOS Safari's popup blocker
     const newWindow = window.open("about:blank", "_blank");
     if (newWindow) {
@@ -1279,7 +1279,7 @@ export default function WorkerDashboard({ user }) {
       if (insertError) throw insertError;
 
       toast.success("¡Solicitud de gasto enviada con éxito!", { id: loadingToast });
-      
+
       // Reiniciar formulario
       setExpenseForm({
         requested_amount: "",
@@ -1289,7 +1289,7 @@ export default function WorkerDashboard({ user }) {
         description: ""
       });
       setReceiptFile(null);
-      
+
       // Recargar lista y registrar actividad
       fetchExpenses();
       addActivity(`Registraste una solicitud de ${expenseForm.expense_type} por $${parseFloat(expenseForm.requested_amount).toLocaleString("es-CL")}`, "info");
@@ -1516,8 +1516,8 @@ export default function WorkerDashboard({ user }) {
         <button
           onClick={() => setActiveSubTab("dashboard")}
           className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-sm font-bold transition-all duration-300 ${activeSubTab === "dashboard"
-              ? "bg-amber-500/20 text-amber-300 border border-amber-500/30 shadow-[0_0_12px_rgba(245,158,11,0.15)]"
-              : "text-gray-400 hover:bg-white/5 hover:text-gray-200"
+            ? "bg-amber-500/20 text-amber-300 border border-amber-500/30 shadow-[0_0_12px_rgba(245,158,11,0.15)]"
+            : "text-gray-400 hover:bg-white/5 hover:text-gray-200"
             }`}
         >
           <CalendarDays className="w-4 h-4" />
@@ -1526,8 +1526,8 @@ export default function WorkerDashboard({ user }) {
         <button
           onClick={() => setActiveSubTab("finanzas")}
           className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-sm font-bold transition-all duration-300 ${activeSubTab === "finanzas"
-              ? "bg-amber-500/20 text-amber-300 border border-amber-500/30 shadow-[0_0_12px_rgba(245,158,11,0.15)]"
-              : "text-gray-400 hover:bg-white/5 hover:text-gray-200"
+            ? "bg-amber-500/20 text-amber-300 border border-amber-500/30 shadow-[0_0_12px_rgba(245,158,11,0.15)]"
+            : "text-gray-400 hover:bg-white/5 hover:text-gray-200"
             }`}
         >
           <DollarSign className="w-4 h-4" />
@@ -1665,9 +1665,9 @@ export default function WorkerDashboard({ user }) {
                                 {event.type || "Producción técnica"}
                               </span>
                               <span className={`text-[10px] px-2 py-0.5 rounded border font-semibold ${priorityName === "Crítica" ? "bg-red-500/20 text-red-300 border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.1)]" :
-                                  priorityName === "Alta" ? "bg-amber-500/20 text-amber-300 border-amber-500/30" :
-                                    priorityName === "Media" ? "bg-blue-500/20 text-blue-300 border-blue-500/30" :
-                                      "bg-gray-500/20 text-gray-400 border-gray-500/30"
+                                priorityName === "Alta" ? "bg-amber-500/20 text-amber-300 border-amber-500/30" :
+                                  priorityName === "Media" ? "bg-blue-500/20 text-blue-300 border-blue-500/30" :
+                                    "bg-gray-500/20 text-gray-400 border-gray-500/30"
                                 }`}>
                                 Prioridad {priorityName}
                               </span>
@@ -1773,11 +1773,10 @@ export default function WorkerDashboard({ user }) {
                                     whileTap={!checkInDisabled ? { scale: 0.98 } : {}}
                                     onClick={() => handleMarkCheckIn(event.id, event.assignment_id)}
                                     disabled={checkInDisabled || loadingAttendanceId === `in-${event.assignment_id}`}
-                                    className={`flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-extrabold transition-all duration-300 shrink-0 select-none ${
-                                      checkInDisabled
+                                    className={`flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-extrabold transition-all duration-300 shrink-0 select-none ${checkInDisabled
                                         ? "bg-gray-800/40 text-gray-500 border border-gray-700/50 cursor-not-allowed"
                                         : "bg-amber-500/20 text-amber-300 hover:bg-amber-500 hover:text-gray-900 border border-amber-500/50 shadow-md"
-                                    }`}
+                                      }`}
                                   >
                                     {loadingAttendanceId === `in-${event.assignment_id}` ? (
                                       <span className="w-4 h-4 border-2 border-amber-300 border-t-transparent rounded-full animate-spin" />
@@ -1803,11 +1802,10 @@ export default function WorkerDashboard({ user }) {
                                     whileTap={{ scale: 0.98 }}
                                     onClick={() => handleMarkCheckOut(event.id, event.assignment_id)}
                                     disabled={checkOutDisabled || loadingAttendanceId === `out-${event.assignment_id}`}
-                                    className={`flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-extrabold transition-all duration-300 border shadow-md shrink-0 select-none ${
-                                      checkOutDisabled
+                                    className={`flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-extrabold transition-all duration-300 border shadow-md shrink-0 select-none ${checkOutDisabled
                                         ? "bg-gray-800/40 text-gray-500 border-gray-700/50 cursor-not-allowed"
                                         : "bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500 hover:text-gray-900 border-emerald-500/50"
-                                    }`}
+                                      }`}
                                   >
                                     {loadingAttendanceId === `out-${event.assignment_id}` ? (
                                       <span className="w-4 h-4 border-2 border-emerald-300 border-t-transparent rounded-full animate-spin" />
@@ -1899,8 +1897,8 @@ export default function WorkerDashboard({ user }) {
                           {isEventCompleted && (
                             <div className="flex flex-col gap-1 w-full sm:flex-1 lg:flex-none lg:w-44">
                               <span className={`flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl border font-extrabold text-xs shadow-inner text-center tracking-wide ${isConfirmed ? 'bg-emerald-500/5 text-emerald-400/60 border-emerald-500/10' :
-                                  isRejected ? 'bg-red-500/5 text-red-400/60 border-red-500/10' :
-                                    'bg-gray-500/5 text-gray-400/60 border-gray-500/10'
+                                isRejected ? 'bg-red-500/5 text-red-400/60 border-red-500/10' :
+                                  'bg-gray-500/5 text-gray-400/60 border-gray-500/10'
                                 }`}>
                                 {isConfirmed ? '✓ Asistió' : isRejected ? '✗ No Asistió' : 'Sin respuesta'}
                               </span>
@@ -2318,18 +2316,16 @@ export default function WorkerDashboard({ user }) {
             <motion.div variants={itemVariants} className="flex items-center gap-2 bg-gray-900/60 p-1.5 rounded-xl border border-white/5 max-w-sm mb-4">
               <button
                 onClick={() => setFinanceSection("events")}
-                className={`flex-1 py-2 px-3 rounded-lg text-xs font-extrabold transition-all flex items-center justify-center gap-1.5 ${
-                  financeSection === "events" ? "bg-amber-500/20 text-amber-300 border border-amber-500/20 shadow-[0_0_12px_rgba(245,158,11,0.1)]" : "text-gray-400 hover:text-gray-200"
-                }`}
+                className={`flex-1 py-2 px-3 rounded-lg text-xs font-extrabold transition-all flex items-center justify-center gap-1.5 ${financeSection === "events" ? "bg-amber-500/20 text-amber-300 border border-amber-500/20 shadow-[0_0_12px_rgba(245,158,11,0.1)]" : "text-gray-400 hover:text-gray-200"
+                  }`}
               >
                 <DollarSign className="w-3.5 h-3.5" />
                 Honorarios Eventos
               </button>
               <button
                 onClick={() => setFinanceSection("expenses")}
-                className={`flex-1 py-2 px-3 rounded-lg text-xs font-extrabold transition-all flex items-center justify-center gap-1.5 ${
-                  financeSection === "expenses" ? "bg-amber-500/20 text-amber-300 border border-amber-500/20 shadow-[0_0_12px_rgba(245,158,11,0.1)]" : "text-gray-400 hover:text-gray-200"
-                }`}
+                className={`flex-1 py-2 px-3 rounded-lg text-xs font-extrabold transition-all flex items-center justify-center gap-1.5 ${financeSection === "expenses" ? "bg-amber-500/20 text-amber-300 border border-amber-500/20 shadow-[0_0_12px_rgba(245,158,11,0.1)]" : "text-gray-400 hover:text-gray-200"
+                  }`}
               >
                 <FileText className="w-3.5 h-3.5" />
                 Viáticos y Gastos
@@ -2403,7 +2399,7 @@ export default function WorkerDashboard({ user }) {
                     <div>
                       <h3 className="text-lg font-bold text-white flex items-center gap-2">
                         <Layers className="w-5 h-5 text-amber-400" />
-                        Control de Boletas SII (Lotes de Validación Consolidada V3)
+                        Control de Boletas SII (Lotes de Validación Consolidada V3.6)
                       </h3>
                       <p className="text-xs text-gray-400">
                         Administración agrupa tus eventos completados en un solo período para validación ágil y transferencias masivas.
@@ -2426,7 +2422,7 @@ export default function WorkerDashboard({ user }) {
                       groupedInvoicePeriods.map(period => {
                         const activeBatch = period.activeBatch;
                         const rate = parseFloat(retentionRateSetting || 15.25);
-                        
+
                         const liquidAmount = activeBatch ? parseFloat(activeBatch.total_liquid_amount) : period.total_liquid;
                         const grossExpected = activeBatch ? parseFloat(activeBatch.expected_gross_amount) : Math.round(liquidAmount / (1 - (rate / 100)));
                         const retentionEstimated = activeBatch ? parseFloat(activeBatch.estimated_retention) : (grossExpected - liquidAmount);
@@ -2435,7 +2431,7 @@ export default function WorkerDashboard({ user }) {
                         if (period.status === "Pagada") {
                           // Estado Pagada (Verde/Historial)
                           return (
-                            <GlassCard 
+                            <GlassCard
                               key={period.period_key}
                               className="p-6 border border-emerald-500/10 relative overflow-hidden bg-gradient-to-br from-emerald-500/[0.01] to-transparent shadow-sm opacity-85 hover:opacity-100 transition-all duration-300"
                             >
@@ -2489,7 +2485,7 @@ export default function WorkerDashboard({ user }) {
                         if (period.status === "Falta boleta") {
                           // Estado Falta Boleta (Naranja/Amber)
                           return (
-                            <GlassCard 
+                            <GlassCard
                               key={period.period_key}
                               className="p-6 border border-amber-500/20 relative overflow-hidden bg-gradient-to-br from-amber-500/[0.03] to-transparent shadow-[0_0_24px_rgba(245,158,11,0.02)]"
                             >
@@ -2543,33 +2539,30 @@ export default function WorkerDashboard({ user }) {
                         // Estado Boleta Recibida / En Proceso de Pago (Azul/Teal)
                         const isVerified = period.status === "En proceso de pago";
                         return (
-                          <GlassCard 
+                          <GlassCard
                             key={period.period_key}
-                            className={`p-6 border relative overflow-hidden bg-gradient-to-br shadow-sm transition-all duration-300 ${
-                              isVerified 
-                                ? 'border-teal-500/20 from-teal-500/[0.03] to-transparent shadow-[0_0_24px_rgba(20,184,166,0.02)]' 
+                            className={`p-6 border relative overflow-hidden bg-gradient-to-br shadow-sm transition-all duration-300 ${isVerified
+                                ? 'border-teal-500/20 from-teal-500/[0.03] to-transparent shadow-[0_0_24px_rgba(20,184,166,0.02)]'
                                 : 'border-indigo-500/20 from-indigo-500/[0.03] to-transparent shadow-[0_0_24px_rgba(99,102,241,0.02)]'
-                            }`}
+                              }`}
                           >
                             <div className="absolute top-0 right-0 p-4">
-                              <span className={`px-2.5 py-1 rounded text-[10px] font-black uppercase tracking-wider flex items-center gap-1 ${
-                                isVerified 
-                                  ? 'bg-teal-500/15 border border-teal-500/30 text-teal-300' 
+                              <span className={`px-2.5 py-1 rounded text-[10px] font-black uppercase tracking-wider flex items-center gap-1 ${isVerified
+                                  ? 'bg-teal-500/15 border border-teal-500/30 text-teal-300'
                                   : 'bg-indigo-500/15 border border-indigo-500/30 text-indigo-300'
-                              }`}>
+                                }`}>
                                 <span className={`w-1.5 h-1.5 rounded-full ${isVerified ? 'bg-teal-400 animate-pulse' : 'bg-indigo-400 animate-pulse'}`} />
                                 {isVerified ? "En Proceso de Pago" : "Boleta Recibida"}
                               </span>
                             </div>
 
-                            <h4 className={`text-sm font-black flex items-center gap-1.5 mb-1.5 uppercase tracking-wider ${
-                              isVerified ? 'text-teal-300' : 'text-indigo-300'
-                            }`}>
+                            <h4 className={`text-sm font-black flex items-center gap-1.5 mb-1.5 uppercase tracking-wider ${isVerified ? 'text-teal-300' : 'text-indigo-300'
+                              }`}>
                               Boleta {period.period_label}
                             </h4>
                             <p className="text-[10px] text-gray-400 mb-4 leading-relaxed">
-                              {isVerified 
-                                ? "Boleta consolidada validada con éxito. Los pagos están autorizados para transferencia masiva." 
+                              {isVerified
+                                ? "Boleta consolidada validada con éxito. Los pagos están autorizados para transferencia masiva."
                                 : "Tu boleta consolidada ha sido cargada y está pendiente de validación formal administrativa."
                               }
                             </p>
@@ -2677,8 +2670,8 @@ export default function WorkerDashboard({ user }) {
                                     </td>
                                     <td className="py-3.5 px-4 text-center">
                                       <span className={`px-2.5 py-1 rounded-full text-2xs font-extrabold border ${isPaid
-                                          ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
-                                          : 'bg-red-500/10 border-red-500/30 text-red-400'
+                                        ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                                        : 'bg-red-500/10 border-red-500/30 text-red-400'
                                         }`}>
                                         {isPaid ? "Pagado" : "Pendiente"}
                                       </span>

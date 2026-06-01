@@ -94,7 +94,7 @@ export default function Finanzas() {
 
   // Enmascaramiento de Cuentas Bancarias (Shoulder-Surfing prevention)
   const [revealedAccounts, setRevealedAccounts] = useState({});
-  
+
   // Estados de Gestión de Viáticos y Reembolsos (Módulo Administrativo)
   const [expenses, setExpenses] = useState([]);
   const [adminTab, setAdminTab] = useState("nominas"); // "nominas" | "viaticos"
@@ -186,7 +186,7 @@ export default function Finanzas() {
     } catch (err) {
       console.warn("Deno Edge Function IMAP direct connection fallback to CLI guide...", err);
       toast.dismiss(searchToast);
-      
+
       // Mostrar una notificación de ayuda limpia e informativa al usuario sin contaminar con datos de prueba
       toast(
         (t) => (
@@ -207,7 +207,7 @@ export default function Finanzas() {
         ),
         { duration: 12000, icon: '💡' }
       );
-      
+
       // Refrescar los registros reales existentes sincronizados por la terminal local
       fetchDetectedInvoices();
       fetchPayments();
@@ -361,7 +361,7 @@ export default function Finanzas() {
       const dateStr = p.event_date || p.date || "";
       const periodKey = dateStr.substring(0, 7) || new Date().toISOString().substring(0, 7); // "YYYY-MM"
       const groupKey = `${p.staff_rut || p.staff_id}_${periodKey}`;
-      
+
       if (!p.staff_rut && !p.staff_id) return;
 
       if (!groups[groupKey]) {
@@ -376,7 +376,7 @@ export default function Finanzas() {
           invoice_required: false
         };
       }
-      
+
       groups[groupKey].payments.push(p);
       groups[groupKey].total_liquid += parseFloat(p.monto) || 0;
       if (p.invoice_required) {
@@ -393,7 +393,7 @@ export default function Finanzas() {
       const allReceived = requiredPayments.length > 0 && requiredPayments.every(p => p.invoice_received);
       const someReceived = requiredPayments.some(p => p.invoice_received);
 
-      let batchStatus = "pending"; 
+      let batchStatus = "pending";
       let activeBatch = null;
 
       if (!g.invoice_required) {
@@ -405,7 +405,7 @@ export default function Finanzas() {
         const fechaVal = requiredPayments.find(p => p.invoice_received_at)?.invoice_received_at || "";
         const notes = requiredPayments.find(p => p.invoice_notes)?.invoice_notes || "";
         const amount = requiredPayments.reduce((sum, p) => sum + (p.invoice_amount || 0), 0);
-        
+
         activeBatch = {
           invoice_number: invoiceNum,
           invoice_amount: amount,
@@ -478,7 +478,7 @@ export default function Finanzas() {
     setSelectedInvoicePayment(payment);
     setInvoiceFormNum(payment.invoice_number || "");
     setInvoiceFormDate(payment.invoice_received_at ? new Date(payment.invoice_received_at).toISOString().split("T")[0] : new Date().toISOString().split("T")[0]);
-    
+
     // Calcular bruto sugerido basado en la tasa de retención cargada
     const rate = parseFloat(retentionRateSetting || 15.25) / 100;
     const brutoSugerido = Math.round(payment.monto / (1 - rate));
@@ -759,7 +759,7 @@ export default function Finanzas() {
       const diffText = diferencia === 0 ? "Sin diferencia" : `${diferencia > 0 ? "+" : ""}$${diferencia.toLocaleString("es-CL")} CLP`;
       const verificadoPor = p.invoice_verified_by_name || 'Admin';
       const fechaVal = p.invoice_received_at ? new Date(p.invoice_received_at).toLocaleDateString("es-CL") : 'No registrada';
-      
+
       const tooltipText = `Detalles Tributarios:\n` +
         `- Líquido Pactado: $${p.monto.toLocaleString("es-CL")} CLP\n` +
         `- Retención SII (${rate}%): $${retencionEstimada.toLocaleString("es-CL")} CLP\n` +
@@ -772,7 +772,7 @@ export default function Finanzas() {
         `${p.invoice_notes ? '\n- Notas: ' + p.invoice_notes : ''}`;
 
       return (
-        <span 
+        <span
           className="px-2.5 py-0.5 rounded-full text-2xs font-extrabold bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 cursor-help select-none"
           title={p.invoice_received ? tooltipText : "Pago procesado y finalizado"}
         >
@@ -790,7 +790,7 @@ export default function Finanzas() {
       const diffText = diferencia === 0 ? "Sin diferencia" : `${diferencia > 0 ? "+" : ""}$${diferencia.toLocaleString("es-CL")} CLP`;
       const verificadoPor = p.invoice_verified_by_name || 'Admin';
       const fechaVal = p.invoice_received_at ? new Date(p.invoice_received_at).toLocaleDateString("es-CL") : 'No registrada';
-      
+
       const tooltipText = `Detalles Tributarios:\n` +
         `- Líquido Pactado: $${p.monto.toLocaleString("es-CL")} CLP\n` +
         `- Retención SII (${rate}%): $${retencionEstimada.toLocaleString("es-CL")} CLP\n` +
@@ -803,7 +803,7 @@ export default function Finanzas() {
         `${p.invoice_notes ? '\n- Notas: ' + p.invoice_notes : ''}`;
 
       return (
-        <span 
+        <span
           className="px-2.5 py-0.5 rounded-full text-2xs font-extrabold bg-blue-500/10 border border-blue-500/30 text-blue-300 cursor-help flex items-center gap-1"
           title={tooltipText}
         >
@@ -883,7 +883,7 @@ export default function Finanzas() {
         const { data: settingsData } = await supabase
           .from("app_settings")
           .select("*");
-        
+
         if (settingsData) {
           const rateRow = settingsData.find(s => s.key === "honorarios_retention_rate");
           if (rateRow && rateRow.value && rateRow.value.rate !== undefined) {
@@ -969,7 +969,7 @@ export default function Finanzas() {
       const { data: attLogs } = await supabase
         .from("event_attendance_logs")
         .select("*");
-      
+
       const attMap = {};
       if (attLogs) {
         attLogs.forEach(log => {
@@ -1055,50 +1055,50 @@ export default function Finanzas() {
         const formatted = assignments.map(a => {
           const defaultRate = a.profiles?.monto_transferencia ? parseFloat(a.profiles.monto_transferencia) : 25000;
           const rate = a.custom_rate ? parseFloat(a.custom_rate) : defaultRate;
-          
+
           const day = a.event_days;
           const parent = a.events || {};
-          
+
           const eventStatus = day ? (day.status ? day.status.toLowerCase() : "") : (parent.status ? parent.status.toLowerCase() : "");
           const dayDate = day ? day.date : parent.date;
-          
+
           const todayStr = new Date().toLocaleDateString("en-CA");
           const isDateFinished = dayDate ? dayDate <= todayStr : false;
           const isFinished = eventStatus === "completado" || eventStatus === "finalizado" || isDateFinished;
-          
+
           // Indexar log de asistencia por event_day_id o en su defecto por parent event_id
           const attKey = a.event_day_id ? `${a.event_day_id}-${a.profiles?.id}` : `${parent.id}-${a.profiles?.id}`;
           const attLog = attMap[attKey];
 
           return {
-              id: a.id,
-              event_name: parent.name || "Sin Nombre",
-              event_date: dayDate || "",
-              is_finished: isFinished,
-              staff_id: a.profiles?.id || "",
-              staff_name: a.profiles?.name || "Personal Desconocido",
-              staff_rut: a.profiles?.rut || "",
-              staff_email: a.profiles?.email || "",
-              staff_role: a.profiles?.role || "",
-              cuenta_origen: a.profiles?.cuenta_origen || "",
-              cuenta_destino: a.profiles?.cuenta_destino || "",
-              codigo_banco_destino: a.profiles?.codigo_banco_destino || "",
-              glosa_transferencia: a.profiles?.glosa_transferencia || "",
-              mensaje_beneficiario: a.profiles?.mensaje_beneficiario || "",
-              banco_name: BANCOS_CHILE[a.profiles?.codigo_banco_destino] || "Banco No Registrado",
-              monto: rate,
-              status: a.payment_status || "Pendiente",
-              assignment_status: a.status,
-              attendance_log: attLog,
-              invoice_required: a.invoice_required !== undefined ? a.invoice_required : true,
-              invoice_received: a.invoice_received !== undefined ? a.invoice_received : false,
-              invoice_number: a.invoice_number || null,
-              invoice_received_at: a.invoice_received_at || null,
-              invoice_amount: a.invoice_amount ? parseFloat(a.invoice_amount) : null,
-              invoice_verified_by: a.invoice_verified_by || null,
-              invoice_verified_by_name: a.verifier?.name || null,
-              invoice_notes: a.invoice_notes || null
-            };
+            id: a.id,
+            event_name: parent.name || "Sin Nombre",
+            event_date: dayDate || "",
+            is_finished: isFinished,
+            staff_id: a.profiles?.id || "",
+            staff_name: a.profiles?.name || "Personal Desconocido",
+            staff_rut: a.profiles?.rut || "",
+            staff_email: a.profiles?.email || "",
+            staff_role: a.profiles?.role || "",
+            cuenta_origen: a.profiles?.cuenta_origen || "",
+            cuenta_destino: a.profiles?.cuenta_destino || "",
+            codigo_banco_destino: a.profiles?.codigo_banco_destino || "",
+            glosa_transferencia: a.profiles?.glosa_transferencia || "",
+            mensaje_beneficiario: a.profiles?.mensaje_beneficiario || "",
+            banco_name: BANCOS_CHILE[a.profiles?.codigo_banco_destino] || "Banco No Registrado",
+            monto: rate,
+            status: a.payment_status || "Pendiente",
+            assignment_status: a.status,
+            attendance_log: attLog,
+            invoice_required: a.invoice_required !== undefined ? a.invoice_required : true,
+            invoice_received: a.invoice_received !== undefined ? a.invoice_received : false,
+            invoice_number: a.invoice_number || null,
+            invoice_received_at: a.invoice_received_at || null,
+            invoice_amount: a.invoice_amount ? parseFloat(a.invoice_amount) : null,
+            invoice_verified_by: a.invoice_verified_by || null,
+            invoice_verified_by_name: a.verifier?.name || null,
+            invoice_notes: a.invoice_notes || null
+          };
         }).filter(a => a.assignment_status === "Confirmado" || a.assignment_status === "Aceptado");
 
         // Consolidación transparente
@@ -1190,7 +1190,7 @@ export default function Finanzas() {
       toast.error("Esta solicitud no cuenta con un comprobante adjunto.");
       return;
     }
-    
+
     // Open a blank window synchronously to bypass iOS Safari's popup blocker
     const newWindow = window.open("about:blank", "_blank");
     if (newWindow) {
@@ -1298,8 +1298,8 @@ export default function Finanzas() {
 
   const handleSelectAll = () => {
     // Only select pending payments that do not have a missing invoice
-    const pendingPayments = filteredPayments.filter(p => 
-      p.status !== "Pagado" && 
+    const pendingPayments = filteredPayments.filter(p =>
+      p.status !== "Pagado" &&
       !(p.invoice_required && !p.invoice_received)
     );
     if (selectedIds.length === pendingPayments.length) {
@@ -1938,7 +1938,7 @@ export default function Finanzas() {
 
       const filterStr = statusFilter === "all" ? "TODOS" : statusFilter === "paid" ? "PAGADOS" : "PENDIENTES";
       const fileName = `REPORTE_FINANZAS_${filterStr}_${new Date().toISOString().slice(0, 10)}.xlsx`;
-      
+
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
@@ -2124,27 +2124,24 @@ export default function Finanzas() {
       <div className="relative z-10 flex items-center gap-2 bg-gray-900/60 p-1.5 rounded-xl border border-white/5 w-full max-w-lg mb-6">
         <button
           onClick={() => setAdminTab("nominas")}
-          className={`flex-1 py-2.5 px-3 rounded-lg text-xs font-extrabold transition-all duration-150 flex items-center justify-center gap-1.5 cursor-pointer active:bg-amber-500/30 active:opacity-90 ${
-            adminTab === "nominas" ? "bg-amber-500/20 text-amber-300 border border-amber-500/20 shadow-[0_0_12px_rgba(245,158,11,0.15)]" : "text-gray-400 hover:text-gray-200"
-          }`}
+          className={`flex-1 py-2.5 px-3 rounded-lg text-xs font-extrabold transition-all duration-150 flex items-center justify-center gap-1.5 cursor-pointer active:bg-amber-500/30 active:opacity-90 ${adminTab === "nominas" ? "bg-amber-500/20 text-amber-300 border border-amber-500/20 shadow-[0_0_12px_rgba(245,158,11,0.15)]" : "text-gray-400 hover:text-gray-200"
+            }`}
         >
           <DollarSign className="w-3.5 h-3.5 text-amber-400" />
           Nóminas y Pagos
         </button>
         <button
           onClick={() => setAdminTab("viaticos")}
-          className={`flex-1 py-2.5 px-3 rounded-lg text-xs font-extrabold transition-all duration-150 flex items-center justify-center gap-1.5 cursor-pointer active:bg-amber-500/30 active:opacity-90 ${
-            adminTab === "viaticos" ? "bg-amber-500/20 text-amber-300 border border-amber-500/20 shadow-[0_0_12px_rgba(245,158,11,0.15)]" : "text-gray-400 hover:text-gray-200"
-          }`}
+          className={`flex-1 py-2.5 px-3 rounded-lg text-xs font-extrabold transition-all duration-150 flex items-center justify-center gap-1.5 cursor-pointer active:bg-amber-500/30 active:opacity-90 ${adminTab === "viaticos" ? "bg-amber-500/20 text-amber-300 border border-amber-500/20 shadow-[0_0_12px_rgba(245,158,11,0.15)]" : "text-gray-400 hover:text-gray-200"
+            }`}
         >
           <FileText className="w-3.5 h-3.5 text-amber-400" />
           Aprobación Viáticos
         </button>
         <button
           onClick={() => setAdminTab("boletas_detectadas")}
-          className={`flex-1 py-2.5 px-3 rounded-lg text-xs font-extrabold transition-all duration-150 flex items-center justify-center gap-1.5 cursor-pointer active:bg-amber-500/30 active:opacity-90 ${
-            adminTab === "boletas_detectadas" ? "bg-amber-500/20 text-amber-300 border border-amber-500/20 shadow-[0_0_12px_rgba(245,158,11,0.15)]" : "text-gray-400 hover:text-gray-200"
-          }`}
+          className={`flex-1 py-2.5 px-3 rounded-lg text-xs font-extrabold transition-all duration-150 flex items-center justify-center gap-1.5 cursor-pointer active:bg-amber-500/30 active:opacity-90 ${adminTab === "boletas_detectadas" ? "bg-amber-500/20 text-amber-300 border border-amber-500/20 shadow-[0_0_12px_rgba(245,158,11,0.15)]" : "text-gray-400 hover:text-gray-200"
+            }`}
         >
           <Inbox className="w-3.5 h-3.5 text-amber-400" />
           Boletas SII
@@ -2293,11 +2290,11 @@ export default function Finanzas() {
           <motion.div variants={itemVariants} className="mb-8">
             <GlassCard className="p-6 border border-white/5 relative overflow-hidden bg-gray-900/60 backdrop-blur-xl rounded-3xl">
               <div className="absolute top-0 right-0 w-80 h-80 bg-amber-500/5 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none"></div>
-              
+
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-5 pb-4 border-b border-white/5">
                 <div>
                   <h3 className="text-base font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-amber-200 to-amber-400 flex items-center gap-2 uppercase tracking-wide">
-                    📋 Control de Boletas por Trabajador (SII Lotes V3)
+                    📋 Control de Boletas por Trabajador (SII Lotes V3.6)
                   </h3>
                   <p className="text-2xs text-gray-400 mt-0.5">
                     Toda la app trabaja visualmente en líquidos, pero aquí puedes verificar la boleta combinada emitida por el total de eventos de cada staff.
@@ -2363,7 +2360,7 @@ export default function Finanzas() {
                                 }
                                 if (group.batchStatus === "verified") {
                                   return (
-                                    <span 
+                                    <span
                                       className="px-2.5 py-1 rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-2xs font-extrabold cursor-help whitespace-nowrap"
                                       title={`Boleta verified: Nº ${group.activeBatch?.invoice_number || ""}\nMonto: $${(group.activeBatch?.invoice_amount || 0).toLocaleString("es-CL")}\nFecha: ${group.activeBatch?.invoice_received_at ? new Date(group.activeBatch.invoice_received_at).toLocaleDateString("es-CL") : ""}\nNotas: ${group.activeBatch?.invoice_notes || ""}`}
                                     >
@@ -2552,9 +2549,9 @@ export default function Finanzas() {
                               {p.status === "Pagado" ? (
                                 <CheckSquare className="w-5 h-5 text-gray-600/50 cursor-not-allowed" title="Ya está pagado" />
                               ) : p.invoice_required && !p.invoice_received ? (
-                                <Square 
-                                  className="w-5 h-5 text-red-500/30 cursor-not-allowed" 
-                                  title="Falta boleta de honorarios. No se puede seleccionar para pago." 
+                                <Square
+                                  className="w-5 h-5 text-red-500/30 cursor-not-allowed"
+                                  title="Falta boleta de honorarios. No se puede seleccionar para pago."
                                 />
                               ) : (
                                 <button
@@ -2594,11 +2591,10 @@ export default function Finanzas() {
                                   ${(parseFloat(p?.monto) || 0).toLocaleString("es-CL")}
                                 </span>
                                 {!p.is_expense && p.attendance_log && (
-                                  <span className={`text-[10px] mt-1 font-bold inline-flex items-center gap-1 cursor-help ${
-                                    p.attendance_log.is_complete 
-                                      ? "text-emerald-400" 
-                                      : "text-amber-400 animate-pulse"
-                                  }`} title={p.attendance_log.is_complete ? "Jornada completa registrada" : "Jornada incompleta o salida pendiente"}>
+                                  <span className={`text-[10px] mt-1 font-bold inline-flex items-center gap-1 cursor-help ${p.attendance_log.is_complete
+                                    ? "text-emerald-400"
+                                    : "text-amber-400 animate-pulse"
+                                    }`} title={p.attendance_log.is_complete ? "Jornada completa registrada" : "Jornada incompleta o salida pendiente"}>
                                     ⏱️ {Math.floor(p.attendance_log.total_duration_minutes / 60)}h {p.attendance_log.total_duration_minutes % 60}m
                                     {p.attendance_log.verified_by_admin && " (✍️)"}
                                   </span>
@@ -2647,8 +2643,8 @@ export default function Finanzas() {
                             </td>
                             <td className="py-4 px-6 text-center">
                               <span className={`px-3 py-1.5 rounded-full text-xs font-extrabold shadow-sm border ${p.status === "Pagado"
-                                  ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
-                                  : 'bg-red-500/10 border-red-500/30 text-red-400'
+                                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                                : 'bg-red-500/10 border-red-500/30 text-red-400'
                                 }`}>
                                 {p.status}
                               </span>
@@ -2682,11 +2678,10 @@ export default function Finanzas() {
                     const batchPeriod = batch ? batch.period_label : null;
 
                     return (
-                       <GlassCard
+                      <GlassCard
                         key={p.id}
-                        className={`p-5 transition-all duration-200 flex flex-col gap-4 border select-none ${
-                          isSelected ? "border-amber-500/50 bg-amber-500/[0.03]" : "border-white/5 bg-gray-900/30"
-                        } ${p.status === "Pagado" ? "opacity-70" : ""}`}
+                        className={`p-5 transition-all duration-200 flex flex-col gap-4 border select-none ${isSelected ? "border-amber-500/50 bg-amber-500/[0.03]" : "border-white/5 bg-gray-900/30"
+                          } ${p.status === "Pagado" ? "opacity-70" : ""}`}
                       >
                         {/* Fila Superior: Checkbox / Nombre / RUT / Estado */}
                         <div className="flex items-start justify-between gap-3">
@@ -2694,8 +2689,8 @@ export default function Finanzas() {
                             {p.status === "Pagado" ? (
                               <CheckSquare className="w-6 h-6 text-gray-600/50 shrink-0" />
                             ) : p.invoice_required && !p.invoice_received ? (
-                              <Square 
-                                className="w-6 h-6 text-red-500/30 shrink-0 cursor-not-allowed" 
+                              <Square
+                                className="w-6 h-6 text-red-500/30 shrink-0 cursor-not-allowed"
                                 title="Falta boleta de honorarios. No se puede seleccionar."
                               />
                             ) : (
@@ -2726,11 +2721,10 @@ export default function Finanzas() {
                             </div>
                           </div>
 
-                          <span className={`px-2.5 py-1 rounded-full text-[10px] font-extrabold shadow-sm border shrink-0 ${
-                            p.status === "Pagado"
-                              ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
-                              : 'bg-red-500/10 border-red-500/30 text-red-400'
-                          }`}>
+                          <span className={`px-2.5 py-1 rounded-full text-[10px] font-extrabold shadow-sm border shrink-0 ${p.status === "Pagado"
+                            ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                            : 'bg-red-500/10 border-red-500/30 text-red-400'
+                            }`}>
                             {p.status}
                           </span>
                         </div>
@@ -2810,11 +2804,10 @@ export default function Finanzas() {
                           <div className="flex flex-col">
                             <span className="text-[10px] text-gray-500 uppercase font-bold tracking-wider">Monto a Transferir</span>
                             {!p.is_expense && p.attendance_log && (
-                              <span className={`text-[9px] mt-0.5 font-extrabold inline-flex items-center gap-1 ${
-                                p.attendance_log.is_complete 
-                                  ? "text-emerald-400" 
-                                  : "text-amber-400 animate-pulse"
-                              }`}>
+                              <span className={`text-[9px] mt-0.5 font-extrabold inline-flex items-center gap-1 ${p.attendance_log.is_complete
+                                ? "text-emerald-400"
+                                : "text-amber-400 animate-pulse"
+                                }`}>
                                 ⏱️ {Math.floor(p.attendance_log.total_duration_minutes / 60)}h {p.attendance_log.total_duration_minutes % 60}m
                                 {p.attendance_log.verified_by_admin && " (corregido)"}
                               </span>
@@ -2849,11 +2842,10 @@ export default function Finanzas() {
                       setExpenseStatusFilter(status);
                       setSelectedExpense(null);
                     }}
-                    className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all duration-150 cursor-pointer active:opacity-85 ${
-                      expenseStatusFilter === status
-                        ? "bg-amber-500 text-black shadow-lg shadow-amber-500/20"
-                        : "bg-gray-800/60 text-gray-400 hover:text-white"
-                    }`}
+                    className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all duration-150 cursor-pointer active:opacity-85 ${expenseStatusFilter === status
+                      ? "bg-amber-500 text-black shadow-lg shadow-amber-500/20"
+                      : "bg-gray-800/60 text-gray-400 hover:text-white"
+                      }`}
                   >
                     {label} ({count})
                   </button>
@@ -2888,30 +2880,27 @@ export default function Finanzas() {
                           setApprovedAmountInput(e.approved_amount || e.requested_amount || "");
                           setExpenseComment(e.admin_comment || "");
                         }}
-                        className={`p-5 transition-all cursor-pointer border ${
-                          isSelected
-                            ? "border-amber-500/50 bg-amber-500/[0.02]"
-                            : "border-white/5 hover:border-gray-700/80"
-                        }`}
+                        className={`p-5 transition-all cursor-pointer border ${isSelected
+                          ? "border-amber-500/50 bg-amber-500/[0.02]"
+                          : "border-white/5 hover:border-gray-700/80"
+                          }`}
                       >
                         <div className="flex justify-between items-start gap-4">
                           <div className="space-y-2 text-left">
                             <div className="flex items-center gap-2">
-                              <span className={`px-2.5 py-0.5 rounded-md text-[10px] font-extrabold uppercase tracking-wide border ${
-                                e.expense_type === "Viático" ? "bg-purple-500/10 border-purple-500/30 text-purple-400" :
+                              <span className={`px-2.5 py-0.5 rounded-md text-[10px] font-extrabold uppercase tracking-wide border ${e.expense_type === "Viático" ? "bg-purple-500/10 border-purple-500/30 text-purple-400" :
                                 e.expense_type === "Reembolso" ? "bg-teal-500/10 border-teal-500/30 text-teal-400" :
-                                e.expense_type === "Compra Operacional" ? "bg-sky-500/10 border-sky-500/30 text-sky-400" :
-                                "bg-gray-500/10 border-gray-500/30 text-gray-400"
-                              }`}>
+                                  e.expense_type === "Compra Operacional" ? "bg-sky-500/10 border-sky-500/30 text-sky-400" :
+                                    "bg-gray-500/10 border-gray-500/30 text-gray-400"
+                                }`}>
                                 {e.expense_type}
                               </span>
-                              <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold border ${
-                                e.status === "Pagado" ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400" :
+                              <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold border ${e.status === "Pagado" ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400" :
                                 e.status === "Aprobado" ? "bg-amber-500/10 border-amber-500/30 text-amber-400" :
-                                e.status === "En revisión" ? "bg-blue-500/10 border-blue-500/30 text-blue-400" :
-                                e.status === "Rechazado" ? "bg-red-500/10 border-red-500/30 text-red-400" :
-                                "bg-gray-500/10 border-gray-500/30 text-gray-400"
-                              }`}>
+                                  e.status === "En revisión" ? "bg-blue-500/10 border-blue-500/30 text-blue-400" :
+                                    e.status === "Rechazado" ? "bg-red-500/10 border-red-500/30 text-red-400" :
+                                      "bg-gray-500/10 border-gray-500/30 text-gray-400"
+                                }`}>
                                 {e.status}
                               </span>
                             </div>
@@ -3103,7 +3092,7 @@ export default function Finanzas() {
                 Las boletas válidas se auto-validan y liberan los lotes de pago correspondientes.
               </p>
             </div>
-            
+
             <div className="flex items-center gap-2 shrink-0">
               <button
                 onClick={triggerInvoiceSearch}
@@ -3113,7 +3102,7 @@ export default function Finanzas() {
                 <RefreshCw className={`w-3.5 h-3.5 ${isSearchingInvoices ? "animate-spin" : ""}`} />
                 <span>{isSearchingInvoices ? "Buscando..." : "Buscar boletas nuevas"}</span>
               </button>
-              
+
               <button
                 onClick={handleCleanInvoices}
                 className="px-3.5 py-2.5 bg-gray-800/80 hover:bg-gray-700 text-gray-300 hover:text-white text-xs font-bold rounded-xl transition-all border border-white/5 flex items-center gap-1.5 cursor-pointer"
@@ -3173,18 +3162,17 @@ export default function Finanzas() {
                   <button
                     key={f.value}
                     onClick={() => setDetectedFilter(f.value)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all duration-150 cursor-pointer ${
-                      detectedFilter === f.value
-                        ? "bg-amber-500 text-black font-extrabold shadow-md shadow-amber-500/10"
-                        : "bg-gray-800/50 text-gray-400 hover:text-white border border-transparent hover:border-white/5"
-                    }`}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all duration-150 cursor-pointer ${detectedFilter === f.value
+                      ? "bg-amber-500 text-black font-extrabold shadow-md shadow-amber-500/10"
+                      : "bg-gray-800/50 text-gray-400 hover:text-white border border-transparent hover:border-white/5"
+                      }`}
                   >
                     {f.label} ({count})
                   </button>
                 );
               })}
             </div>
-            
+
             <div className="text-[11px] text-gray-500 font-medium">
               Mostrando {detectedInvoices.filter(i => detectedFilter === "all" || i.match_status === detectedFilter).length} boletas detectadas
             </div>
@@ -3221,12 +3209,12 @@ export default function Finanzas() {
                       {detectedInvoices
                         .filter(i => detectedFilter === "all" || i.match_status === detectedFilter)
                         .map(invoice => {
-                          const scoreColor = invoice.confidence_score >= 90 
-                            ? "text-emerald-400 bg-emerald-500/10 border-emerald-500/20" 
-                            : invoice.confidence_score >= 60 
-                            ? "text-amber-400 bg-amber-500/10 border-amber-500/20" 
-                            : "text-red-400 bg-red-500/10 border-red-500/20";
-                          
+                          const scoreColor = invoice.confidence_score >= 90
+                            ? "text-emerald-400 bg-emerald-500/10 border-emerald-500/20"
+                            : invoice.confidence_score >= 60
+                              ? "text-amber-400 bg-amber-500/10 border-amber-500/20"
+                              : "text-red-400 bg-red-500/10 border-red-500/20";
+
                           return (
                             <tr key={invoice.id} className="hover:bg-white/5 transition-colors">
                               <td className="py-3.5 px-4">
@@ -3240,7 +3228,7 @@ export default function Finanzas() {
                                   </span>
                                 </div>
                               </td>
-                              
+
                               <td className="py-3.5 px-4 text-left">
                                 <div className="flex flex-col">
                                   <span className="font-extrabold text-gray-200 text-sm">{toTitleCase(invoice.issuer_name) || "Desconocido"}</span>
@@ -3322,7 +3310,7 @@ export default function Finanzas() {
                                       >
                                         Vincular
                                       </button>
-                                      
+
                                       <button
                                         onClick={() => handleRejectInvoice(invoice)}
                                         className="p-1.5 bg-red-500/10 hover:bg-red-500 text-red-400 hover:text-white border border-red-500/20 hover:border-transparent rounded-lg cursor-pointer transition-all"
@@ -3332,7 +3320,7 @@ export default function Finanzas() {
                                       </button>
                                     </>
                                   )}
-                                  
+
                                   <button
                                     onClick={() => {
                                       setSelectedDetailInvoice(invoice);
@@ -3394,7 +3382,7 @@ export default function Finanzas() {
                 const liquido = selectedInvoicePayment ? (parseFloat(selectedInvoicePayment.monto) || 0) : (parseFloat(selectedWorkerGroup.total_liquid) || 0);
                 const brutoEsperado = Math.round(liquido / (1 - (rate / 100)));
                 const retencionEstimada = brutoEsperado - liquido;
-                
+
                 const cleanFormAmount = parseFloat(String(invoiceFormAmount).replace(/\D/g, "")) || 0;
                 const difference = Math.abs(cleanFormAmount - brutoEsperado);
                 const hasDifference = difference > toleranceSetting;
@@ -3409,7 +3397,7 @@ export default function Finanzas() {
                       <span className="text-gray-500 font-bold uppercase tracking-wider block text-3xs">Resumen Tributario del Servicio</span>
                       <p className="text-gray-200 font-medium text-2xs">{detailLabel}</p>
                       <p className="text-gray-500 text-3xs">{detailDate}</p>
-                      
+
                       <div className="grid grid-cols-2 gap-3 pt-2 border-t border-white/5 mt-1.5 text-2xs">
                         <div>
                           <span className="text-gray-400 block font-semibold">Monto Líquido:</span>
@@ -3467,10 +3455,10 @@ export default function Finanzas() {
                           <span>Monto difiere del bruto esperado</span>
                         </div>
                         <p className="text-[10px] text-gray-300 leading-relaxed">
-                          La diferencia de <strong>${difference.toLocaleString("es-CL")} CLP</strong> supera la tolerancia máxima permitida (${toleranceSetting} CLP). 
+                          La diferencia de <strong>${difference.toLocaleString("es-CL")} CLP</strong> supera la tolerancia máxima permitida (${toleranceSetting} CLP).
                           <strong> Es obligatorio escribir una justificación en las Notas/Observaciones</strong> y marcar la casilla de confirmación para habilitar la liberación del pago.
                         </p>
-                        
+
                         <label className="flex items-start gap-2 bg-amber-500/5 p-2 rounded-lg border border-amber-500/10 cursor-pointer select-none">
                           <input
                             type="checkbox"
@@ -3751,7 +3739,7 @@ export default function Finanzas() {
               <label className="block text-2xs font-extrabold text-gray-300 uppercase tracking-wide">
                 Selecciona Lote Tributario Pendiente
               </label>
-              
+
               {workerInvoiceGroups.filter(
                 g => g.staff_rut === selectedDetectedInvoice.issuer_rut && g.batchStatus !== "verified"
               ).length === 0 ? (
@@ -3905,13 +3893,12 @@ export default function Finanzas() {
               </div>
               <div className="text-right shrink-0">
                 <span className="text-gray-500 font-bold block text-3xs uppercase">Confianza</span>
-                <span className={`px-2.5 py-1 rounded-full text-2xs font-extrabold border mt-1 inline-block ${
-                  selectedDetailInvoice.confidence_score >= 90 
-                    ? "text-emerald-400 bg-emerald-500/10 border-emerald-500/20" 
-                    : selectedDetailInvoice.confidence_score >= 60 
-                    ? "text-amber-400 bg-amber-500/10 border-amber-500/20" 
+                <span className={`px-2.5 py-1 rounded-full text-2xs font-extrabold border mt-1 inline-block ${selectedDetailInvoice.confidence_score >= 90
+                  ? "text-emerald-400 bg-emerald-500/10 border-emerald-500/20"
+                  : selectedDetailInvoice.confidence_score >= 60
+                    ? "text-amber-400 bg-amber-500/10 border-amber-500/20"
                     : "text-red-400 bg-red-500/10 border-red-500/20"
-                }`}>
+                  }`}>
                   {selectedDetailInvoice.confidence_score}%
                 </span>
               </div>
