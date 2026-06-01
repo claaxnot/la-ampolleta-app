@@ -98,7 +98,7 @@ export default function Finanzas() {
   // Estados de Gestión de Viáticos y Reembolsos (Módulo Administrativo)
   const [expenses, setExpenses] = useState([]);
   const [adminTab, setAdminTab] = useState("nominas"); // "nominas" | "viaticos"
-  const [expenseStatusFilter, setExpenseStatusFilter] = useState("Pendiente");
+  const [expenseStatusFilter, setExpenseStatusFilter] = useState("all");
   const [expenseComment, setExpenseComment] = useState("");
   const [selectedExpense, setSelectedExpense] = useState(null);
   const [submittingExpenseAction, setSubmittingExpenseAction] = useState(false);
