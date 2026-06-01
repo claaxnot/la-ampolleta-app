@@ -547,6 +547,18 @@ serve(async (req) => {
           throw new Error(`Error en RPC de auto-verificación de lote pre-existente: ${verifyRpcError.message}`);
         }
 
+        // Insertar notificación de boleta recibida
+        try {
+          await supabase.from('notifications').insert({
+            user_id: finalBatch.worker_id,
+            title: "🧾 Boleta Verificada",
+            description: `Tu boleta N° ${invoiceNumber} por $${invoiceAmount.toLocaleString("es-CL")} CLP para el periodo ${finalBatch.period_label} ha sido recibida y verificada con éxito automáticamente.`,
+            type: "success"
+          });
+        } catch (errNotif) {
+          console.warn("⚠️ [NOTIFICATIONS]: Error inserting batch auto-verification notification:", errNotif);
+        }
+
         await insertDetectedInvoice(supabase, {
           message_id: messageId,
           sender_email: sender,
@@ -728,6 +740,18 @@ serve(async (req) => {
 
         if (createRpcError) {
           throw new Error(`Error en RPC de auto-creación de lote transaccional: ${createRpcError.message}`);
+        }
+
+        // Insertar notificación de boleta recibida
+        try {
+          await supabase.from('notifications').insert({
+            user_id: targetWorkerId || staffIds[0],
+            title: "🧾 Boleta Verificada",
+            description: `Tu boleta N° ${invoiceNumber} por $${invoiceAmount.toLocaleString("es-CL")} CLP para el periodo ${invoicePeriod} ha sido recibida y verificada con éxito automáticamente.`,
+            type: "success"
+          });
+        } catch (errNotif) {
+          console.warn("⚠️ [NOTIFICATIONS]: Error inserting auto-create batch notification:", errNotif);
         }
 
         // Registrar la boleta detectada como auto_verified

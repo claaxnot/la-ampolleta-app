@@ -2623,7 +2623,7 @@ export default function WorkerDashboard({ user }) {
                       </h3>
 
                       <div className="overflow-x-auto">
-                        <table className="w-full text-left border-collapse text-sm">
+                        <table className="w-full min-w-[550px] text-left border-collapse text-sm">
                           <thead>
                             <tr className="border-b border-white/10 text-gray-400 text-xs font-semibold uppercase bg-white/5">
                               <th className="py-3 px-4">Evento</th>
@@ -2653,22 +2653,25 @@ export default function WorkerDashboard({ user }) {
                                     <td className="py-3.5 px-4 text-center">
                                       {event.invoice_required ? (
                                         event.invoice_received ? (
-                                          <span className="px-2.5 py-1 rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-2xs font-extrabold" title={event.invoice_received_at ? `Validada en lote el ${new Date(event.invoice_received_at).toLocaleDateString("es-CL")}` : ""}>
-                                            🟢 Lote Nº {event.invoice_number}
+                                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-2xs font-extrabold whitespace-nowrap" title={event.invoice_received_at ? `Validada en lote el ${new Date(event.invoice_received_at).toLocaleDateString("es-CL")}` : ""}>
+                                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
+                                            Lote Nº {event.invoice_number}
                                           </span>
                                         ) : (
-                                          <div className="flex flex-col items-center gap-0.5 justify-center">
-                                            <span className="px-2.5 py-1 rounded bg-amber-500/10 border border-amber-500/30 text-amber-400 text-2xs font-extrabold animate-pulse">
-                                              🔴 Falta Boleta
+                                          <div className="flex flex-col items-center gap-1 justify-center">
+                                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-amber-500/10 border border-amber-500/30 text-amber-400 text-2xs font-extrabold whitespace-nowrap animate-pulse">
+                                              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
+                                              Falta Boleta
                                             </span>
-                                            <span className="text-[10px] text-gray-500">
+                                            <span className="text-[9px] text-gray-500 whitespace-nowrap">
                                               enviar a contacto@laampolleta.tv
                                             </span>
                                           </div>
                                         )
                                       ) : (
-                                        <span className="px-2.5 py-1 rounded bg-gray-800 border border-white/10 text-gray-400 text-2xs font-extrabold">
-                                          ⚪ No requiere
+                                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-gray-800 border border-white/10 text-gray-400 text-2xs font-extrabold whitespace-nowrap">
+                                          <span className="w-1.5 h-1.5 rounded-full bg-gray-500 shrink-0" />
+                                          No requiere
                                         </span>
                                       )}
                                     </td>

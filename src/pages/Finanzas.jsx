@@ -275,6 +275,18 @@ export default function Finanzas() {
           .in("id", assignmentIds);
       }
 
+      // 4. Insertar notificación de boleta recibida
+      try {
+        await supabase.from('notifications').insert({
+          user_id: batch.worker_id,
+          title: "🧾 Boleta Verificada",
+          description: `Tu boleta N° ${detectedInvoice.invoice_number} por $${(parseFloat(detectedInvoice.invoice_amount) || 0).toLocaleString("es-CL")} CLP para el periodo ${batch.period_label} ha sido vinculada y verificada con éxito.`,
+          type: "success"
+        });
+      } catch (errNotif) {
+        console.warn("⚠️ [NOTIFICATIONS]: Error inserting notification in manual match:", errNotif);
+      }
+
       toast.success("¡Boleta vinculada y lote verificado con éxito!", { id: loadingToast });
       fetchDetectedInvoices();
       fetchPayments();
@@ -590,6 +602,18 @@ export default function Finanzas() {
           if (syncError) throw syncError;
         }
 
+        // D. Insertar notificación de boleta recibida
+        try {
+          await supabase.from('notifications').insert({
+            user_id: workerId,
+            title: "🧾 Boleta Verificada",
+            description: `Tu boleta N° ${invoiceNum} por $${cleanAmount.toLocaleString("es-CL")} CLP para el periodo ${selectedWorkerGroup.period_key} ha sido recibida y verificada con éxito.`,
+            type: "success"
+          });
+        } catch (errNotif) {
+          console.warn("⚠️ [NOTIFICATIONS]: Error inserting batch invoice verification notification:", errNotif);
+        }
+
       } else {
         // --- CASO 2: Validación Legacy Individual ---
         const { error } = await supabase
@@ -605,6 +629,18 @@ export default function Finanzas() {
           .eq("id", selectedInvoicePayment.id);
 
         if (error) throw error;
+
+        // Insertar notificación de boleta recibida
+        try {
+          await supabase.from('notifications').insert({
+            user_id: selectedInvoicePayment.staff_id,
+            title: "🧾 Boleta Verificada",
+            description: `Tu boleta N° ${invoiceNum} por $${cleanAmount.toLocaleString("es-CL")} CLP para el evento "${selectedInvoicePayment.event_name}" ha sido recibida y verificada.`,
+            type: "success"
+          });
+        } catch (errNotif) {
+          console.warn("⚠️ [NOTIFICATIONS]: Error inserting legacy invoice verification notification:", errNotif);
+        }
       }
 
       toast.success("¡Boleta verificada con éxito! Pagos liberados.", { id: loadingToast });
@@ -2745,15 +2781,15 @@ export default function Finanzas() {
 
                         {/* Fila Boleta Mobile */}
                         <div className="flex flex-col gap-2 pt-3 border-t border-white/5">
-                          <div className="flex items-center justify-between">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
                             <span className="text-[9px] text-gray-500 uppercase font-extrabold tracking-wider">Boleta de Honorarios</span>
-                            <div className="flex items-center gap-1.5 shrink-0">
+                            <div className="flex items-center gap-1.5 flex-wrap">
                               {renderInvoiceBadge(p)}
                             </div>
                           </div>
 
                           {batch && (
-                            <div className="flex items-center justify-between">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
                               <span className="text-[9px] text-gray-500 uppercase font-extrabold tracking-wider">Lote Tributario</span>
                               <span className="text-[10px] text-gray-400 font-mono">
                                 📦 Lote: {batchPeriod}
