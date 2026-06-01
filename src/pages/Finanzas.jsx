@@ -2412,6 +2412,9 @@ export default function Finanzas() {
         >
           <FileText className="w-3.5 h-3.5 text-amber-400" />
           Aprobación Viáticos
+          <span className="px-1 py-0.5 rounded bg-amber-500/20 border border-amber-500/30 text-amber-300 text-[9px] font-black tracking-tighter">
+            {expenses.filter(e => e.status === 'Pendiente' || e.status === 'En revisión').length}
+          </span>
         </button>
         <button
           onClick={() => setAdminTab("boletas_detectadas")}
