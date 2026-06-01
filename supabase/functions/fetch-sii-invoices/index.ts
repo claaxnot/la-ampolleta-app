@@ -418,15 +418,21 @@ serve(async (req) => {
 
       const staffIds = staffProfiles.map(p => p.id);
 
-      // Buscar lotes de nóminas tributarias pendientes o rechazados
-      const { data: candidateBatches } = await supabase
+      // Buscar todos los lotes de este trabajador para el periodo, sin importar el estado
+      const { data: existingBatches, error: batError } = await supabase
         .from("worker_invoice_batches")
-        .select("id, worker_id, period_label, expected_gross_amount, status")
+        .select("id, worker_id, period_label, expected_gross_amount, status, invoice_number")
         .in("worker_id", staffIds)
-        .eq("period_label", invoicePeriod)
-        .in("status", ["pending", "rejected"]);
+        .eq("period_label", invoicePeriod);
 
-      if (!candidateBatches || candidateBatches.length === 0) {
+      if (batError) {
+        summary.logs.push(`⚠️ Error al buscar lotes existentes para el trabajador: ${batError.message}`);
+      }
+
+      // Si existe algún lote verificado o pagado en el período, esto requiere revisión o es un posible duplicado (Regla 6)
+      const verifiedOrPaidBatch = existingBatches?.find(b => b.status === "verified" || b.status === "paid");
+      if (verifiedOrPaidBatch) {
+        const isExactFolio = verifiedOrPaidBatch.invoice_number === invoiceNumber;
         await insertDetectedInvoice(supabase, {
           message_id: messageId,
           sender_email: sender,
@@ -444,9 +450,12 @@ serve(async (req) => {
           receiver_rut: normReceiverRut,
           receiver_name: receiverName,
           raw_text_preview,
+          matched_batch_id: verifiedOrPaidBatch.id,
           match_status: "needs_review",
-          confidence_score: 40,
-          match_reason: `Se encontró perfil de staff, pero no registra ningún Lote Tributario en estado 'pending' o 'rejected' para el periodo ${invoicePeriod}.`,
+          confidence_score: 50,
+          match_reason: isExactFolio
+            ? `Ya existe un lote tributario '${verifiedOrPaidBatch.status}' con el mismo Folio N° ${invoiceNumber} para el periodo ${invoicePeriod}. Posible reenvío o duplicado.`
+            : `El periodo ${invoicePeriod} ya registra un Lote Tributario en estado '${verifiedOrPaidBatch.status}' (ID: ${verifiedOrPaidBatch.id}). Requiere revisión manual.`,
           xml_parse_status: "success"
         });
         summary.needsReview++;
@@ -454,135 +463,301 @@ serve(async (req) => {
         continue;
       }
 
-      // Filtrar lotes que calzan en monto bruto (respetando tolerancia)
-      const matchingBatches = candidateBatches.filter(b => {
-        const diff = Math.abs((b.expected_gross_amount || 0) - invoiceAmount);
-        return diff <= toleranceSetting;
-      });
+      const candidateBatches = existingBatches ? existingBatches.filter(b => b.status === "pending" || b.status === "rejected") : [];
 
-      if (matchingBatches.length === 0) {
-        // Encontrar lote con mayor similitud o dejar en revisión
-        const bestCandidate = candidateBatches[0];
-        await insertDetectedInvoice(supabase, {
-          message_id: messageId,
-          sender_email: sender,
-          subject,
-          received_at: receivedAt,
-          notification_date: notificationDate,
-          issuer_rut: normIssuerRut,
-          issuer_name: issuerNameXml || issuerName,
-          invoice_number: invoiceNumber,
-          invoice_date: invoiceDate,
-          invoice_amount: invoiceAmount,
-          liquid_amount: liquidAmount,
-          withheld_tax: withheldTax,
-          tax_rate: taxRate,
-          receiver_rut: normReceiverRut,
-          receiver_name: receiverName,
-          raw_text_preview,
-          matched_batch_id: bestCandidate.id,
-          match_status: "needs_review",
-          confidence_score: 60,
-          match_reason: `El RUT y periodo coinciden, pero el monto bruto de la boleta ($${invoiceAmount}) difiere del esperado ($${bestCandidate.expected_gross_amount}) superando la tolerancia de $${toleranceSetting} CLP.`,
-          xml_parse_status: "success"
+      if (candidateBatches.length > 0) {
+        // --- CASO A: SI YA EXISTE UN LOTE FÍSICO EN ESTADO PENDING/REJECTED ---
+        const matchingBatches = candidateBatches.filter(b => {
+          const diff = Math.abs((b.expected_gross_amount || 0) - invoiceAmount);
+          return diff <= toleranceSetting;
         });
-        summary.needsReview++;
-        summary.newInvoices++;
-        continue;
-      }
 
-      if (matchingBatches.length > 1) {
-        await insertDetectedInvoice(supabase, {
-          message_id: messageId,
-          sender_email: sender,
-          subject,
-          received_at: receivedAt,
-          notification_date: notificationDate,
-          issuer_rut: normIssuerRut,
-          issuer_name: issuerNameXml || issuerName,
-          invoice_number: invoiceNumber,
-          invoice_date: invoiceDate,
-          invoice_amount: invoiceAmount,
-          liquid_amount: liquidAmount,
-          withheld_tax: withheldTax,
-          tax_rate: taxRate,
-          receiver_rut: normReceiverRut,
-          receiver_name: receiverName,
-          raw_text_preview,
-          match_status: "needs_review",
-          confidence_score: 70,
-          match_reason: "Existen múltiples lotes candidatos pendientes para este trabajador en el mismo mes. Requiere vinculación manual.",
-          xml_parse_status: "success"
-        });
-        summary.needsReview++;
-        summary.newInvoices++;
-        continue;
-      }
-
-      // MATCH PERFECTO ENCONTRADO (Score 100% -> Auto Verified)
-      const finalBatch = matchingBatches[0];
-      
-      // Transacción y actualización del lote tributario
-      // 1. Guardar la boleta como auto_verified
-      await insertDetectedInvoice(supabase, {
-        message_id: messageId,
-        sender_email: sender,
-        subject,
-        received_at: receivedAt,
-        notification_date: notificationDate,
-        issuer_rut: normIssuerRut,
-        issuer_name: issuerNameXml || issuerName,
-        invoice_number: invoiceNumber,
-        invoice_date: invoiceDate,
-        invoice_amount: invoiceAmount,
-        liquid_amount: liquidAmount,
-        withheld_tax: withheldTax,
-        tax_rate: taxRate,
-        receiver_rut: normReceiverRut,
-        receiver_name: receiverName,
-        raw_text_preview,
-        matched_batch_id: finalBatch.id,
-        match_status: "auto_verified",
-        confidence_score: 100,
-        match_reason: "Coincidencia perfecta en RUT, Período e Importe Bruto (Validado automáticamente).",
-        xml_parse_status: "success"
-      });
-
-      // 2. Actualizar worker_invoice_batches a verified (¡NO MARCA PAGADO!)
-      await supabase
-        .from("worker_invoice_batches")
-        .update({
-          invoice_number: invoiceNumber,
-          invoice_amount: invoiceAmount,
-          invoice_received_at: new Date().toISOString(),
-          invoice_notes: "Validado automáticamente desde correo SII (Finanzas 3.5)",
-          status: "verified",
-          updated_at: new Date().toISOString()
-        })
-        .eq("id", finalBatch.id);
-
-      // 3. Compatibilidad legacy: Actualizar event_assignments vinculados a ese lote
-      const { data: batchItems } = await supabase
-        .from("worker_invoice_batch_items")
-        .select("assignment_id")
-        .eq("batch_id", finalBatch.id);
-
-      if (batchItems && batchItems.length > 0) {
-        const assignmentIds = batchItems.map(item => item.assignment_id);
-        await supabase
-          .from("event_assignments")
-          .update({
-            invoice_received: true,
+        if (matchingBatches.length === 0) {
+          // Encontrar lote con mayor similitud o dejar en revisión
+          const bestCandidate = candidateBatches[0];
+          await insertDetectedInvoice(supabase, {
+            message_id: messageId,
+            sender_email: sender,
+            subject,
+            received_at: receivedAt,
+            notification_date: notificationDate,
+            issuer_rut: normIssuerRut,
+            issuer_name: issuerNameXml || issuerName,
             invoice_number: invoiceNumber,
+            invoice_date: invoiceDate,
             invoice_amount: invoiceAmount,
-            invoice_received_at: new Date().toISOString(),
-            invoice_notes: `Validación automática agrupada (Lote ${finalBatch.period_label})`
-          })
-          .in("id", assignmentIds);
-      }
+            liquid_amount: liquidAmount,
+            withheld_tax: withheldTax,
+            tax_rate: taxRate,
+            receiver_rut: normReceiverRut,
+            receiver_name: receiverName,
+            raw_text_preview,
+            matched_batch_id: bestCandidate.id,
+            match_status: "needs_review",
+            confidence_score: 60,
+            match_reason: `El RUT y periodo coinciden, pero el monto bruto de la boleta ($${invoiceAmount}) difiere del esperado ($${bestCandidate.expected_gross_amount}) en el lote existente, superando la tolerancia de $${toleranceSetting} CLP.`,
+            xml_parse_status: "success"
+          });
+          summary.needsReview++;
+          summary.newInvoices++;
+          continue;
+        }
 
-      summary.autoVerified++;
-      summary.newInvoices++;
+        if (matchingBatches.length > 1) {
+          await insertDetectedInvoice(supabase, {
+            message_id: messageId,
+            sender_email: sender,
+            subject,
+            received_at: receivedAt,
+            notification_date: notificationDate,
+            issuer_rut: normIssuerRut,
+            issuer_name: issuerNameXml || issuerName,
+            invoice_number: invoiceNumber,
+            invoice_date: invoiceDate,
+            invoice_amount: invoiceAmount,
+            liquid_amount: liquidAmount,
+            withheld_tax: withheldTax,
+            tax_rate: taxRate,
+            receiver_rut: normReceiverRut,
+            receiver_name: receiverName,
+            raw_text_preview,
+            match_status: "needs_review",
+            confidence_score: 70,
+            match_reason: "Existen múltiples lotes candidatos pendientes para este trabajador en el mismo mes. Requiere vinculación manual.",
+            xml_parse_status: "success"
+          });
+          summary.needsReview++;
+          summary.newInvoices++;
+          continue;
+        }
+
+        // MATCH PERFECTO ENCONTRADO (Score 100% -> Auto Verified con lote existente)
+        const finalBatch = matchingBatches[0];
+        
+        // Ejecutar la auto-verificación atómica del lote pre-existente mediante RPC
+        const { error: verifyRpcError } = await supabase
+          .rpc("auto_verify_existing_invoice_batch_v3", {
+            p_batch_id: finalBatch.id,
+            p_invoice_number: invoiceNumber,
+            p_invoice_amount: invoiceAmount,
+            p_period_label: finalBatch.period_label
+          });
+
+        if (verifyRpcError) {
+          throw new Error(`Error en RPC de auto-verificación de lote pre-existente: ${verifyRpcError.message}`);
+        }
+
+        await insertDetectedInvoice(supabase, {
+          message_id: messageId,
+          sender_email: sender,
+          subject,
+          received_at: receivedAt,
+          notification_date: notificationDate,
+          issuer_rut: normIssuerRut,
+          issuer_name: issuerNameXml || issuerName,
+          invoice_number: invoiceNumber,
+          invoice_date: invoiceDate,
+          invoice_amount: invoiceAmount,
+          liquid_amount: liquidAmount,
+          withheld_tax: withheldTax,
+          tax_rate: taxRate,
+          receiver_rut: normReceiverRut,
+          receiver_name: receiverName,
+          raw_text_preview,
+          matched_batch_id: finalBatch.id,
+          match_status: "auto_verified",
+          confidence_score: 100,
+          match_reason: "Coincidencia perfecta en RUT, Período e Importe Bruto con lote tributario existente (Procesado de forma atómica).",
+          xml_parse_status: "success"
+        });
+
+        summary.autoVerified++;
+        summary.newInvoices++;
+      } else {
+        // --- CASO B: AUTO-CREADOR DINÁMICO DE LOTES ON-THE-FLY (Si no existe ningún lote previo) ---
+        // Cargar tasa de retención desde la base de datos (app_settings) si existe, o usar el fallback 2026 (15.25%)
+        let retentionRate = 15.25;
+        try {
+          const { data: settingsData } = await supabase
+            .from("app_settings")
+            .select("value")
+            .eq("key", "honorarios_retention_rate")
+            .maybeSingle();
+          if (settingsData && settingsData.value && settingsData.value.rate !== undefined) {
+            retentionRate = parseFloat(settingsData.value.rate);
+          }
+        } catch (err) {
+          summary.logs.push(`⚠️ No se pudo cargar la tasa de retención de app_settings: ${err.message}. Usando fallback 15.25%.`);
+        }
+
+        // Consultar asignaciones de eventos pendientes en tiempo real para este trabajador
+        const { data: assignments, error: assErr } = await supabase
+          .from("event_assignments")
+          .select(`
+            id,
+            status,
+            payment_status,
+            custom_rate,
+            invoice_required,
+            invoice_received,
+            event_day_id,
+            event_id,
+            event_days ( date ),
+            events ( date ),
+            profiles:staff_id ( id, name, monto_transferencia )
+          `)
+          .in("staff_id", staffIds)
+          .in("status", ["Confirmado", "Aceptado"])
+          .neq("payment_status", "Pagado");
+
+        if (assErr) {
+          summary.logs.push(`⚠️ Error al buscar asignaciones de eventos pendientes: ${assErr.message}`);
+        }
+
+        const pendingGroup = [];
+        let totalLiquid = 0;
+        let targetWorkerId = null;
+
+        if (assignments && assignments.length > 0) {
+          for (const a of assignments) {
+            // Excluir si ya tiene boleta recibida
+            if (a.invoice_received) continue;
+            // Excluir si explícitamente se configuró que NO requiere boleta
+            if (a.invoice_required === false) continue;
+
+            // Obtener fecha del evento (priorizando event_days.date)
+            const dateStr = a.event_days?.date || a.events?.date || "";
+            if (!dateStr) continue;
+
+            const periodKey = dateStr.substring(0, 7); // "YYYY-MM"
+            if (periodKey === invoicePeriod) {
+              const defaultRate = a.profiles?.monto_transferencia ? parseFloat(a.profiles.monto_transferencia) : 25000;
+              const rate = a.custom_rate ? parseFloat(a.custom_rate) : defaultRate;
+
+              totalLiquid += rate;
+              pendingGroup.push({
+                id: a.id,
+                liquid_amount: rate
+              });
+              if (!targetWorkerId) {
+                targetWorkerId = a.profiles?.id;
+              }
+            }
+          }
+        }
+
+        if (pendingGroup.length === 0) {
+          // No hay asignaciones pendientes que requieran boleta para este periodo
+          await insertDetectedInvoice(supabase, {
+            message_id: messageId,
+            sender_email: sender,
+            subject,
+            received_at: receivedAt,
+            notification_date: notificationDate,
+            issuer_rut: normIssuerRut,
+            issuer_name: issuerNameXml || issuerName,
+            invoice_number: invoiceNumber,
+            invoice_date: invoiceDate,
+            invoice_amount: invoiceAmount,
+            liquid_amount: liquidAmount,
+            withheld_tax: withheldTax,
+            tax_rate: taxRate,
+            receiver_rut: normReceiverRut,
+            receiver_name: receiverName,
+            raw_text_preview,
+            match_status: "needs_review",
+            confidence_score: 30,
+            match_reason: `No se encontraron asignaciones de eventos pendientes que requieran boleta de honorarios para el periodo ${invoicePeriod}.`,
+            xml_parse_status: "success"
+          });
+          summary.needsReview++;
+          summary.newInvoices++;
+          continue;
+        }
+
+        // Si hay asignaciones, calculamos el bruto esperado
+        const calculatedGross = Math.round(totalLiquid / (1 - (retentionRate / 100)));
+        const diff = Math.abs(calculatedGross - invoiceAmount);
+
+        if (diff > toleranceSetting) {
+          // Si no calza el monto bruto esperado (Diferencia fuera de la tolerancia)
+          await insertDetectedInvoice(supabase, {
+            message_id: messageId,
+            sender_email: sender,
+            subject,
+            received_at: receivedAt,
+            notification_date: notificationDate,
+            issuer_rut: normIssuerRut,
+            issuer_name: issuerNameXml || issuerName,
+            invoice_number: invoiceNumber,
+            invoice_date: invoiceDate,
+            invoice_amount: invoiceAmount,
+            liquid_amount: liquidAmount,
+            withheld_tax: withheldTax,
+            tax_rate: taxRate,
+            receiver_rut: normReceiverRut,
+            receiver_name: receiverName,
+            raw_text_preview,
+            match_status: "needs_review",
+            confidence_score: 60,
+            match_reason: `Se encontraron ${pendingGroup.length} asignaciones pendientes para el periodo ${invoicePeriod}, pero el monto bruto de la boleta ($${invoiceAmount}) difiere del bruto esperado ($${calculatedGross}) calculado a partir del líquido pactado ($${totalLiquid}). Diferencia: $${diff} CLP (Tolerancia: $${toleranceSetting} CLP).`,
+            xml_parse_status: "success"
+          });
+          summary.needsReview++;
+          summary.newInvoices++;
+          continue;
+        }
+
+        // ¡MATCH PERFECTO DINÁMICO ENCONTRADO! (Tolerancia aceptada)
+        const assignmentIds = pendingGroup.map(item => item.id);
+
+        // Ejecutar la auto-creación atómica mediante RPC transaccional
+        const { data: createdBatchId, error: createRpcError } = await supabase
+          .rpc("auto_create_invoice_batch_v3", {
+            p_worker_id: targetWorkerId || staffIds[0],
+            p_period_label: invoicePeriod,
+            p_total_liquid_amount: totalLiquid,
+            p_retention_rate: retentionRate,
+            p_expected_gross_amount: calculatedGross,
+            p_estimated_retention: calculatedGross - totalLiquid,
+            p_invoice_number: invoiceNumber,
+            p_invoice_amount: invoiceAmount,
+            p_assignment_ids: assignmentIds,
+            p_invoice_notes: "Lote creado y validado automáticamente desde correo SII (Finanzas 3.5 - Auto-Match)"
+          });
+
+        if (createRpcError) {
+          throw new Error(`Error en RPC de auto-creación de lote transaccional: ${createRpcError.message}`);
+        }
+
+        // Registrar la boleta detectada como auto_verified
+        await insertDetectedInvoice(supabase, {
+          message_id: messageId,
+          sender_email: sender,
+          subject,
+          received_at: receivedAt,
+          notification_date: notificationDate,
+          issuer_rut: normIssuerRut,
+          issuer_name: issuerNameXml || issuerName,
+          invoice_number: invoiceNumber,
+          invoice_date: invoiceDate,
+          invoice_amount: invoiceAmount,
+          liquid_amount: liquidAmount,
+          withheld_tax: withheldTax,
+          tax_rate: taxRate,
+          receiver_rut: normReceiverRut,
+          receiver_name: receiverName,
+          raw_text_preview,
+          matched_batch_id: createdBatchId,
+          match_status: "auto_verified",
+          confidence_score: 100,
+          match_reason: "Lote creado y validado automáticamente desde XML SII (Procesado de forma atómica)",
+          xml_parse_status: "success"
+        });
+
+        summary.autoVerified++;
+        summary.newInvoices++;
+      }
     }
 
     summary.logs.push("Sincronización IMAP y validación de boletas finalizada.");

@@ -5,6 +5,9 @@ const path = require("path");
 
 // Cargar variables de entorno locales desde .env.local
 let supabaseUrl = "https://bvdcbsetmzvmodnklwfp.supabase.co";
+if (process.argv.includes("--local")) {
+  supabaseUrl = "http://localhost:3000";
+}
 let supabaseAnonKey = "";
 
 const envPath = path.join(__dirname, ".env.local");
