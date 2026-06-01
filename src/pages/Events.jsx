@@ -333,24 +333,6 @@ export default function Events({ user }) {
         }
       }
 
-      // Create system notifications for the assigned staff
-      if (eventId && staffIds.length > 0) {
-        try {
-          const isCancelled = eventData.status?.toLowerCase() === "cancelado" || eventData.status?.toLowerCase() === "cancelled";
-          const notificationsPayload = staffIds.map(id => ({
-            user_id: id,
-            title: isCancelled ? "🚨 Evento Cancelado" : "📅 Nueva Asignación de Evento",
-            description: isCancelled 
-              ? `El evento "${eventData.name || 'Producción'}" programado para el ${eventData.date || ''} ha sido CANCELADO.`
-              : `Has sido asignado para el evento "${eventData.name || 'Producción'}" el ${eventData.date || ''}.`,
-            type: isCancelled ? "danger" : "info"
-          }));
-          await supabase.from('notifications').insert(notificationsPayload);
-        } catch (err) {
-          console.warn("⚠️ [NOTIFICATIONS TABLE]: Error al insertar notificaciones en BD.");
-        }
-      }
-
       toast.success(eventData.id ? "¡Evento actualizado con éxito!" : "¡Evento creado con éxito!");
       fetchEvents();
       closeModal();

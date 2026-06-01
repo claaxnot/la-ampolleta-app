@@ -509,7 +509,7 @@ CREATE TRIGGER trg_on_new_staff
   EXECUTE FUNCTION public.notify_on_new_staff();
 
 
--- 3. Notificar al trabajador cuando es asignado a un evento
+-- 3. Notificar al trabajador cuando es asignado a un evento (Fórmula optimizada tipo 'event_assigned')
 CREATE OR REPLACE FUNCTION public.notify_on_new_assignment()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -527,9 +527,9 @@ BEGIN
   INSERT INTO public.notifications (user_id, title, description, type, priority, related_event_id, related_assignment_id)
   VALUES (
     NEW.staff_id,
-    '📅 Nueva Asignación de Evento',
-    'Has sido citado para participar en el evento "' || COALESCE(event_name, 'Sin nombre') || '" el ' || to_char(COALESCE(event_date, now()::date), 'DD/MM/YYYY') || '. Por favor confirma tu asistencia.',
-    'warning',
+    '📅 Nuevo evento asignado',
+    'Has sido convocado para participar en el evento "' || COALESCE(event_name, 'Sin nombre') || '" el ' || to_char(COALESCE(event_date, now()::date), 'DD/MM/YYYY') || '. Revisa los detalles en tu portal.',
+    'event_assigned',
     'normal',
     NEW.event_id,
     NEW.id
@@ -589,12 +589,115 @@ CREATE TRIGGER trg_on_assignment_status_update
   EXECUTE FUNCTION public.notify_on_assignment_status_update();
 
 
+-- 5. Trigger para cuando se remueve una asignación (DELETE de event_assignments)
+CREATE OR REPLACE FUNCTION public.notify_on_assignment_delete()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  event_name text;
+  event_date date;
+  event_status text;
+BEGIN
+  SELECT name, date, status INTO event_name, event_date, event_status 
+  FROM public.events 
+  WHERE id = OLD.event_id;
+  
+  -- Solo notificar si el evento no está cancelado (ya que si está cancelado se notifica la cancelación general del evento)
+  IF COALESCE(event_status, '') <> 'Cancelado' THEN
+    INSERT INTO public.notifications (user_id, title, description, type, priority, related_event_id)
+    VALUES (
+      OLD.staff_id,
+      '🚫 Citación Removida',
+      'Se ha cancelado tu asignación para el evento "' || COALESCE(event_name, 'Sin nombre') || '" del ' || to_char(COALESCE(event_date, now()::date), 'DD/MM/YYYY') || '.',
+      'assignment_removed',
+      'normal',
+      OLD.event_id
+    );
+  END IF;
+  RETURN OLD;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_on_assignment_delete ON public.event_assignments;
+CREATE TRIGGER trg_on_assignment_delete
+  AFTER DELETE ON public.event_assignments
+  FOR EACH ROW
+  EXECUTE FUNCTION public.notify_on_assignment_delete();
+
+
+-- 6. Trigger para cuando se edita/actualiza un evento (UPDATE de events)
+CREATE OR REPLACE FUNCTION public.notify_on_event_update()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  assign_record record;
+  is_status_cancelled boolean;
+  is_relevant_update boolean;
+BEGIN
+  is_status_cancelled := (NEW.status = 'Cancelado' AND OLD.status <> 'Cancelado');
+  
+  is_relevant_update := (
+    NEW.name IS DISTINCT FROM OLD.name OR
+    NEW.date IS DISTINCT FROM OLD.date OR
+    NEW.time IS DISTINCT FROM OLD.time OR
+    NEW.end_time IS DISTINCT FROM OLD.end_time OR
+    NEW.location IS DISTINCT FROM OLD.location OR
+    NEW.client IS DISTINCT FROM OLD.client OR
+    NEW.operational_notes IS DISTINCT FROM OLD.operational_notes OR
+    (NEW.status IS DISTINCT FROM OLD.status AND NEW.status <> 'Cancelado')
+  );
+
+  -- Notificar a todos los trabajadores actualmente asignados al evento
+  FOR assign_record IN 
+    SELECT DISTINCT staff_id FROM public.event_assignments 
+    WHERE event_id = NEW.id
+  LOOP
+    IF is_status_cancelled THEN
+      INSERT INTO public.notifications (user_id, title, description, type, priority, related_event_id)
+      VALUES (
+        assign_record.staff_id,
+        '🚨 Evento Cancelado',
+        'El evento "' || NEW.name || '" programado para el ' || to_char(NEW.date, 'DD/MM/YYYY') || ' ha sido CANCELADO.',
+        'event_cancelled',
+        'high',
+        NEW.id
+      );
+    ELSIF is_relevant_update THEN
+      INSERT INTO public.notifications (user_id, title, description, type, priority, related_event_id)
+      VALUES (
+        assign_record.staff_id,
+        '🔔 Evento Actualizado',
+        'Se actualizaron los detalles de "' || NEW.name || '". Revisa la información actualizada en tu portal.',
+        'event_updated',
+        'normal',
+        NEW.id
+      );
+    END IF;
+  END LOOP;
+  
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_on_event_update ON public.events;
+CREATE TRIGGER trg_on_event_update
+  AFTER UPDATE ON public.events
+  FOR EACH ROW
+  EXECUTE FUNCTION public.notify_on_event_update();
+
+
 -- ==========================================================
 -- V3.7.1 - FASE 5: REPLICACIÓN REALTIME EN TABLA NOTIFICATIONS
 -- ==========================================================
 
 -- Habilitar la transmisión en tiempo real de Supabase (Realtime Channel) para notificaciones
-ALTER PUBLICATION supabase_realtime ADD TABLE public.notifications;
+-- ALTER PUBLICATION supabase_realtime ADD TABLE public.notifications;
 
 
 

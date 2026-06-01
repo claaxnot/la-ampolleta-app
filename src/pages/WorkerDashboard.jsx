@@ -2026,10 +2026,10 @@ export default function WorkerDashboard({ user }) {
                     (showAllNotifications ? notifications : notifications.slice(0, 5)).map(n => {
                       let cardStyle = "border-amber-500/10 bg-amber-500/5 hover:bg-amber-500/10";
                       let icon = <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />;
-                      if (n.type === "info") {
+                      if (n.type === "info" || n.type === "event_assigned") {
                         cardStyle = "border-blue-500/10 bg-blue-500/5 hover:bg-blue-500/10";
                         icon = <Info className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />;
-                      } else if (n.type === "danger") {
+                      } else if (n.type === "danger" || n.type === "event_cancelled" || n.type === "assignment_removed") {
                         cardStyle = "border-red-500/10 bg-red-500/5 hover:bg-red-500/10";
                         icon = <XCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />;
                       }
