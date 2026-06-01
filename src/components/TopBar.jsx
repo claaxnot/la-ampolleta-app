@@ -33,20 +33,37 @@ export default function TopBar({ user, onToggleMenu }) {
       .channel(`topbar-notifications-${user.id}`)
       .on(
         'postgres_changes',
-        { 
-          event: '*', 
-          schema: 'public', 
-          table: 'notifications'
-        },
+        { event: 'INSERT', schema: 'public', table: 'notifications' },
         (payload) => {
-          console.log("🔔 [REALTIME] - Cambio detectado en notificaciones de TopBar:", payload);
-          const affectedUserId = payload.new?.user_id || payload.old?.user_id;
-          if (affectedUserId === user.id) {
+          console.log("🔔 [REALTIME INSERT] - Cambio detectado:", payload);
+          if (payload.new && payload.new.user_id === user.id) {
             fetchNotifications();
           }
         }
       )
-      .subscribe();
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'notifications' },
+        (payload) => {
+          console.log("🔔 [REALTIME UPDATE] - Cambio detectado:", payload);
+          if (payload.new && payload.new.user_id === user.id) {
+            fetchNotifications();
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'DELETE', schema: 'public', table: 'notifications' },
+        (payload) => {
+          console.log("🔔 [REALTIME DELETE] - Cambio detectado:", payload);
+          if (payload.old && payload.old.user_id === user.id) {
+            fetchNotifications();
+          }
+        }
+      )
+      .subscribe((status) => {
+        console.log(`🔌 [REALTIME STATUS TOPBAR]: ${status}`);
+      });
 
     return () => {
       if (channel) supabase.removeChannel(channel);
