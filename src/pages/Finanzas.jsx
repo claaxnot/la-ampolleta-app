@@ -334,6 +334,225 @@ export default function Finanzas() {
     }
   };
 
+  const handleReprocessInvoice = async (invoice) => {
+    const loadingToast = toast.loading(`Re-evaluando boleta Folio Nº ${invoice.invoice_number} en tiempo real...`);
+    try {
+      const rut = invoice.issuer_rut;
+      // Obtener periodo de la boleta "YYYY-MM"
+      const periodKey = invoice.invoice_date
+        ? invoice.invoice_date.substring(0, 7)
+        : new Date().toISOString().substring(0, 7);
+
+      // 1. Buscar si el perfil de staff existe por RUT
+      const { data: profile, error: profErr } = await supabase
+        .from("profiles")
+        .select("id, name")
+        .eq("rut", rut)
+        .maybeSingle();
+
+      if (profErr) throw profErr;
+
+      if (!profile) {
+        // CASO 1: Aún no existe el perfil de staff (0% de confianza)
+        await supabase
+          .from("detected_invoices")
+          .update({
+            match_status: "rejected",
+            confidence_score: 0,
+            match_reason: `El RUT del emisor (${rut}) sigue sin corresponder a ningún perfil de staff registrado en el sistema.`,
+            xml_parse_status: "success"
+          })
+          .eq("id", invoice.id);
+
+        toast.error("El trabajador aún no está registrado en el sistema.", { id: loadingToast });
+        fetchDetectedInvoices();
+        return;
+      }
+
+      // 2. Si existe el perfil, buscar asignaciones del periodo
+      const startOfMonth = `${periodKey}-01`;
+      const endOfMonth = `${periodKey}-31`;
+
+      const { data: assignments, error: assErr } = await supabase
+        .from("event_assignments")
+        .select(`
+          id,
+          custom_rate,
+          status,
+          invoice_required,
+          invoice_received,
+          event_days (
+            date
+          ),
+          events:event_id (
+            date
+          ),
+          profiles:staff_id (
+            id,
+            name,
+            rut,
+            monto_transferencia
+          )
+        `)
+        .eq("staff_id", profile.id);
+
+      if (assErr) throw assErr;
+
+      // Filtrar las asignaciones que corresponden al periodo, requieren boleta, no están pagadas/recibidas y están confirmadas/aceptadas
+      const pendingAssignments = (assignments || []).filter(a => {
+        const dayDate = a.event_days ? a.event_days.date : (a.events ? a.events.date : "");
+        const assignmentPeriod = dayDate ? dayDate.substring(0, 7) : "";
+        
+        const isPeriodMatch = assignmentPeriod === periodKey;
+        const isPending = a.invoice_required && !a.invoice_received && a.status !== "Pagado" && (a.status === "Confirmado" || a.status === "Aceptado");
+        
+        return isPeriodMatch && isPending;
+      });
+
+      if (pendingAssignments.length === 0) {
+        // CASO 2: Trabajador existe pero no tiene eventos o cobros en este mes (30% de confianza)
+        await supabase
+          .from("detected_invoices")
+          .update({
+            match_status: "needs_review",
+            confidence_score: 30,
+            match_reason: `Trabajador registrado en el sistema, pero no registra cobros pendientes ni eventos que requieran boleta para el periodo ${periodKey}.`
+          })
+          .eq("id", invoice.id);
+
+        toast.success("Boleta re-evaluada: Trabajador encontrado pero sin cobros en el periodo (30% confianza).", { id: loadingToast });
+        fetchDetectedInvoices();
+        return;
+      }
+
+      // 3. Si tiene cobros, calcular montos
+      const totalPendingLiquid = pendingAssignments.reduce((sum, a) => {
+        const defaultRate = a.profiles?.monto_transferencia ? parseFloat(a.profiles.monto_transferencia) : 25000;
+        const rate = a.custom_rate ? parseFloat(a.custom_rate) : defaultRate;
+        return sum + rate;
+      }, 0);
+      const rateVal = parseFloat(retentionRateSetting || 15.25);
+      const brutoEsperado = Math.round(totalPendingLiquid / (1 - (rateVal / 100)));
+      const difference = Math.abs((invoice.invoice_amount || 0) - brutoEsperado);
+      const isWithinTolerance = difference <= toleranceSetting;
+
+      if (isWithinTolerance) {
+        // CASO 3: Coincidencia perfecta! Auto-verificar lote y asignaciones (100% de confianza)
+        // A. Buscar si ya existe un lote de este trabajador en este periodo
+        const { data: existingBatch } = await supabase
+          .from("worker_invoice_batches")
+          .select("id")
+          .eq("worker_id", profile.id)
+          .eq("period_label", periodKey)
+          .maybeSingle();
+
+        let batchId;
+        if (existingBatch) {
+          batchId = existingBatch.id;
+          // Actualizar lote existente
+          await supabase
+            .from("worker_invoice_batches")
+            .update({
+              invoice_number: invoice.invoice_number,
+              invoice_amount: invoice.invoice_amount,
+              invoice_received_at: new Date().toISOString(),
+              status: "verified"
+            })
+            .eq("id", batchId);
+        } else {
+          // Crear nuevo lote
+          const { data: newBatch, error: batchErr } = await supabase
+            .from("worker_invoice_batches")
+            .insert({
+              worker_id: profile.id,
+              period_label: periodKey,
+              total_liquid_amount: totalPendingLiquid,
+              retention_rate: rateVal,
+              expected_gross_amount: brutoEsperado,
+              estimated_retention: brutoEsperado - totalPendingLiquid,
+              invoice_number: invoice.invoice_number,
+              invoice_amount: invoice.invoice_amount,
+              invoice_received_at: new Date().toISOString(),
+              status: 'verified'
+            })
+            .select()
+            .single();
+
+          if (batchErr) throw batchErr;
+          batchId = newBatch.id;
+
+          // Crear items del lote
+          const batchItems = pendingAssignments.map(a => {
+            const defaultRate = a.profiles?.monto_transferencia ? parseFloat(a.profiles.monto_transferencia) : 25000;
+            const rate = a.custom_rate ? parseFloat(a.custom_rate) : defaultRate;
+            return {
+              batch_id: batchId,
+              assignment_id: a.id,
+              liquid_amount: rate
+            };
+          });
+
+          await supabase.from("worker_invoice_batch_items").insert(batchItems);
+        }
+
+        // B. Actualizar asignaciones individuales
+        const assignmentIds = pendingAssignments.map(a => a.id);
+        await supabase
+          .from("event_assignments")
+          .update({
+            invoice_received: true,
+            invoice_number: invoice.invoice_number,
+            invoice_received_at: new Date().toISOString(),
+            invoice_amount: Math.round(invoice.invoice_amount / pendingAssignments.length) // prorrateado
+          })
+          .in("id", assignmentIds);
+
+        // C. Insertar notificación para el trabajador
+        try {
+          await supabase.from('notifications').insert({
+            user_id: profile.id,
+            title: "🧾 Boleta Auto-Verificada",
+            description: `Tu boleta N° ${invoice.invoice_number} para el periodo ${periodKey} fue procesada y auto-verificada con éxito tras la re-evaluación contable.`,
+            type: "success"
+          });
+        } catch (errNotif) {
+          console.warn("⚠️ [NOTIFICATIONS]: Error inserting notification:", errNotif);
+        }
+
+        // D. Actualizar la boleta detectada a auto_verified
+        await supabase
+          .from("detected_invoices")
+          .update({
+            match_status: "auto_verified",
+            confidence_score: 100,
+            match_reason: `Trabajador y cobros mensuales conciliados perfectamente. Boleta auto-verificada de forma automática tras re-evaluación.`
+          })
+          .eq("id", invoice.id);
+
+        toast.success("¡Boleta conciliada y auto-verificada con éxito! Pagos liberados.", { id: loadingToast });
+
+      } else {
+        // CASO 4: Hay discrepancia de montos (60% de confianza)
+        await supabase
+          .from("detected_invoices")
+          .update({
+            match_status: "needs_review",
+            confidence_score: 60,
+            match_reason: `Trabajador registrado en el sistema, pero el monto bruto de la boleta ($${Math.round(invoice.invoice_amount || 0).toLocaleString("es-CL")}) difiere del bruto esperado ($${brutoEsperado.toLocaleString("es-CL")}) para los cobros del mes.`
+          })
+          .eq("id", invoice.id);
+
+        toast.success("Boleta re-evaluada: Trabajador encontrado pero con diferencia de montos (60% confianza).", { id: loadingToast });
+      }
+
+      fetchDetectedInvoices();
+      fetchPayments();
+    } catch (err) {
+      console.error("Error en handleReprocessInvoice:", err);
+      toast.error("Error crítico al re-procesar la boleta contable.", { id: loadingToast });
+    }
+  };
+
   const handleCleanInvoices = async () => {
     if (!window.confirm("¿Deseas ejecutar la limpieza segura de boletas en la base de datos?\nSe eliminarán registros resueltos (auto_verified, matched, rejected) con más de 60 días de antigüedad.")) return;
     const cleanToast = toast.loading("Ejecutando limpieza de registros antiguos (más de 60 días)...");
@@ -3312,6 +3531,15 @@ export default function Finanzas() {
                                       </button>
 
                                       <button
+                                        onClick={() => handleReprocessInvoice(invoice)}
+                                        className="px-2.5 py-1.5 bg-emerald-500/10 hover:bg-emerald-500 hover:text-black border border-emerald-500/20 hover:border-transparent rounded-lg text-emerald-300 font-extrabold text-3xs uppercase tracking-wide cursor-pointer transition-all flex items-center gap-1"
+                                        title="Volver a evaluar esta boleta con los datos actuales del sistema"
+                                      >
+                                        <RefreshCw className="w-3 h-3" />
+                                        <span>Re-evaluar</span>
+                                      </button>
+
+                                      <button
                                         onClick={() => handleRejectInvoice(invoice)}
                                         className="p-1.5 bg-red-500/10 hover:bg-red-500 text-red-400 hover:text-white border border-red-500/20 hover:border-transparent rounded-lg cursor-pointer transition-all"
                                         title="Rechazar y archivar boleta"
@@ -3319,6 +3547,17 @@ export default function Finanzas() {
                                         <Trash2 className="w-3.5 h-3.5" />
                                       </button>
                                     </>
+                                  )}
+
+                                  {invoice.match_status === "rejected" && (
+                                    <button
+                                      onClick={() => handleReprocessInvoice(invoice)}
+                                      className="px-2.5 py-1.5 bg-emerald-500/10 hover:bg-emerald-500 hover:text-black border border-emerald-500/20 hover:border-transparent rounded-lg text-emerald-300 font-extrabold text-3xs uppercase tracking-wide cursor-pointer transition-all flex items-center gap-1"
+                                      title="Volver a evaluar esta boleta con los datos actuales del sistema"
+                                    >
+                                      <RefreshCw className="w-3 h-3" />
+                                      <span>Re-evaluar</span>
+                                    </button>
                                   )}
 
                                   <button
