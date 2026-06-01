@@ -27,46 +27,66 @@ export default function TopBar({ user, onToggleMenu }) {
     
     fetchNotifications();
 
-    console.log("🔌 [REALTIME] - Subscribiendo TopBar a notificaciones en vivo para el usuario:", user.id);
-    
-    const channel = supabase
-      .channel(`topbar-notifications-${user.id}`)
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'notifications' },
-        (payload) => {
-          console.log("🔔 [REALTIME INSERT] - Cambio detectado:", payload);
-          if (payload.new && payload.new.user_id === user.id) {
-            fetchNotifications();
+    let channel;
+
+    const setupSubscription = () => {
+      if (channel) {
+        supabase.removeChannel(channel);
+      }
+
+      console.log("🔌 [REALTIME] - Subscribiendo TopBar a notificaciones en vivo para el usuario:", user.id);
+      
+      channel = supabase
+        .channel(`topbar-notifications-${user.id}`)
+        .on(
+          'postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'notifications' },
+          (payload) => {
+            console.log("🔔 [REALTIME INSERT] - Cambio detectado:", payload);
+            if (payload.new && payload.new.user_id === user.id) {
+              fetchNotifications();
+            }
           }
-        }
-      )
-      .on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'notifications' },
-        (payload) => {
-          console.log("🔔 [REALTIME UPDATE] - Cambio detectado:", payload);
-          if (payload.new && payload.new.user_id === user.id) {
-            fetchNotifications();
+        )
+        .on(
+          'postgres_changes',
+          { event: 'UPDATE', schema: 'public', table: 'notifications' },
+          (payload) => {
+            console.log("🔔 [REALTIME UPDATE] - Cambio detectado:", payload);
+            if (payload.new && payload.new.user_id === user.id) {
+              fetchNotifications();
+            }
           }
-        }
-      )
-      .on(
-        'postgres_changes',
-        { event: 'DELETE', schema: 'public', table: 'notifications' },
-        (payload) => {
-          console.log("🔔 [REALTIME DELETE] - Cambio detectado:", payload);
-          if (payload.old && payload.old.user_id === user.id) {
-            fetchNotifications();
+        )
+        .on(
+          'postgres_changes',
+          { event: 'DELETE', schema: 'public', table: 'notifications' },
+          (payload) => {
+            console.log("🔔 [REALTIME DELETE] - Cambio detectado:", payload);
+            if (payload.old && payload.old.user_id === user.id) {
+              fetchNotifications();
+            }
           }
-        }
-      )
-      .subscribe((status) => {
-        console.log(`🔌 [REALTIME STATUS TOPBAR]: ${status}`);
-      });
+        )
+        .subscribe((status) => {
+          console.log(`🔌 [REALTIME STATUS TOPBAR]: ${status}`);
+        });
+    };
+
+    // Configurar suscripción inicial
+    setupSubscription();
+
+    // Re-suscribir si el estado de autenticación cambia en Supabase (soluciona race condition asíncrona)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log(`🔑 [AUTH EVENT TOPBAR]: ${event}`);
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        setupSubscription();
+      }
+    });
 
     return () => {
       if (channel) supabase.removeChannel(channel);
+      if (subscription) subscription.unsubscribe();
     };
   }, [user]);
 
