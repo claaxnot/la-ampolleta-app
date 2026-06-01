@@ -3124,7 +3124,7 @@ export default function Finanzas() {
             </GlassCard>
             <GlassCard className="p-4 relative overflow-hidden bg-gray-900/20">
               <span className="text-[10px] text-gray-500 uppercase tracking-wider font-extrabold block">Auto Verificadas (SII)</span>
-              <span className="text-xl sm:text-2xl font-extrabold text-emerald-400 mt-1 block flex items-center gap-1">
+              <span className="text-xl sm:text-2xl font-extrabold text-emerald-400 mt-1 flex items-center gap-1">
                 <Sparkles className="w-4 h-4 text-emerald-400" />
                 {detectedInvoices.filter(i => i.match_status === "auto_verified").length}
               </span>
@@ -3137,7 +3137,7 @@ export default function Finanzas() {
             </GlassCard>
             <GlassCard className={`p-4 relative overflow-hidden transition-all duration-300 ${detectedInvoices.filter(i => i.match_status === "needs_review").length > 0 ? "bg-red-500/5 border border-red-500/20" : "bg-gray-900/20"}`}>
               <span className="text-[10px] text-gray-500 uppercase tracking-wider font-extrabold block">Requieren Atención</span>
-              <span className={`text-xl sm:text-2xl font-extrabold mt-1 block flex items-center gap-1.5 ${detectedInvoices.filter(i => i.match_status === "needs_review").length > 0 ? "text-red-400 animate-pulse font-black" : "text-gray-400"}`}>
+              <span className={`text-xl sm:text-2xl font-extrabold mt-1 flex items-center gap-1.5 ${detectedInvoices.filter(i => i.match_status === "needs_review").length > 0 ? "text-red-400 animate-pulse font-black" : "text-gray-400"}`}>
                 <AlertTriangle className="w-4 h-4" />
                 {detectedInvoices.filter(i => i.match_status === "needs_review").length}
               </span>
