@@ -38,6 +38,49 @@ export default function Login({ onLogin }) {
       return;
     }
 
+    // Safety timeout to prevent getting stuck in "Conectando..." in standalone PWA contexts
+    const safetyTimeout = setTimeout(async () => {
+      console.warn("⚠️ Login safety timeout triggered after 8s.");
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user) {
+          console.log("🔒 Session is already active in Supabase. Recovering user profile.");
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', session.user.id)
+            .single();
+
+          if (profile && profile.status !== 'Inactivo') {
+            const systemRole = profile.system_role || (session.user.email === 'admin@laampolleta.tv' ? 'admin' : 'worker');
+            const userInfo = {
+              id: session.user.id,
+              email: session.user.email,
+              systemRole,
+              role: profile.role || 'Staff',
+              name: profile.name || session.user.email.split('@')[0],
+              avatar: profile.avatar_url || null,
+              cuenta_destino: profile.cuenta_destino || null,
+              codigo_banco_destino: profile.codigo_banco_destino || null
+            };
+            onLogin(userInfo);
+            if (userInfo.systemRole === 'admin') {
+              navigate("/dashboard");
+            } else {
+              navigate("/worker-dashboard");
+            }
+            setIsLoading(false);
+            return;
+          }
+        }
+      } catch (err) {
+        console.error("Error in login safety timeout:", err);
+      }
+      setIsLoading(false);
+      setError("La conexión tardó demasiado. Por favor, intenta de nuevo.");
+      toast.error("⚠️ La conexión tardó demasiado. Reintenta.");
+    }, 8000);
+
     try {
       const { data, error: authError } = await supabase.auth.signInWithPassword({
         email,
@@ -73,6 +116,7 @@ export default function Login({ onLogin }) {
         codigo_banco_destino: profile?.codigo_banco_destino || null
       };
 
+      clearTimeout(safetyTimeout);
       onLogin(userInfo);
 
       if (userInfo.systemRole === 'admin') {
@@ -82,6 +126,7 @@ export default function Login({ onLogin }) {
       }
 
     } catch (err) {
+      clearTimeout(safetyTimeout);
       console.log("Auth Error Details:", err);
 
       const errMessage = err?.message || "";
