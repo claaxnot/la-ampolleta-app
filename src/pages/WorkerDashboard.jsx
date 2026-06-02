@@ -2532,19 +2532,27 @@ export default function WorkerDashboard({ user }) {
                                 </div>
                               </div>
 
-                              <div className="bg-amber-500/10 border border-amber-500/20 p-3 rounded-xl text-[10px] text-amber-200 leading-relaxed space-y-1">
-                                <p className="font-extrabold flex items-center gap-1">
-                                  💡 Instrucciones de Emisión SII:
+                              <div className="bg-amber-500/5 border border-amber-500/20 p-4 rounded-xl text-xs text-gray-300 leading-relaxed space-y-2.5">
+                                <p className="font-black text-amber-400 flex items-center gap-1.5 uppercase tracking-wider text-[11px] mb-1">
+                                  💡 Instructivo de Emisión SII:
                                 </p>
                                 <p>
-                                  1. Emite <b>una boleta de honorarios</b> en el portal del SII por el monto bruto de <b className="text-amber-300 font-extrabold font-mono">${grossExpected.toLocaleString("es-CL")}</b>.
+                                  1. Emite <b>una boleta de honorarios</b> en el portal del SII por el monto bruto de <b className="text-amber-300 font-black font-mono text-sm">${grossExpected.toLocaleString("es-CL")}</b>.
                                 </p>
                                 <p>
-                                  2. Envíala en PDF a <span className="text-white underline font-semibold">contacto@laampolleta.tv</span> indicando tu RUT y número de boleta.
+                                  2. ⚠️ <strong>IMPORTANTE:</strong> El correo de la boleta <strong>debe ser enviado directamente desde la web del SII</strong> a <span className="text-white underline font-semibold text-xs">contacto@laampolleta.tv</span> para que incluya tanto el <strong>PDF</strong> como el <strong>XML</strong>. <em>De lo contrario, no será válido.</em>
                                 </p>
                                 <p>
-                                  3. Al validarse, administración autorizará la transferencia en la próxima fecha masiva de pago.
+                                  3. Al validarse por administración, se autorizará la transferencia.
                                 </p>
+                                <div className="pt-2 border-t border-white/5 mt-2 text-gray-400">
+                                  <p className="flex items-center gap-1.5 text-[11px] text-amber-300/90 font-bold uppercase tracking-wider">
+                                    🗓️ Calendario de Pago:
+                                  </p>
+                                  <p className="mt-0.5 text-xs text-gray-300">
+                                    Las fechas de pago son dentro de los primeros <strong>10 días hábiles</strong> del mes siguiente.
+                                  </p>
+                                </div>
                               </div>
                             </GlassCard>
                           );
