@@ -86,7 +86,7 @@
   - `WorkerDashboard.jsx` (monto solicitado del gasto).
   - `Finanzas.jsx` (monto final aprobado por el administrador).
 - [x] **Corrección de Tiempos en Notificaciones (TopBar):** Corregir la consulta de asignaciones para usar `updated_at` en lugar de `created_at` al renderizar la confirmación de asistencia y la notificación de pago realizado, mostrando la fecha y hora correctas en la campana en tiempo real.
-- [x] **Seguridad de Base de Datos y Hardening SQL (Supabase):** Resolver la advertencia de seguridad `0011_function_search_path_mutable` y `0029_authenticated_security_definer_function_executable` en `public.handle_new_user`, `public.sync_user_confirmation`, `public.handle_updated_at` y `public.update_updated_at_column` aplicando `search_path = ''`, `SECURITY INVOKER` y revocación explícita de privilegios RPC.
+- [x] **Seguridad de Base de Datos y Hardening SQL (Supabase):** Resolver la advertencia de seguridad `0011_function_search_path_mutable` and `0029_authenticated_security_definer_function_executable` en `public.handle_new_user`, `public.sync_user_confirmation`, `public.handle_updated_at` y `public.update_updated_at_column` aplicando `search_path = ''`, `SECURITY INVOKER` y revocación explícita de privilegios RPC.
 
 ## 8. Módulo de Control de Asistencia y Reloj de Personal (Anfitrionas)
 - [x] **Esquema de Base de Datos Seguro (Supabase):** Crear la tabla `event_attendance_logs` y funciones RPC seguras (`mark_event_check_in` / `mark_event_check_out`) con políticas RLS e inmutabilidad garantizada por la hora del servidor (`NOW()`) en el huso chileno.
@@ -97,38 +97,33 @@
 - [x] **Integración de Nóminas y Finanzas:** Consultar y renderizar horas reales trabajadas en los pagos de Finanzas (`Finanzas.jsx`) con badges `⏱️ Xh Ym` e indicadores de pulso de jornadas incompletas.
 - [x] **Inputs Premium y Selectores Cohesivos:** Reemplazar selectores nativos por componentes personalizados `DatePicker` y `ClockPicker` con iconografía WebKit invertida de alta fidelidad.
 
-## 9. Pendientes y Tareas Futuras
-- [ ] **Reportes Visuales y Gráficos de Finanzas (Admin):** Gráficos interactivos de barra/línea sobre egresos mensuales y exportación de informes analíticos en PDF.
-- [ ] **Bitácora de Auditoría Operacional (Logs):** Registro e historial detallado de acciones administrativas críticas (ej: creación de eventos, cambios de estados de pago).
-- [ ] Escribir archivo README.md completo con instrucciones de configuración local y variables de entorno.
-
-## 10. Mejoras en Calendario y Auditoría de Eventos Finalizados
+## 9. Mejoras en Calendario y Auditoría de Eventos Finalizados
 - [x] **Sincronización en Tiempo Real del Calendario:** Integrar canal WebSocket en `Calendar.jsx` para refrescar los eventos en vivo ante cambios en la BD.
 - [x] **Estandarización de Colores en Calendario:** Sincronizar colores por estado en `Calendar.jsx` (Confirmado/Activo=Verde, Finalizado/Completado=Gris, Cancelado=Rojo, Planificado=Ámbar).
 - [x] **Módulo de Auditoría en Detalle de Eventos Finalizados:** Modificar `EventDetails.jsx` para obtener `custom_rate` y renderizar la grilla detallada de personal y asistencia siempre que un evento esté finalizado o completado.
 - [x] **Badges de Ausencia y Control Desactivado:** Integrar badges de advertencia sutiles cuando no existan logs de asistencia o cuando el control de ingreso haya estado desactivado.
 - [x] **Compilación de Producción:** Ejecutar `npm run build` para garantizar la correcta compilación en producción.
 
-## 11. Optimización del Dashboard de Eventos y Visibilidad Financiera (SII Lotes V3 y Viáticos)
+## 10. Optimización del Dashboard de Eventos y Visibilidad Financiera (SII Lotes V3 y Viáticos)
 - [x] **Segmentación Contable por Trabajador y Período Mensual (SII Lotes V3):** Reestructurar el hook contable de agrupamiento en el backend y frontend del panel administrativo para separar los eventos por cada mes calendario (formato YYYY-MM), resolviendo discrepancias contables y alineándose con la legislación del SII.
 - [x] **Filtro Mensual por Defecto en Finanzas:** Inicializar dinámicamente el selector del período al mes actual de operaciones para evitar confusión visual y agilizar la navegación contable del administrador al cargar el panel de finanzas.
 - [x] **Sincronización Total de la Nómina y Lotes:** Restringir la visualización de la tabla consolidada de boletas (`CONTROL DE BOLETAS POR TRABAJADOR`) al período exacto que el administrador tenga filtrado.
 - [x] **Ocultación de Boletas de Períodos Futuros (Tablero del Trabajador):** Restringir visualmente en el portal del trabajador la tarjeta consolidada de boletas de meses que no han comenzado, mostrando solo el mes actual y meses pasados pendientes de pago.
 - [x] **Foco Predeterminado de Viáticos en Pendientes:** Configurar la pestaña de Viáticos y Reembolsos para mostrar por defecto las solicitudes en estado `"Pendiente"`, permitiendo una toma de decisiones y aprobaciones administrativas inmediatas.
 
-## 12. Endurecimiento de Seguridad y Rendimiento Supabase (Advisor Hardening)
+## 11. Endurecimiento de Seguridad y Rendimiento Supabase (Advisor Hardening)
 - [x] **Parche de Seguridad en Autenticación:** Aplicar `SECURITY DEFINER` e inyección segura con `search_path = ''` y llamadas cualificadas a `public.handle_new_user` y `public.sync_user_confirmation`, restringiendo los privilegios RPC.
-- [x] **Parche de Seguridad en Asistencia:** Aplicar `SET search_path = ''` y llamadas de catálogo a `public.mark_event_check_in` y `public.mark_event_check_out`, bloqueando accesos anónimos e inyectando `pg_catalog.now()` AT TIME ZONE 'UTC'.
+- [x] **Parche de Seguridad en Asistencia:** Aplicar `SET search_path = ''` y llamadas de catálogo a `public.mark_event_check_in` and `public.mark_event_check_out`, bloqueando accesos anónimos e inyectando `pg_catalog.now()` AT TIME ZONE 'UTC'.
 - [x] **Parche de Rendimiento RLS (InitPlan Caching):** Resolver alerta de inicialización de RLS en `public.profiles` reemplazando la llamada directa `auth.uid()` por la subconsulta optimizada `(SELECT auth.uid()) IS NOT NULL` en la política `"Enable read access for all authenticated users"`.
 
-## 13. Mejoras Operativas y Estructura Organizacional (Mayo 2026)
+## 12. Mejoras Operativas y Estructura Organizacional (Mayo 2026)
 - [x] **Alineación de Calendario Lunes-Domingo:** Corregir el cálculo de desfase de días en `DatePicker.jsx` para que el inicio de semana comience de forma natural el día Lunes y finalice el Domingo, previniendo errores de visualización de turnos.
 - [x] **Ampliación del Catálogo de Roles Operacionales:** Integrar en el formulario de creación de eventos los 10 nuevos tipos de evento clave (Montaje/Desmontaje, CCTV, Fletes, Servicios Especiales, Visita Técnica, etc.).
 - [x] **Autocompletado de Ubicaciones y Malls:** Incorporar catálogo precargado de 16 Malls en `EventModal.jsx` con direcciones físicas y coordenadas GPS, facilitando la autocompletación inteligente del formulario con protección anti-sobreescritura para personalizaciones manuales previas.
 - [x] **Acceso Híbrido a Portal Trabajador para Administradores:** Habilitar de manera sutil el acceso al WorkerDashboard para roles directivos (`admin` / `viewer`) sin alterar permisos principales en la BD. Integrar el agrupador `"MENÚ TRABAJADOR"` en la barra lateral (`Sidebar.jsx`) y aislar las finanzas individuales y boletas por el identificador del usuario autenticado.
 - [x] **Clima Resiliente y Autorreparable de Alta Velocidad:** Diseñar un sistema de doble endpoint que aborta en 2.0 segundos mediante `AbortController` si la API primaria (Open-Meteo) está caída (502 Bad Gateway), saltando automáticamente al fallback de `wttr.in` de manera completamente imperceptible para el usuario y con logs limpios en consola.
 
-## 14. Validación Automática de Boletas y Sincronización SII (Finanzas 3.5)
+## 13. Validación Automática de Boletas y Sincronización SII (Finanzas 3.5)
 - [x] **Corrección de Desplazamiento de Fecha de Emisión:** Reemplazar el formateador del objeto Date local de JS por manipulación directa de string reversible `DD-MM-YYYY`, solucionando el desfase de -1 día causado por zonas horarias del navegador.
 - [x] **Optimización de Ventana de Sincronización IMAP:** Restablecer la ventana de escaneo automático de correos a 30 días en el script de sincronización `sync-sii-invoices.js` y en la función Deno de Supabase.
 - [x] **Generación de Respaldo Failsafe Pre-3.5:** Crear el archivo comprimido `backup_pre_finanzas_3_5.zip` basado en el último commit estable de Git antes del despliegue contable de la versión 3.5.
@@ -137,7 +132,7 @@
 - [x] **Bloqueo Operacional Horario (Check-In/Out):** Restringir el botón "Marcar Entrada" estrictamente al día del evento (con mensaje dinámico preventivo en ámbar) y el "Marcar Salida" a un plazo de hasta 24h tras el check-in (con advertencia en rojo por expiración).
 - [x] **Depuración de Errores de Inicialización:** Corregir el error de referencia temporal (`ReferenceError`) en la inicialización de `todayStr` reubicando su declaración de forma segura al inicio del callback.
 
-## 15. Sistema de Notificaciones en Tiempo Real y UX Financiero Móvil (Finanzas 3.6)
+## 14. Sistema de Notificaciones en Tiempo Real y UX Financiero Móvil (Finanzas 3.6)
 - [x] **Notificaciones en Tiempo Real para Trabajadores:** Implementación de inserciones en la tabla `notifications` al validar boletas manualmente en el panel administrativo (`Finanzas.jsx`) tanto a nivel individual como en lotes de validación consolidada.
 - [x] **Notificaciones Automáticas SII en Edge Functions:** Actualización de la Cloud Function de Supabase (`fetch-sii-invoices`) para disparar alertas automáticas al trabajador cuando su boleta sea verificada automáticamente o cuando se cree un lote al vuelo.
 - [x] **Optimización de UI/UX Móvil en Tarjetas de Boletas:** Rediseño responsivo de las tarjetas de boletas detectadas en `Finanzas.jsx` mediante flujo flexible (`flex-col sm:flex-row`), evitando desbordamientos de texto e iconos.
@@ -145,6 +140,15 @@
 - [x] **Estado "En Proceso de Pago" Dinámico:** Vinculación en tiempo real del historial de pagos individuales de los trabajadores para que reflejen dinámicamente el estado `"En Proceso de Pago"` (con badge Teal estilizado) cuando su lote mensual correspondiente se encuentre verificado por administración.
 - [x] **Depuración Estricta de TypeScript en Edge Functions:** Corrección de todas las advertencias locales y remotas del compilador TS, incluyendo tipado explícito de parámetros callbacks (`(p: any)`, `(b: any)`), manejo de excepciones `unknown` (`err as any`), y silenciamiento elegante de imports de módulos de Deno (`npm:`) y global de `Deno` usando comentarios de control `// @ts-ignore`.
 
+## 15. Notificaciones Push e Instructivos de Boletas SII (Versión 3.7.4)
+- [x] **Modal de Onboarding Push Failsafe:** Implementar helper `getSafeRegistration` con `Promise.race` y timeout de 2 segundos para evitar que consultas al Service Worker congelen el inicio de sesión.
+- [x] **Actualización de Instructivo SII para Trabajadores:** Agregar aclaración de que el correo con la boleta de honorarios debe ser enviado directamente desde la web del SII (para adjuntar PDF + XML, de lo contrario no es válido).
+- [x] **Definición de Fechas de Pago:** Explicitar en la sección del portal de trabajadores que los pagos se procesan dentro de los primeros 10 días hábiles del mes siguiente.
+- [x] **Rediseño del Panel Informativo:** Letras más claras (`text-xs`), monto bruto visible en tamaño grande (`text-sm`) e iconografía integrada para una visualización premium e instructiva.
+- [x] **Actualización de Versión Global en UI:** Actualizar el indicativo de versión de la aplicación a `v3.7.4` en la firma de consola, pantalla de Login y barra lateral.
+- [x] **Control de Respaldos Git (Tags):** Crear y subir etiquetas de versión (`v3.7.4-stable-push` y `v3.7.4-auth-backup`) para facilitar reversiones rápidas ante regresiones.
 
-
-
+## 16. Pendientes y Tareas Futuras
+- [ ] **Reportes Visuales y Gráficos de Finanzas (Admin):** Gráficos interactivos de barra/línea sobre egresos mensuales y exportación de informes analíticos en PDF.
+- [ ] **Bitácora de Auditoría Operacional (Logs):** Registro e historial detallado de acciones administrativas críticas (ej: creación de eventos, cambios de estados de pago).
+- [ ] **Documentación Completa:** Escribir archivo README.md completo con instrucciones de configuración local y variables de entorno.
