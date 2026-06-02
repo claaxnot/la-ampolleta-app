@@ -183,7 +183,7 @@ export default function Sidebar({ user, onLogout, isOpen, setIsOpen }) {
             title="Ver detalles del sistema"
           >
             <span className="text-[9px] text-gray-500 group-hover:text-amber-400/90 transition-colors font-extrabold uppercase tracking-widest">
-              La Ampolleta Platform v3.7.2b
+              La Ampolleta Platform v3.7.3
             </span>
             <span className="text-[8px] text-gray-600 group-hover:text-gray-400 transition-colors font-medium tracking-wider">
               Engineered by Cristopher Vidal
@@ -234,7 +234,7 @@ export default function Sidebar({ user, onLogout, isOpen, setIsOpen }) {
                   Internal
                 </span>
               </div>
-              <span className="text-[10px] text-gray-500 font-extrabold tracking-wider mb-5">Versión 3.7.2b • Producción</span>
+              <span className="text-[10px] text-gray-500 font-extrabold tracking-wider mb-5">Versión 3.7.3 • Producción</span>
 
               {/* Description */}
               <p className="text-[11px] text-gray-400 leading-relaxed max-w-[280px] mb-5">
