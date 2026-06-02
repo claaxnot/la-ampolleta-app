@@ -74,6 +74,17 @@ export const AuthProvider = ({ children }) => {
         if (session?.user) {
           console.log("🔒 [SECURITY] Session found on startup. Recovering user data.");
           await syncProfileWithUser(session.user.id, session.user.email);
+        } else {
+          // If Supabase session is null, check if we have a stale non-demo user and clear it
+          const savedUser = localStorage.getItem("ampolleta_user");
+          if (savedUser) {
+            const parsed = JSON.parse(savedUser);
+            if (parsed && parsed.id !== "demo-viewer-id") {
+              console.log("🔒 [SECURITY] No active Supabase session found on startup. Clearing stale localStorage.");
+              setUser(null);
+              localStorage.removeItem("ampolleta_user");
+            }
+          }
         }
       } catch (err) {
         console.error("Failed to recover session on mount:", err);

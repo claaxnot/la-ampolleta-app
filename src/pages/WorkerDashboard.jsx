@@ -658,7 +658,7 @@ export default function WorkerDashboard({ user }) {
         supabase.removeChannel(channel);
       };
     }
-  }, [user]);
+  }, [user?.id]);
 
   // Suscripción Realtime en Supabase para actualizaciones en vivo
   useEffect(() => {
@@ -1045,96 +1045,106 @@ export default function WorkerDashboard({ user }) {
   };
 
   const fetchMyEvents = async (workerId) => {
+    if (!workerId) return;
     setIsLoading(true);
-    const { data, error } = await supabase
-      .from('event_assignments')
-      .select(`
-        id,
-        status,
-        payment_status,
-        custom_rate,
-        event_id,
-        event_day_id,
-        invoice_required,
-        invoice_received,
-        invoice_number,
-        invoice_received_at,
-        invoice_amount,
-        event_days (
+    try {
+      const { data, error } = await supabase
+        .from('event_assignments')
+        .select(`
           id,
-          date,
-          start_time,
-          end_time,
-          call_time,
-          setup_time,
           status,
-          notes
-        ),
-        events (
-          id, name, date, time, location, client, status, description,
-          call_time, setup_time, end_time, priority, operational_notes,
-          supervisor_id, type, operational_info_pending,
-          attendance_control_enabled, attendance_require_confirmed, latitude, longitude, allowed_radius_meters,
-          profiles:supervisor_id (
-            name
+          payment_status,
+          custom_rate,
+          event_id,
+          event_day_id,
+          invoice_required,
+          invoice_received,
+          invoice_number,
+          invoice_received_at,
+          invoice_amount,
+          event_days (
+            id,
+            date,
+            start_time,
+            end_time,
+            call_time,
+            setup_time,
+            status,
+            notes
+          ),
+          events (
+            id, name, date, time, location, client, status, description,
+            call_time, setup_time, end_time, priority, operational_notes,
+            supervisor_id, type, operational_info_pending,
+            attendance_control_enabled, attendance_require_confirmed, latitude, longitude, allowed_radius_meters,
+            profiles:supervisor_id (
+              name
+            )
           )
-        )
-      `)
-      .eq('staff_id', workerId);
+        `)
+        .eq('staff_id', workerId);
 
-    if (data) {
-      const formattedEvents = data
-        .map(assignment => {
-          const day = assignment.event_days;
-          const parent = assignment.events || {};
+      if (error) throw error;
 
-          return {
-            assignment_id: assignment.id,
-            assignment_status: assignment.status,
-            payment_status: assignment.payment_status,
-            custom_rate: assignment.custom_rate,
-            event_day_id: assignment.event_day_id,
-            invoice_required: assignment.invoice_required !== undefined ? assignment.invoice_required : true,
-            invoice_received: assignment.invoice_received !== undefined ? assignment.invoice_received : false,
-            invoice_number: assignment.invoice_number || null,
-            invoice_received_at: assignment.invoice_received_at || null,
-            invoice_amount: assignment.invoice_amount ? parseFloat(assignment.invoice_amount) : null,
+      if (data) {
+        const formattedEvents = data
+          .map(assignment => {
+            if (!assignment) return null;
+            const day = assignment.event_days;
+            const parent = assignment.events || {};
 
-            // Parent info
-            id: parent.id,
-            name: parent.name,
-            location: parent.location,
-            client: parent.client,
-            description: parent.description,
-            priority: parent.priority,
-            supervisor_id: parent.supervisor_id,
-            profiles: parent.profiles,
-            type: parent.type,
-            operational_info_pending: parent.operational_info_pending,
-            attendance_control_enabled: parent.attendance_control_enabled,
-            attendance_require_confirmed: parent.attendance_require_confirmed,
-            latitude: parent.latitude,
-            longitude: parent.longitude,
-            allowed_radius_meters: parent.allowed_radius_meters,
+            return {
+              assignment_id: assignment.id,
+              assignment_status: assignment.status,
+              payment_status: assignment.payment_status,
+              custom_rate: assignment.custom_rate,
+              event_day_id: assignment.event_day_id,
+              invoice_required: assignment.invoice_required !== undefined ? assignment.invoice_required : true,
+              invoice_received: assignment.invoice_received !== undefined ? assignment.invoice_received : false,
+              invoice_number: assignment.invoice_number || null,
+              invoice_received_at: assignment.invoice_received_at || null,
+              invoice_amount: assignment.invoice_amount ? parseFloat(assignment.invoice_amount) : null,
 
-            // Dynamic day values with parent fallback
-            date: day ? day.date : parent.date,
-            time: day ? (day.start_time ? day.start_time.substring(0, 5) : parent.time) : parent.time,
-            end_time: day ? (day.end_time ? day.end_time.substring(0, 5) : parent.end_time) : parent.end_time,
-            call_time: day ? (day.call_time ? day.call_time.substring(0, 5) : parent.call_time) : parent.call_time,
-            setup_time: day ? (day.setup_time ? day.setup_time.substring(0, 5) : parent.setup_time) : parent.setup_time,
-            status: day ? day.status : parent.status,
-            notes: day ? day.notes : parent.operational_notes
-          };
-        })
-        .filter(e => e.status?.toLowerCase() !== "cancelado" && e.status?.toLowerCase() !== "cancelled");
+              // Parent info
+              id: parent.id,
+              name: parent.name,
+              location: parent.location,
+              client: parent.client,
+              description: parent.description,
+              priority: parent.priority,
+              supervisor_id: parent.supervisor_id,
+              profiles: parent.profiles,
+              type: parent.type,
+              operational_info_pending: parent.operational_info_pending,
+              attendance_control_enabled: parent.attendance_control_enabled,
+              attendance_require_confirmed: parent.attendance_require_confirmed,
+              latitude: parent.latitude,
+              longitude: parent.longitude,
+              allowed_radius_meters: parent.allowed_radius_meters,
 
-      setAssignedEvents(formattedEvents);
-      fetchMyInvoiceBatches(workerId);
-      fetchMyDbNotifications(workerId, formattedEvents);
-      await fetchAttendanceLogs(workerId);
+              // Dynamic day values with parent fallback
+              date: day ? day.date : parent.date,
+              time: day ? (day.start_time ? day.start_time.substring(0, 5) : parent.time) : parent.time,
+              end_time: day ? (day.end_time ? day.end_time.substring(0, 5) : parent.end_time) : parent.end_time,
+              call_time: day ? (day.call_time ? day.call_time.substring(0, 5) : parent.call_time) : parent.call_time,
+              setup_time: day ? (day.setup_time ? day.setup_time.substring(0, 5) : parent.setup_time) : parent.setup_time,
+              status: day ? day.status : parent.status,
+              notes: day ? day.notes : parent.operational_notes
+            };
+          })
+          .filter(Boolean)
+          .filter(e => e.status?.toLowerCase() !== "cancelado" && e.status?.toLowerCase() !== "cancelled");
+
+        setAssignedEvents(formattedEvents);
+        fetchMyInvoiceBatches(workerId);
+        fetchMyDbNotifications(workerId, formattedEvents);
+        await fetchAttendanceLogs(workerId);
+      }
+    } catch (err) {
+      console.error("❌ Error loading worker events:", err);
+    } finally {
+      setIsLoading(false);
     }
-    setIsLoading(false);
   };
 
   const fetchMyInvoiceBatches = async (workerId) => {
