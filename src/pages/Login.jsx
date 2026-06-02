@@ -6,8 +6,11 @@ import GlassCard from "../components/GlassCard.jsx";
 import Button from "../components/Button.jsx";
 import { toast } from "react-hot-toast";
 
+import { useAuth } from "../hooks/useAuth.js";
+
 export default function Login({ onLogin }) {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -15,6 +18,20 @@ export default function Login({ onLogin }) {
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [logoError, setLogoError] = useState(false);
+
+  React.useEffect(() => {
+    if (user) {
+      if (user.systemRole === 'admin' || user.systemRole === 'viewer') {
+        navigate("/dashboard");
+      } else {
+        navigate("/worker-dashboard");
+      }
+    }
+  }, [user, navigate]);
+
+  if (user) {
+    return null;
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault();
