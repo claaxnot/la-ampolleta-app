@@ -820,8 +820,7 @@ BEGIN
     internal_token := 'la_ampolleta_push_internal_token_secret_2026';
   END IF;
 
-  -- 6. Disparar petición HTTP asíncrona a la Edge Function
-  -- Usamos un bloque EXCEPTION defensivo para que si pg_net no está configurado, no rompa la transacción principal
+  -- 6. Disparar petición HTTP asíncrona mediante firma posicional exacta
   BEGIN
     SELECT net.http_post(
       'https://bvdcbsetmzvmodnklwfp.supabase.co/functions/v1/send-push-dispatcher'::text,
@@ -834,9 +833,10 @@ BEGIN
         'type', NEW.type,
         'related_event_id', NEW.related_event_id
       ),
-      '{}'::jsonb, -- params
+      '{}'::jsonb, -- params (vacío pero mandatorio por posición)
       jsonb_build_object(
         'Content-Type', 'application/json',
+        'Authorization', 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ2ZGNic2V0bXp2bW9kbmtsd2ZwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg3NzcyNDMsImV4cCI6MjA5NDM1MzI0M30.nK7UkraNG_Xhqng7f-FEv9BzBdyMr-MWeuz4Li5AZSc',
         'X-Internal-Token', internal_token
       ),
       10000::integer -- timeout_ms
