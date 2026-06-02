@@ -744,4 +744,101 @@ CREATE POLICY "Users can manage their own subscriptions"
   WITH CHECK ( (select auth.uid()) = user_id );
 
 
+-- ==========================================================
+-- V3.7.2-B - FASE B1: TABLA PUSH_DELIVERY_LOGS Y TRIGGER AUTOMÁTICO
+-- ==========================================================
+
+-- Habilitar extensión pg_net si no está activa
+CREATE EXTENSION IF NOT EXISTS pg_net;
+
+-- Crear tabla push_delivery_logs
+CREATE TABLE IF NOT EXISTS public.push_delivery_logs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  notification_id UUID NOT NULL REFERENCES public.notifications(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  status TEXT NOT NULL DEFAULT 'pending', -- 'pending', 'success', 'failed', 'no_subscribers'
+  sent_count INT DEFAULT 0,
+  failed_count INT DEFAULT 0,
+  error_message TEXT NULL,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- RLS en push_delivery_logs
+ALTER TABLE public.push_delivery_logs ENABLE ROW LEVEL SECURITY;
+
+-- Los usuarios pueden leer sus propios logs de envíos push
+DROP POLICY IF EXISTS "Users can view their own push logs" ON public.push_delivery_logs;
+CREATE POLICY "Users can view their own push logs" 
+  ON public.push_delivery_logs 
+  FOR SELECT 
+  TO authenticated 
+  USING ( (select auth.uid()) = user_id );
+
+-- Función Trigger para encolar el push de forma asíncrona
+CREATE OR REPLACE FUNCTION public.enqueue_push_notification()
+RETURNS TRIGGER AS $$
+DECLARE
+  has_active_subs BOOLEAN;
+  log_id UUID;
+BEGIN
+  -- 1. Filtrar solo por tipos aprobados (event_assigned, event_updated, event_cancelled, assignment_removed)
+  IF NEW.type NOT IN ('event_assigned', 'event_updated', 'event_cancelled', 'assignment_removed') THEN
+    RETURN NEW;
+  END IF;
+
+  -- 2. Verificar si el usuario tiene dispositivos con push activos
+  SELECT EXISTS(
+    SELECT 1 FROM public.push_subscriptions 
+    WHERE user_id = NEW.user_id AND active = true
+  ) INTO has_active_subs;
+
+  -- 3. Si no tiene suscripciones, salir pacíficamente sin hacer nada
+  IF NOT has_active_subs THEN
+    RETURN NEW;
+  END IF;
+
+  -- 4. Registrar en push_delivery_logs de forma segura
+  INSERT INTO public.push_delivery_logs (notification_id, user_id, status)
+  VALUES (NEW.id, NEW.user_id, 'pending')
+  RETURNING id INTO log_id;
+
+  -- 5. Disparar petición HTTP asíncrona a la Edge Function
+  -- Usamos un bloque EXCEPTION defensivo para que si pg_net no está configurado, no rompa la transacción principal
+  BEGIN
+    PERFORM net.http_post(
+      url := 'https://bvdcbsetmzvmodnklwfp.supabase.co/functions/v1/send-push-dispatcher',
+      headers := jsonb_build_object(
+        'Content-Type', 'application/json',
+        'Authorization', 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ2ZGNic2V0bXp2bW9kbmtsd2ZwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg3NzcyNDMsImV4cCI6MjA5NDM1MzI0M30.nK7UkraNG_Xhqng7f-FEv9BzBdyMr-MWeuz4Li5AZSc'
+      ),
+      body := jsonb_build_object(
+        'notification_id', NEW.id,
+        'log_id', log_id,
+        'user_id', NEW.user_id,
+        'title', NEW.title,
+        'description', NEW.description,
+        'type', NEW.type,
+        'related_event_id', NEW.related_event_id
+      ),
+      timeout_ms := 10000
+    );
+  EXCEPTION WHEN OTHERS THEN
+    UPDATE public.push_delivery_logs 
+    SET status = 'failed', error_message = 'Error en base de datos al encolar petición pg_net: ' || SQLERRM
+    WHERE id = log_id;
+  END;
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Crear el disparador en la tabla public.notifications
+DROP TRIGGER IF EXISTS trg_enqueue_push_notification ON public.notifications;
+CREATE TRIGGER trg_enqueue_push_notification
+  AFTER INSERT ON public.notifications
+  FOR EACH ROW
+  EXECUTE FUNCTION public.enqueue_push_notification();
+
+
 
