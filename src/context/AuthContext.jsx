@@ -69,6 +69,11 @@ export const AuthProvider = ({ children }) => {
 
   // 1. Initial Session Recovery and onAuthStateChange listener (unconditional on mount)
   useEffect(() => {
+    const recoverTimeout = setTimeout(() => {
+      console.warn("⚠️ recoverSession safety timeout triggered after 3s. Forcing initialization.");
+      setInitialized(true);
+    }, 3000);
+
     const recoverSession = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
@@ -90,6 +95,7 @@ export const AuthProvider = ({ children }) => {
       } catch (err) {
         console.error("Failed to recover session on mount:", err);
       } finally {
+        clearTimeout(recoverTimeout);
         setInitialized(true);
       }
     };
