@@ -20,18 +20,51 @@ const supabaseAnonKey = env.VITE_SUPABASE_ANON_KEY;
 
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-async function inspect() {
-  console.log("Fetching registered push subscriptions...");
-  const { data, error } = await supabase
+async function testInsert() {
+  const fakeUserId = '00000000-0000-0000-0000-000000000000';
+  
+  console.log("Testing insert with Format A ('endpoint', 'p256dh', 'auth')...");
+  const payloadFormatA = {
+    user_id: fakeUserId,
+    endpoint: 'https://fcm.googleapis.com/fcm/send/test-endpoint-A',
+    p256dh: 'test-p256dh',
+    auth: 'test-auth',
+    platform: 'Desktop',
+    browser: 'Chrome',
+    device_label: 'Test A',
+    active: true
+  };
+
+  const { error: errorA } = await supabase
     .from('push_subscriptions')
-    .select('id, user_id, platform, browser, device_label, active, created_at, last_seen_at');
-    
-  if (error) {
-    console.error("Error fetching subscriptions:", error);
+    .insert([payloadFormatA]);
+
+  if (errorA) {
+    console.log("Format A Result:", errorA.message);
   } else {
-    console.log("Current subscriptions in database:");
-    console.log(data);
+    console.log("Format A Success! (Wait, how did it bypass foreign key? Or maybe it created it?)");
+  }
+
+  console.log("\nTesting insert with Format B ('token')...");
+  const payloadFormatB = {
+    user_id: fakeUserId,
+    token: 'test-token-B',
+    provider: 'web-push',
+    platform: 'Desktop',
+    browser: 'Chrome',
+    device_label: 'Test B',
+    active: true
+  };
+
+  const { error: errorB } = await supabase
+    .from('push_subscriptions')
+    .insert([payloadFormatB]);
+
+  if (errorB) {
+    console.log("Format B Result:", errorB.message);
+  } else {
+    console.log("Format B Success!");
   }
 }
 
-inspect();
+testInsert();
