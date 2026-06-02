@@ -43,7 +43,7 @@ export const PushOnboardingModal = () => {
     // Basic checks for rendering the modal
     if (!user || user.id === "demo-viewer-id") return;
     if (!pushSupported) return;
-    if (isSubscribed || pushPermission === 'granted') return;
+    if (isSubscribed) return;
 
     // Check localStorage rules
     const isCompleted = localStorage.getItem('push_onboarding_completed') === 'true';
@@ -233,7 +233,7 @@ export const PushOnboardingBanner = () => {
   useEffect(() => {
     if (!user || user.id === "demo-viewer-id") return;
     if (!pushSupported) return;
-    if (isSubscribed || pushPermission === 'granted') return;
+    if (isSubscribed) return;
 
     // Check localStorage rules
     const isCompleted = localStorage.getItem('push_onboarding_completed') === 'true';
