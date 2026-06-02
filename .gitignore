@@ -4,6 +4,5 @@ node_modules
 .env.*.local
 .env.development
 .env.production
-.env.example
 *.log
 .DS_Store
