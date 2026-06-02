@@ -19,8 +19,32 @@ import { Toaster } from "react-hot-toast";
 import { PushOnboardingModal } from "./components/PushOnboarding.jsx";
 
 function App() {
-  const { user, login: handleLogin, logout: handleLogout, updateUser } = useAuth();
+  const { user, login: handleLogin, logout: handleLogout, updateUser, initialized } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
+
+  if (!initialized) {
+    return (
+      <div className="relative flex items-center justify-center h-screen bg-gray-900 text-white font-sans antialiased overflow-hidden">
+        {/* Ambient background glows */}
+        <div className="absolute -top-20 -left-20 w-96 h-96 bg-red-600/10 rounded-full blur-3xl"></div>
+        <div className="absolute -bottom-24 -right-24 w-[500px] h-[500px] bg-amber-500/10 rounded-full blur-3xl"></div>
+        
+        <div className="z-10 text-center flex flex-col items-center">
+          {/* Pulsing lightbulb icon */}
+          <div className="w-20 h-20 bg-amber-500/10 border border-amber-500/30 rounded-2xl flex items-center justify-center mb-6 shadow-[0_0_30px_rgba(245,158,11,0.15)] animate-pulse">
+            <span className="text-3xl text-amber-400">💡</span>
+          </div>
+          <h2 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-amber-200 to-amber-500 mb-2">
+            La Ampolleta
+          </h2>
+          <p className="text-gray-400 text-sm mb-6 font-medium">Iniciando conexión segura...</p>
+          
+          {/* Smooth spinning loader */}
+          <div className="w-10 h-10 border-4 border-amber-500/20 border-t-amber-500 rounded-full animate-spin"></div>
+        </div>
+      </div>
+    );
+  }
 
 
 

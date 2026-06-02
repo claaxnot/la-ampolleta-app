@@ -57,7 +57,7 @@ export default function Login({ onLogin }) {
 
     // Safety timeout to prevent getting stuck in "Conectando..." in standalone PWA contexts
     const safetyTimeout = setTimeout(async () => {
-      console.warn("⚠️ Login safety timeout triggered after 8s.");
+      console.warn("⚠️ Login safety timeout triggered after 15s.");
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (session?.user) {
@@ -96,7 +96,7 @@ export default function Login({ onLogin }) {
       setIsLoading(false);
       setError("La conexión tardó demasiado. Por favor, intenta de nuevo.");
       toast.error("⚠️ La conexión tardó demasiado. Reintenta.");
-    }, 8000);
+    }, 15000);
 
     try {
       const { data, error: authError } = await supabase.auth.signInWithPassword({
