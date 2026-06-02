@@ -41,6 +41,7 @@ import { supabase } from "../lib/supabase.js";
 import { toast } from "react-hot-toast";
 import DatePicker from "../components/DatePicker.jsx";
 import CurrencyInputCLP from "../components/CurrencyInputCLP.jsx";
+import { PushOnboardingBanner } from "../components/PushOnboarding.jsx";
 
 
 // Helper functions for mini calendar
@@ -1507,6 +1508,9 @@ export default function WorkerDashboard({ user }) {
           </div>
         </div>
       </motion.div>
+
+      {/* Push Onboarding Banner */}
+      <PushOnboardingBanner />
 
       {/* Selector de Pestañas Premium (Visible solo en móviles/tablets) */}
       <motion.div

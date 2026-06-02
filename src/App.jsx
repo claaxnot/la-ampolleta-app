@@ -16,6 +16,7 @@ import Finanzas from "./pages/Finanzas.jsx";
 
 import { useAuth } from "./hooks/useAuth.js";
 import { Toaster } from "react-hot-toast";
+import { PushOnboardingModal } from "./components/PushOnboarding.jsx";
 
 function App() {
   const { user, login: handleLogin, logout: handleLogout, updateUser } = useAuth();
@@ -90,6 +91,7 @@ function App() {
       {/* Gradient / orb background */}
       <div className="absolute -top-20 -left-20 w-96 h-96 bg-red-600/20 rounded-full blur-3xl"></div>
       <div className="absolute -bottom-24 -right-24 w-[500px] h-[500px] bg-amber-500/15 rounded-full blur-3xl"></div>
+    {user && <PushOnboardingModal />}
     {user && <Sidebar user={user} onLogout={handleLogout} isOpen={mobileMenuOpen} setIsOpen={setMobileMenuOpen} />}
     <div className="flex-1 flex flex-col overflow-hidden">
       {user && <TopBar user={user} onToggleMenu={() => setMobileMenuOpen(true)} />}
