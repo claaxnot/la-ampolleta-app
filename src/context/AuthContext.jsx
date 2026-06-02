@@ -8,6 +8,7 @@ export const AuthProvider = ({ children }) => {
     const savedUser = localStorage.getItem("ampolleta_user");
     return savedUser ? JSON.parse(savedUser) : null;
   });
+  const [initialized, setInitialized] = useState(false);
 
   const login = (userInfo) => {
     setUser(userInfo);
@@ -88,6 +89,8 @@ export const AuthProvider = ({ children }) => {
         }
       } catch (err) {
         console.error("Failed to recover session on mount:", err);
+      } finally {
+        setInitialized(true);
       }
     };
 
@@ -172,7 +175,7 @@ export const AuthProvider = ({ children }) => {
   }, [user?.id]);
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, updateUser }}>
+    <AuthContext.Provider value={{ user, login, logout, updateUser, initialized }}>
       {children}
     </AuthContext.Provider>
   );
