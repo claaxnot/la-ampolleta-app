@@ -597,10 +597,21 @@ SECURITY DEFINER
 SET search_path = ''
 AS $$
 DECLARE
+  event_exists boolean;
   event_name text;
   event_date date;
   event_status text;
 BEGIN
+  -- Verificar si el evento aún existe (evita errores en borrados en cascada)
+  SELECT EXISTS(
+    SELECT 1 FROM public.events WHERE id = OLD.event_id
+  ) INTO event_exists;
+
+  -- Si el evento fue eliminado, salir inmediatamente
+  IF NOT event_exists THEN
+    RETURN OLD;
+  END IF;
+
   SELECT name, date, status INTO event_name, event_date, event_status 
   FROM public.events 
   WHERE id = OLD.event_id;
