@@ -110,7 +110,7 @@ export const AuthProvider = ({ children }) => {
     };
   }, []);
 
-  // 2. Active Session Status Verification (re-runs when user.id changes)
+  // 2. Active Session Status Verification (runs periodically to avoid mount/login race conditions)
   useEffect(() => {
     if (!user || user.id === "demo-viewer-id") return;
 
@@ -132,23 +132,29 @@ export const AuthProvider = ({ children }) => {
 
         if (profile) {
           const systemRole = profile.system_role || (user.email === 'admin@laampolleta.tv' ? 'admin' : 'worker');
+          const dbAvatar = profile.avatar_url || null;
+          const dbCuenta = profile.cuenta_destino || null;
+          const dbBanco = profile.codigo_banco_destino || null;
+          const dbRole = profile.role || 'Staff';
+          const dbName = profile.name || user.name;
+
           if (
             systemRole !== user.systemRole ||
-            profile.role !== user.role ||
-            profile.name !== user.name ||
-            profile.avatar_url !== user.avatar ||
-            profile.cuenta_destino !== user.cuenta_destino ||
-            profile.codigo_banco_destino !== user.codigo_banco_destino
+            dbRole !== user.role ||
+            dbName !== user.name ||
+            dbAvatar !== user.avatar ||
+            dbCuenta !== user.cuenta_destino ||
+            dbBanco !== user.codigo_banco_destino
           ) {
             console.log("🔒 [SECURITY]: Profile details updated in database. Syncing session.");
             updateUser({
               ...user,
               systemRole,
-              role: profile.role || 'Staff',
-              name: profile.name || user.name,
-              avatar: profile.avatar_url || null,
-              cuenta_destino: profile.cuenta_destino || null,
-              codigo_banco_destino: profile.codigo_banco_destino || null
+              role: dbRole,
+              name: dbName,
+              avatar: dbAvatar,
+              cuenta_destino: dbCuenta,
+              codigo_banco_destino: dbBanco
             });
           }
         }
@@ -157,7 +163,12 @@ export const AuthProvider = ({ children }) => {
       }
     };
 
-    verifyUserStatus();
+    // Verify periodically every 2 minutes while active instead of immediately on mount/login
+    const interval = setInterval(verifyUserStatus, 120000);
+
+    return () => {
+      clearInterval(interval);
+    };
   }, [user?.id]);
 
   return (
