@@ -24,6 +24,7 @@ export default function Calendar() {
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [events, setEvents] = useState([]);
+  const [selectedDay, setSelectedDay] = useState(new Date().getDate());
 
   React.useEffect(() => {
     fetchEvents();
@@ -94,10 +95,12 @@ export default function Calendar() {
 
   const handlePrevMonth = () => {
     setCurrentDate(new Date(currentYear, currentMonth - 1, 1));
+    setSelectedDay(1);
   };
 
   const handleNextMonth = () => {
     setCurrentDate(new Date(currentYear, currentMonth + 1, 1));
+    setSelectedDay(1);
   };
 
   // Crear arrays para dibujar la cuadrícula
@@ -117,6 +120,8 @@ export default function Calendar() {
     });
   };
 
+  const selectedDayEvents = getEventsForDay(selectedDay);
+
   return (
     <motion.div
       className="p-4 md:p-6"
@@ -124,14 +129,14 @@ export default function Calendar() {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
     >
-      <GlassCard className="p-6 flex flex-col min-h-[85vh]">
+      <GlassCard className="p-4 md:p-6 flex flex-col min-h-[85vh]">
         {/* Cabecera del Calendario */}
-        <div className="flex flex-col md:flex-row items-center justify-between mb-8 gap-4">
+        <div className="flex flex-col md:flex-row items-center justify-between mb-6 md:mb-8 gap-4">
           <div className="flex items-center gap-4">
             <div className="p-3 bg-primary/20 rounded-xl text-primary shadow-[0_0_15px_rgba(234,179,8,0.3)]">
               <CalendarIcon className="w-6 h-6" />
             </div>
-            <h2 className="text-3xl md:text-4xl font-bold text-white tracking-wide">
+            <h2 className="text-2xl md:text-4xl font-bold text-white tracking-wide">
               {MONTH_NAMES[currentMonth]} <span className="text-gray-400 font-light">{currentYear}</span>
             </h2>
           </div>
@@ -141,11 +146,15 @@ export default function Calendar() {
               onClick={handlePrevMonth} 
               className="p-2 rounded-lg hover:bg-gray-700/50 text-gray-300 hover:text-white transition-all"
             >
-              <ChevronLeft className="w-6 h-6" />
+              <ChevronLeft className="w-5 h-5 md:w-6 md:h-6" />
             </button>
             <button 
-              onClick={() => setCurrentDate(new Date())} 
-              className="px-6 py-2 rounded-lg bg-gray-700/30 hover:bg-primary/20 hover:text-primary text-white transition-all font-medium"
+              onClick={() => {
+                const today = new Date();
+                setCurrentDate(today);
+                setSelectedDay(today.getDate());
+              }} 
+              className="px-4 md:px-6 py-2 rounded-lg bg-gray-700/30 hover:bg-primary/20 hover:text-primary text-white transition-all text-sm md:text-base font-medium"
             >
               Hoy
             </button>
@@ -153,27 +162,27 @@ export default function Calendar() {
               onClick={handleNextMonth} 
               className="p-2 rounded-lg hover:bg-gray-700/50 text-gray-300 hover:text-white transition-all"
             >
-              <ChevronRight className="w-6 h-6" />
+              <ChevronRight className="w-5 h-5 md:w-6 md:h-6" />
             </button>
           </div>
         </div>
 
         {/* Días de la Semana */}
-        <div className="grid grid-cols-7 gap-2 md:gap-4 mb-2 md:mb-4">
+        <div className="grid grid-cols-7 gap-1 md:gap-4 mb-2 md:mb-4">
           {DAY_NAMES.map(day => (
-            <div key={day} className="text-center text-xs md:text-sm font-semibold text-gray-400 uppercase tracking-wider py-2">
+            <div key={day} className="text-center text-[10px] md:text-sm font-semibold text-gray-400 uppercase tracking-wider py-1 md:py-2">
               {day}
             </div>
           ))}
         </div>
 
         {/* Cuadrícula del Calendario */}
-        <div className="grid grid-cols-7 gap-2 md:gap-4 flex-1">
+        <div className="grid grid-cols-7 gap-1 md:gap-4">
           {/* Celdas vacías (días del mes anterior) */}
           {blanks.map(blank => (
             <div 
               key={`blank-${blank}`} 
-              className="rounded-2xl bg-white/5 border border-white/5 opacity-40 min-h-[100px] md:min-h-[140px]" 
+              className="rounded-xl md:rounded-2xl bg-white/5 border border-white/5 opacity-30 h-10 md:min-h-[140px]" 
             />
           ))}
           
@@ -184,36 +193,74 @@ export default function Calendar() {
               day === new Date().getDate() && 
               currentMonth === new Date().getMonth() && 
               currentYear === new Date().getFullYear();
+            const isSelected = day === selectedDay;
 
             return (
               <motion.div
                 key={day}
                 whileHover={{ scale: 1.02, zIndex: 10 }}
-                className={`p-2 md:p-3 rounded-2xl border min-h-[100px] md:min-h-[140px] transition-all flex flex-col relative group ${
+                onClick={() => setSelectedDay(day)}
+                className={`p-1 md:p-3 rounded-xl md:rounded-2xl border h-12 md:h-auto md:min-h-[140px] transition-all flex flex-col justify-between md:justify-start cursor-pointer relative group ${
                   isToday 
                     ? 'bg-primary/10 border-primary/50 shadow-[inset_0_0_20px_rgba(234,179,8,0.15)]' 
-                    : 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20'
+                    : isSelected
+                      ? 'bg-amber-500/10 border-amber-500/50 shadow-[inset_0_0_15px_rgba(245,158,11,0.15)]'
+                      : 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20'
                 }`}
               >
-                <div className="flex justify-between items-start mb-2">
-                  <span className={`flex items-center justify-center w-8 h-8 rounded-full text-sm md:text-base font-bold ${
+                <div className="flex justify-between items-center md:items-start w-full">
+                  <span className={`flex items-center justify-center w-5 h-5 md:w-8 md:h-8 rounded-full text-xs md:text-base font-bold ${
                     isToday ? 'bg-primary text-gray-900' : 'text-gray-200'
                   }`}>
                     {day}
                   </span>
                   
-                  {/* Badge contador de eventos */}
+                  {/* Badge contador de eventos - Desktop */}
                   {dayEvents.length > 0 && (
-                    <span className="text-[10px] md:text-xs bg-gray-800/80 text-gray-300 px-2 py-0.5 rounded-full border border-gray-700">
+                    <span className="hidden md:inline-block text-[10px] md:text-xs bg-gray-800/80 text-gray-300 px-2 py-0.5 rounded-full border border-gray-700">
                       {dayEvents.length} {dayEvents.length === 1 ? 'Evt' : 'Evts'}
                     </span>
                   )}
                 </div>
+
+                {/* Mobile: Puntos indicadores de eventos */}
+                {dayEvents.length > 0 && (
+                  <div className="flex md:hidden justify-center gap-0.5 mt-0.5 w-full">
+                    {dayEvents.slice(0, 3).map((event, idx) => {
+                      const getDotColor = (status) => {
+                        switch (status?.toLowerCase()) {
+                          case "confirmado":
+                          case "confirmed":
+                          case "active":
+                          case "activo":
+                            return "bg-emerald-400";
+                          case "completado":
+                          case "completed":
+                          case "finalizado":
+                            return "bg-gray-400";
+                          case "cancelado":
+                          case "cancelled":
+                            return "bg-red-400";
+                          default:
+                            return "bg-amber-400";
+                        }
+                      };
+                      return (
+                        <span 
+                          key={idx} 
+                          className={`w-1 h-1 rounded-full ${getDotColor(event.status)}`}
+                        />
+                      );
+                    })}
+                    {dayEvents.length > 3 && (
+                      <span className="text-[7px] text-gray-500 font-black leading-none">+</span>
+                    )}
+                  </div>
+                )}
                 
-                {/* Lista de eventos del día */}
-                <div className="flex-1 overflow-y-auto space-y-1.5 custom-scrollbar pr-1">
+                {/* Lista de eventos del día - Desktop */}
+                <div className="hidden md:block flex-1 overflow-y-auto space-y-1.5 custom-scrollbar pr-1 mt-2">
                   {dayEvents.map(event => {
-                    // Determinar el color según el estado con mapeador robusto tricolor
                     const getStatusColor = (status) => {
                       switch (status?.toLowerCase()) {
                         case "confirmado":
@@ -228,10 +275,6 @@ export default function Calendar() {
                         case "cancelado":
                         case "cancelled":
                           return "bg-red-500/20 text-red-300 border-red-500/30 hover:bg-red-500/30";
-                        case "planned":
-                        case "planificado":
-                        case "pendiente":
-                        case "en progreso":
                         default:
                           return "bg-amber-500/20 text-amber-300 border-amber-500/30 hover:bg-amber-500/30";
                       }
@@ -241,7 +284,8 @@ export default function Calendar() {
                     return (
                       <div 
                         key={event.day_id || event.id}
-                        onClick={() => {
+                        onClick={(e) => {
+                          e.stopPropagation();
                           setSelectedEvent(event);
                           setIsDetailsOpen(true);
                         }}
@@ -260,6 +304,78 @@ export default function Calendar() {
               </motion.div>
             );
           })}
+        </div>
+
+        {/* Mobile: Detalle de Eventos para el día seleccionado */}
+        <div className="block md:hidden mt-6 border-t border-white/10 pt-4 flex-1">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-base font-bold text-white flex items-center gap-2">
+              <Clock className="w-4 h-4 text-amber-400" />
+              <span>Eventos del {selectedDay} de {MONTH_NAMES[currentMonth]}</span>
+            </h3>
+            <span className="text-[10px] bg-gray-800 text-gray-300 px-2 py-0.5 rounded-lg border border-gray-700 font-medium">
+              {selectedDayEvents.length} {selectedDayEvents.length === 1 ? 'evento' : 'eventos'}
+            </span>
+          </div>
+          
+          {selectedDayEvents.length === 0 ? (
+            <div className="p-6 text-center text-xs text-gray-500 bg-white/5 rounded-2xl border border-white/5">
+              No hay eventos programados para este día.
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {selectedDayEvents.map(event => {
+                const getStatusColor = (status) => {
+                  switch (status?.toLowerCase()) {
+                    case "confirmado":
+                    case "confirmed":
+                    case "active":
+                    case "activo":
+                      return "bg-emerald-500/10 text-emerald-400 border-emerald-500/20";
+                    case "completado":
+                    case "completed":
+                    case "finalizado":
+                      return "bg-gray-500/10 text-gray-400 border-gray-500/20";
+                    case "cancelado":
+                    case "cancelled":
+                      return "bg-red-500/10 text-red-400 border-red-500/20";
+                    default:
+                      return "bg-amber-500/10 text-amber-400 border-amber-500/20";
+                  }
+                };
+                const statusClass = getStatusColor(event.status);
+                
+                return (
+                  <div
+                    key={event.day_id || event.id}
+                    onClick={() => {
+                      setSelectedEvent(event);
+                      setIsDetailsOpen(true);
+                    }}
+                    className="p-3 bg-white/5 rounded-xl border border-white/10 hover:bg-white/10 hover:border-white/20 transition-all cursor-pointer flex flex-col gap-2 active:scale-[0.98]"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <span className="font-bold text-xs text-white leading-snug">{event.name}</span>
+                      <span className={`text-[9px] px-1.5 py-0.5 rounded border uppercase tracking-wider font-extrabold shrink-0 ${statusClass}`}>
+                        {event.status || 'Planificado'}
+                      </span>
+                    </div>
+                    
+                    <div className="flex flex-col gap-1 text-[11px] text-gray-400">
+                      <div className="flex items-center gap-1.5">
+                        <Clock className="w-3 h-3 text-amber-400 shrink-0" />
+                        <span>Horario: <strong className="text-gray-200">{event.time} - {event.end_time}</strong></span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-3 h-3 flex items-center justify-center text-amber-400 shrink-0">📍</span>
+                        <span className="truncate">{event.location}</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </GlassCard>
 
