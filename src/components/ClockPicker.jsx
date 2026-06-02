@@ -78,9 +78,7 @@ export default function ClockPicker({ value, onChange, label, id, error, align =
       const index = hoursList.indexOf(currentHour);
       return index * 30; // 360 / 12 = 30 deg per hour
     } else {
-      // Find nearest 5-minute index
-      const index = minutesList.indexOf(Math.round(currentMinute / 5) * 5 % 60);
-      return index >= 0 ? index * 30 : (currentMinute * 6); // 360 / 60 = 6 deg per minute
+      return currentMinute * 6; // 360 / 60 = 6 deg per minute for exact precision!
     }
   };
 
@@ -189,7 +187,7 @@ export default function ClockPicker({ value, onChange, label, id, error, align =
             ) : (
               minutesList.map((m, i) => {
                 const { x, y } = getCoords(i, 12);
-                const isSelected = Math.round(currentMinute / 5) * 5 % 60 === m;
+                const isSelected = currentMinute === m;
                 return (
                   <button
                     key={`m-${m}`}
@@ -204,6 +202,38 @@ export default function ClockPicker({ value, onChange, label, id, error, align =
               })
             )}
           </div>
+
+          {/* Stepper de Ajuste Fino para Minutos */}
+          {mode === "minutes" && (
+            <div className="flex items-center justify-between w-full px-2.5 mt-3.5 bg-white/5 border border-white/5 py-1.5 rounded-2xl">
+              <span className="text-[9px] text-gray-400 font-extrabold uppercase tracking-widest">Ajuste Fino</span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const nextMin = (currentMinute - 1 + 60) % 60;
+                    handleMinuteSelect(nextMin);
+                  }}
+                  className="w-6 h-6 rounded-lg bg-gray-800 hover:bg-gray-700 active:scale-95 flex items-center justify-center text-xs font-black text-gray-300 hover:text-white transition-all"
+                >
+                  -1
+                </button>
+                <span className="text-xs font-black text-amber-400 w-5 text-center">
+                  {String(currentMinute).padStart(2, "0")}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const nextMin = (currentMinute + 1) % 60;
+                    handleMinuteSelect(nextMin);
+                  }}
+                  className="w-6 h-6 rounded-lg bg-gray-800 hover:bg-gray-700 active:scale-95 flex items-center justify-center text-xs font-black text-gray-300 hover:text-white transition-all"
+                >
+                  +1
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Quick Confirmation Button */}
           <button
