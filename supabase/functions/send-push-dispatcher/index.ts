@@ -128,6 +128,18 @@ serve(async (req: Request) => {
     } else if (type === "assignment_removed") {
       pushBody = "🚫 Citación removida. Revisa tu panel para más detalles.";
       pushUrl = "/";
+    } else if (type === "invoice_verified") {
+      pushBody = "🧾 Boleta validada. Tu documentación ha sido verificada con éxito.";
+      pushUrl = "/finanzas";
+    } else if (type === "payment_released") {
+      pushBody = "💰 Pago liberado. Tu remuneración está lista para cobrar.";
+      pushUrl = "/finanzas";
+    } else if (type === "payment_paid") {
+      pushBody = "✅ Pago liquidado. Se ha completado la transferencia bancaria.";
+      pushUrl = "/finanzas";
+    } else if (type === "attendance_warning") {
+      pushBody = "⚠️ Alerta de asistencia. Revisa los detalles de tu jornada.";
+      pushUrl = "/";
     }
 
     const pushPayload = JSON.stringify({

@@ -784,8 +784,17 @@ DECLARE
   internal_token TEXT;
   req_id BIGINT;
 BEGIN
-  -- 1. Filtrar solo por tipos aprobados (event_assigned, event_updated, event_cancelled, assignment_removed)
-  IF NEW.type NOT IN ('event_assigned', 'event_updated', 'event_cancelled', 'assignment_removed') THEN
+  -- 1. Filtrar solo por tipos aprobados
+  IF NEW.type NOT IN (
+    'event_assigned', 
+    'event_updated', 
+    'event_cancelled', 
+    'assignment_removed',
+    'invoice_verified',
+    'payment_released',
+    'payment_paid',
+    'attendance_warning'
+  ) THEN
     RETURN NEW;
   END IF;
 
