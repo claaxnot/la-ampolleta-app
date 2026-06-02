@@ -4,6 +4,21 @@ import { useAuth } from './useAuth.js';
 
 const VAPID_PUBLIC_KEY = "BK6xAJN2En_UF2GqhoXB_UPpt_lKy__dlpOSOb7nYnhRiOv_tvGZ_NqlcqfXkGQjADrRJzxVYKLhVDcPv7ceFT0";
 
+// Helper to get service worker registration without hanging indefinitely
+const getSafeRegistration = async () => {
+  if (!('serviceWorker' in navigator)) return null;
+  try {
+    const reg = await navigator.serviceWorker.getRegistration();
+    if (reg) return reg;
+  } catch (e) {
+    console.warn("⚠️ getRegistration falló, usando ready:", e);
+  }
+  return Promise.race([
+    navigator.serviceWorker.ready,
+    new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout esperando al Service Worker ready")), 2000))
+  ]);
+};
+
 export const usePushNotifications = (passedUser) => {
   const { user: authUser } = useAuth();
   const currentUser = passedUser || authUser || {};
@@ -23,11 +38,16 @@ export const usePushNotifications = (passedUser) => {
       return;
     }
     try {
-      const reg = await navigator.serviceWorker.ready;
+      const reg = await getSafeRegistration();
+      if (!reg) {
+        setIsSubscribed(false);
+        return;
+      }
       const sub = await reg.pushManager.getSubscription();
       setIsSubscribed(!!sub);
     } catch (err) {
-      console.warn("⚠️ Error al verificar suscripción push:", err);
+      console.warn("⚠️ Error al verificar suscripción push o timeout de Service Worker:", err);
+      setIsSubscribed(false);
     }
   }, []);
 
@@ -62,7 +82,10 @@ export const usePushNotifications = (passedUser) => {
         throw new Error("El permiso de notificaciones fue denegado.");
       }
 
-      const reg = await navigator.serviceWorker.ready;
+      const reg = await getSafeRegistration();
+      if (!reg) {
+        throw new Error("No se pudo obtener la registración del Service Worker.");
+      }
 
       // Convertir llave VAPID a array binario para PushManager
       const urlBase64ToUint8Array = (base64String) => {
@@ -140,7 +163,10 @@ export const usePushNotifications = (passedUser) => {
     setPushLoading(true);
     setMessage("");
     try {
-      const reg = await navigator.serviceWorker.ready;
+      const reg = await getSafeRegistration();
+      if (!reg) {
+        throw new Error("No se pudo obtener la registración del Service Worker.");
+      }
       const sub = await reg.pushManager.getSubscription();
 
       if (sub) {
