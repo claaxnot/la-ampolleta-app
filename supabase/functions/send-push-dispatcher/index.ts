@@ -15,7 +15,7 @@ declare const Deno: any;
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-internal-token",
 };
 
 serve(async (req: Request) => {
@@ -30,16 +30,33 @@ serve(async (req: Request) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // 2. Extraer y verificar la autorización de la petición (por seguridad de pg_net)
+    // 2. Extraer cabeceras de autorización
     const authHeader = req.headers.get("Authorization") || "";
-    if (!authHeader) {
+    const internalHeader = req.headers.get("X-Internal-Token") || "";
+
+    // 3. Validar token interno (Vault) o en su defecto JWT estándar
+    const expectedInternalToken = Deno.env.get("INTERNAL_PUSH_TOKEN") || "la_ampolleta_push_internal_token_secret_2026";
+    let isAuthorized = false;
+
+    if (internalHeader && internalHeader === expectedInternalToken) {
+      isAuthorized = true;
+    } else if (authHeader) {
+      // Fallback: Validar con JWT estándar (útil para pruebas manuales autenticadas desde el cliente)
+      const token = authHeader.replace("Bearer ", "");
+      const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+      if (!authError && user) {
+        isAuthorized = true;
+      }
+    }
+
+    if (!isAuthorized) {
       return new Response(
-        JSON.stringify({ success: false, message: "Falta encabezado de autorización." }),
+        JSON.stringify({ success: false, message: "Petición no autorizada. Acceso denegado." }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // 3. Parsear el payload enviado desde el trigger de base de datos
+    // 4. Parsear el payload enviado desde el trigger de base de datos
     let requestData: any = {};
     try {
       requestData = await req.json();
@@ -59,7 +76,7 @@ serve(async (req: Request) => {
       );
     }
 
-    // 4. Cargar credenciales VAPID
+    // 5. Cargar credenciales VAPID
     const vapidPublicKey = Deno.env.get("VAPID_PUBLIC_KEY") || "BK6xAJN2En_UF2GqhoXB_UPpt_lKy__dlpOSOb7nYnhRiOv_tvGZ_NqlcqfXkGQjADrRJzxVYKLhVDcPv7ceFT0";
     const vapidPrivateKey = Deno.env.get("VAPID_PRIVATE_KEY") || "jZUe-GW_v6GUpWbuavSIu9aWs9acpEnnqav8Thp7yTM";
     const vapidSubject = Deno.env.get("VAPID_SUBJECT") || "mailto:contacto@laampolleta.tv";
@@ -70,7 +87,7 @@ serve(async (req: Request) => {
 
     webpush.setVapidDetails(vapidSubject, vapidPublicKey, vapidPrivateKey);
 
-    // 5. Obtener dispositivos push activos para el usuario
+    // 6. Obtener dispositivos push activos para el usuario
     const { data: subscriptions, error: subsError } = await supabase
       .from("push_subscriptions")
       .select("*")
@@ -95,13 +112,13 @@ serve(async (req: Request) => {
       );
     }
 
-    // 6. Diseñar mensaje breve y seguro (Privacy by Design - Sin información sensible)
+    // 7. Diseñar mensaje breve y seguro (Privacy by Design - Sin información sensible)
     let pushBody = "Tienes una nueva notificación en tu portal de La Ampolleta.";
     let pushUrl = "/";
 
     if (type === "event_assigned") {
       pushBody = "📅 Nuevo evento asignado. Revisa los detalles en tu portal.";
-      pushUrl = "/"; // Redirigir a inicio o vista de eventos
+      pushUrl = "/"; 
     } else if (type === "event_updated") {
       pushBody = "🔔 Evento actualizado. Hay cambios importantes en tu jornada.";
       pushUrl = "/";
@@ -124,7 +141,7 @@ serve(async (req: Request) => {
     let failureCount = 0;
     const errorsList: string[] = [];
 
-    // 7. Enviar notificaciones en paralelo
+    // 8. Enviar notificaciones en paralelo
     const deliveryPromises = subscriptions.map(async (sub: any) => {
       const pushSubscription = {
         endpoint: sub.endpoint,
@@ -161,7 +178,7 @@ serve(async (req: Request) => {
 
     await Promise.all(deliveryPromises);
 
-    // 8. Actualizar log de entrega con estadísticas finales
+    // 9. Actualizar log de entrega con estadísticas finales
     if (log_id) {
       const finalStatus = successCount > 0 ? "success" : "failed";
       await supabase

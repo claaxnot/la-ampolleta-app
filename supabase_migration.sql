@@ -781,6 +781,7 @@ RETURNS TRIGGER AS $$
 DECLARE
   has_active_subs BOOLEAN;
   log_id UUID;
+  internal_token TEXT;
 BEGIN
   -- 1. Filtrar solo por tipos aprobados (event_assigned, event_updated, event_cancelled, assignment_removed)
   IF NEW.type NOT IN ('event_assigned', 'event_updated', 'event_cancelled', 'assignment_removed') THEN
@@ -803,14 +804,29 @@ BEGIN
   VALUES (NEW.id, NEW.user_id, 'pending')
   RETURNING id INTO log_id;
 
-  -- 5. Disparar petición HTTP asíncrona a la Edge Function
+  -- 5. Recuperar token interno seguro desde Supabase Vault
+  BEGIN
+    SELECT decrypted_secret INTO internal_token 
+    FROM vault.decrypted_secrets 
+    WHERE name = 'push_dispatcher_token'
+    LIMIT 1;
+  EXCEPTION WHEN OTHERS THEN
+    internal_token := NULL;
+  END;
+
+  -- Fallback seguro para entorno local si el Vault no está inicializado
+  IF internal_token IS NULL THEN
+    internal_token := 'la_ampolleta_push_internal_token_secret_2026';
+  END IF;
+
+  -- 6. Disparar petición HTTP asíncrona a la Edge Function
   -- Usamos un bloque EXCEPTION defensivo para que si pg_net no está configurado, no rompa la transacción principal
   BEGIN
     PERFORM net.http_post(
       url := 'https://bvdcbsetmzvmodnklwfp.supabase.co/functions/v1/send-push-dispatcher',
       headers := jsonb_build_object(
         'Content-Type', 'application/json',
-        'Authorization', 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ2ZGNic2V0bXp2bW9kbmtsd2ZwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg3NzcyNDMsImV4cCI6MjA5NDM1MzI0M30.nK7UkraNG_Xhqng7f-FEv9BzBdyMr-MWeuz4Li5AZSc'
+        'X-Internal-Token', internal_token
       ),
       body := jsonb_build_object(
         'notification_id', NEW.id,
