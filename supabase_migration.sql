@@ -782,6 +782,7 @@ DECLARE
   has_active_subs BOOLEAN;
   log_id UUID;
   internal_token TEXT;
+  req_id BIGINT;
 BEGIN
   -- 1. Filtrar solo por tipos aprobados (event_assigned, event_updated, event_cancelled, assignment_removed)
   IF NEW.type NOT IN ('event_assigned', 'event_updated', 'event_cancelled', 'assignment_removed') THEN
@@ -822,13 +823,9 @@ BEGIN
   -- 6. Disparar petición HTTP asíncrona a la Edge Function
   -- Usamos un bloque EXCEPTION defensivo para que si pg_net no está configurado, no rompa la transacción principal
   BEGIN
-    PERFORM net.http_post(
-      url := 'https://bvdcbsetmzvmodnklwfp.supabase.co/functions/v1/send-push-dispatcher',
-      headers := jsonb_build_object(
-        'Content-Type', 'application/json',
-        'X-Internal-Token', internal_token
-      ),
-      body := jsonb_build_object(
+    SELECT net.http_post(
+      'https://bvdcbsetmzvmodnklwfp.supabase.co/functions/v1/send-push-dispatcher'::text,
+      jsonb_build_object(
         'notification_id', NEW.id,
         'log_id', log_id,
         'user_id', NEW.user_id,
@@ -837,8 +834,13 @@ BEGIN
         'type', NEW.type,
         'related_event_id', NEW.related_event_id
       ),
-      timeout_ms := 10000
-    );
+      '{}'::jsonb, -- params
+      jsonb_build_object(
+        'Content-Type', 'application/json',
+        'X-Internal-Token', internal_token
+      ),
+      10000::integer -- timeout_ms
+    ) INTO req_id;
   EXCEPTION WHEN OTHERS THEN
     UPDATE public.push_delivery_logs 
     SET status = 'failed', error_message = 'Error en base de datos al encolar petición pg_net: ' || SQLERRM
