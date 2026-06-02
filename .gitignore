@@ -1,1 +1,9 @@
 node_modules
+.env
+.env.local
+.env.*.local
+.env.development
+.env.production
+.env.example
+*.log
+.DS_Store
