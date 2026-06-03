@@ -6,34 +6,28 @@ export default function ClockPicker({ value, onChange, label, id, error, align =
   const [mode, setMode] = useState("hours"); // "hours" | "minutes"
   const popoverRef = useRef(null);
 
-  // Parse current value (HH:MM)
+  // Parse current value (HH:MM) in 24-hour format
   const parseTime = (timeStr) => {
     if (!timeStr || !timeStr.includes(":")) {
-      return { hour: 12, minute: 0, period: "PM" };
+      return { hour: 12, minute: 0 };
     }
     const [hStr, mStr] = timeStr.split(":");
-    let h = parseInt(hStr, 10);
+    const h = parseInt(hStr, 10);
     const m = parseInt(mStr, 10);
-    const period = h >= 12 ? "PM" : "AM";
-    if (h > 12) h -= 12;
-    if (h === 0) h = 12;
-    return { hour: h, minute: m, period };
+    return { hour: isNaN(h) ? 12 : h, minute: isNaN(m) ? 0 : m };
   };
 
-  const { hour: currentHour, minute: currentMinute, period: currentPeriod } = parseTime(value);
+  const { hour: currentHour, minute: currentMinute } = parseTime(value);
 
   // Format and save time
-  const saveTime = (h, m, p) => {
-    let rawHour = h;
-    if (p === "PM" && rawHour < 12) rawHour += 12;
-    if (p === "AM" && rawHour === 12) rawHour = 0;
-    
-    const formattedHour = String(rawHour).padStart(2, "0");
+  const saveTime = (h, m) => {
+    const formattedHour = String(h).padStart(2, "0");
     const formattedMinute = String(m).padStart(2, "0");
     onChange(`${formattedHour}:${formattedMinute}`);
   };
 
-  const hoursList = [12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
+  const hoursListOuter = [12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
+  const hoursListInner = [0, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23];
   const minutesList = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55];
 
   // Get coordinates for placement on clock face (diameter 180px, radius 90px, center 90, 90)
@@ -60,23 +54,22 @@ export default function ClockPicker({ value, onChange, label, id, error, align =
   }, [isOpen]);
 
   const handleHourSelect = (h) => {
-    saveTime(h, currentMinute, currentPeriod);
+    saveTime(h, currentMinute);
     setMode("minutes"); // Auto switch to minutes
   };
 
   const handleMinuteSelect = (m) => {
-    saveTime(currentHour, m, currentPeriod);
+    saveTime(currentHour, m);
   };
 
-  const togglePeriod = (p) => {
-    saveTime(currentHour, currentMinute, p);
-  };
+  // Dynamic hand length depending on inner/outer hour placement
+  const isInner = mode === "hours" && (currentHour === 0 || currentHour >= 13);
+  const handLength = isInner ? 42 : 68;
 
   // Calculate hand rotation angle
   const getHandRotation = () => {
     if (mode === "hours") {
-      const index = hoursList.indexOf(currentHour);
-      return index * 30; // 360 / 12 = 30 deg per hour
+      return (currentHour % 12) * 30; // 360 / 12 = 30 deg per hour
     } else {
       return currentMinute * 6; // 360 / 60 = 6 deg per minute for exact precision!
     }
@@ -126,22 +119,9 @@ export default function ClockPicker({ value, onChange, label, id, error, align =
               </button>
             </div>
             
-            {/* AM/PM Toggle */}
-            <div className="flex flex-col gap-0.5 text-[9px] font-bold">
-              <button
-                type="button"
-                onClick={() => togglePeriod("AM")}
-                className={`px-1.5 py-0.5 rounded-md transition-colors ${currentPeriod === "AM" ? "bg-amber-500/20 text-amber-400 border border-amber-500/30" : "text-gray-500 hover:text-gray-300"}`}
-              >
-                AM
-              </button>
-              <button
-                type="button"
-                onClick={() => togglePeriod("PM")}
-                className={`px-1.5 py-0.5 rounded-md transition-colors ${currentPeriod === "PM" ? "bg-amber-500/20 text-amber-400 border border-amber-500/30" : "text-gray-500 hover:text-gray-300"}`}
-              >
-                PM
-              </button>
+            {/* 24H Indicator */}
+            <div className="px-2 py-0.5 rounded bg-white/5 border border-white/10 text-[9px] font-black text-gray-400 select-none">
+              24H
             </div>
           </div>
 
@@ -150,17 +130,17 @@ export default function ClockPicker({ value, onChange, label, id, error, align =
             
             {/* Clock Hand */}
             <div 
-              className="absolute w-1 bg-amber-500 origin-bottom rounded-full transition-transform duration-300 ease-out"
+              className="absolute w-1 bg-amber-500 origin-bottom rounded-full transition-all duration-300 ease-out"
               style={{
-                height: "64px",
+                height: `${handLength}px`,
                 bottom: "90px",
                 transform: `rotate(${getHandRotation()}deg)`,
                 transformOrigin: "bottom center"
               }}
             >
               {/* Circular selector on target value */}
-              <div className="absolute -top-2.5 -left-3 w-7 h-7 rounded-full bg-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.5)] border border-amber-300/30 flex items-center justify-center text-[10px] font-black text-black">
-                {mode === "hours" ? currentHour : String(currentMinute).padStart(2, "0")}
+              <div className="absolute -top-3.5 -left-3 w-7 h-7 rounded-full bg-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.5)] border border-amber-300/30 flex items-center justify-center text-[10px] font-black text-black">
+                {mode === "hours" ? (currentHour === 0 ? "00" : currentHour) : String(currentMinute).padStart(2, "0")}
               </div>
             </div>
 
@@ -169,32 +149,52 @@ export default function ClockPicker({ value, onChange, label, id, error, align =
 
             {/* Numbers Placement */}
             {mode === "hours" ? (
-              hoursList.map((h, i) => {
-                const { x, y } = getCoords(i, 12);
-                const isSelected = currentHour === h;
-                return (
-                  <button
-                    key={`h-${h}`}
-                    type="button"
-                    onClick={() => handleHourSelect(h)}
-                    style={{ left: `${x - 12}px`, top: `${y - 12}px` }}
-                    className={`absolute w-6 h-6 rounded-full flex items-center justify-center text-[10px] transition-all duration-200 z-10 ${isSelected ? "text-transparent pointer-events-none" : "text-gray-300 hover:bg-white/10 hover:text-white font-semibold"}`}
-                  >
-                    {h}
-                  </button>
-                );
-              })
+              <>
+                {/* Outer Circle (12, 1-11) */}
+                {hoursListOuter.map((h, i) => {
+                  const { x, y } = getCoords(i, 12, 68);
+                  const isSelected = currentHour === h;
+                  return (
+                    <button
+                      key={`h-out-${h}`}
+                      type="button"
+                      onClick={() => handleHourSelect(h)}
+                      style={{ left: `${x - 10}px`, top: `${y - 10}px` }}
+                      className={`absolute w-5 h-5 rounded-full flex items-center justify-center text-[10px] transition-all duration-200 z-10 ${isSelected ? "text-transparent pointer-events-none" : "text-gray-300 hover:bg-white/10 hover:text-white font-semibold"}`}
+                    >
+                      {h}
+                    </button>
+                  );
+                })}
+
+                {/* Inner Circle (00, 13-23) */}
+                {hoursListInner.map((h, i) => {
+                  const { x, y } = getCoords(i, 12, 42);
+                  const isSelected = currentHour === h;
+                  return (
+                    <button
+                      key={`h-in-${h}`}
+                      type="button"
+                      onClick={() => handleHourSelect(h)}
+                      style={{ left: `${x - 10}px`, top: `${y - 10}px` }}
+                      className={`absolute w-5 h-5 rounded-full flex items-center justify-center text-[8.5px] transition-all duration-200 z-10 ${isSelected ? "text-transparent pointer-events-none" : "text-gray-500 hover:bg-white/10 hover:text-white font-medium"}`}
+                    >
+                      {h === 0 ? "00" : h}
+                    </button>
+                  );
+                })}
+              </>
             ) : (
               minutesList.map((m, i) => {
-                const { x, y } = getCoords(i, 12);
+                const { x, y } = getCoords(i, 12, 68);
                 const isSelected = currentMinute === m;
                 return (
                   <button
                     key={`m-${m}`}
                     type="button"
                     onClick={() => handleMinuteSelect(m)}
-                    style={{ left: `${x - 12}px`, top: `${y - 12}px` }}
-                    className={`absolute w-6 h-6 rounded-full flex items-center justify-center text-[10px] transition-all duration-200 z-10 ${isSelected ? "text-transparent pointer-events-none" : "text-gray-400 hover:bg-white/10 hover:text-white font-semibold"}`}
+                    style={{ left: `${x - 10}px`, top: `${y - 10}px` }}
+                    className={`absolute w-5 h-5 rounded-full flex items-center justify-center text-[10px] transition-all duration-200 z-10 ${isSelected ? "text-transparent pointer-events-none" : "text-gray-400 hover:bg-white/10 hover:text-white font-semibold"}`}
                   >
                     {String(m).padStart(2, "0")}
                   </button>
