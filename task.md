@@ -148,6 +148,7 @@
 - [x] **Actualización de Versión Global en UI:** Actualizar el indicativo de versión de la aplicación a `v3.7.4` en la firma de consola, pantalla de Login y barra lateral.
 - [x] **Control de Respaldos Git (Tags):** Crear y subir etiquetas de versión (`v3.7.4-stable-push` y `v3.7.4-auth-backup`) para facilitar reversiones rápidas ante regresiones.
 - [x] **Automatización de Estados por Jornada (Cierre Automático):** Rediseñar la función de base de datos `auto_update_event_statuses` para procesar y finalizar jornadas individuales (`event_days`) e integrarlas recursivamente con el estado del evento principal (`events`).
+- [x] **Reloj en Formato 24 Horas:** Rediseñar visualmente el componente `ClockPicker` a formato 24 horas usando dos anillos concéntricos (exterior para 1-12, interior para 13-23 y 00), removiendo el selector AM/PM y manteniendo el ajuste fino de minutos.
 
 ## 16. Pendientes y Tareas Futuras
 - [ ] **Reportes Visuales y Gráficos de Finanzas (Admin):** Gráficos interactivos de barra/línea sobre egresos mensuales y exportación de informes analíticos en PDF.
