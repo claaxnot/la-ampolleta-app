@@ -1,5 +1,11 @@
 # La Ampolleta Producciones - Roadmap del Proyecto
 
+## 📌 Reglas de Desarrollo y Control de Versiones
+- **Control de Versión Visual:** En cada actualización o modificación importante de la plataforma, se debe incrementar el número de versión visual en los siguientes archivos antes de compilar y empujar a Git:
+  * `src/pages/Login.jsx` (Footer de la tarjeta de Login)
+  * `src/main.jsx` (Signature de la consola de desarrollo)
+  * `src/components/Sidebar.jsx` (Pie de la barra lateral y modal "Acerca de la plataforma")
+
 ## 1. Configuración Inicial y Arquitectura
 - [x] Inicializar proyecto con Vite + React.
 - [x] Configurar Tailwind CSS con temas oscuros, animaciones y glassmorphism.
