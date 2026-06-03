@@ -70,8 +70,7 @@ BEGIN
   WITH to_in_progress_events AS (
     UPDATE public.events e
     SET 
-      status = 'En progreso',
-      updated_at = pg_catalog.now()
+      status = 'En progreso'
     WHERE 
       e.status IN ('Planificado', 'Confirmado')
       -- Tiene al menos una jornada en 'En progreso' o 'Finalizado'
@@ -95,8 +94,7 @@ BEGIN
   WITH to_finished_events AS (
     UPDATE public.events e
     SET 
-      status = 'Finalizado',
-      updated_at = pg_catalog.now()
+      status = 'Finalizado'
     WHERE 
       e.status IN ('Planificado', 'Confirmado', 'En progreso')
       AND EXISTS (SELECT 1 FROM public.event_days d WHERE d.event_id = e.id)
