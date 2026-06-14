@@ -161,7 +161,12 @@
 - [x] **Panel Preventivo y Checkbox de Confirmación:** Diseñar una advertencia estilizada en ámbar que detecta automáticamente si `end_time <= time` y solicita confirmación mediante un checkbox para autorizar el ingreso correctivo de la jornada.
 - [x] **Sincronización Bidireccional en Carga y Reseteo:** Ajustar los parsers de `initialData` en modo de edición y duplicación para calcular la bandera `ends_next_day` al vuelo y asegurar persistencia sin modificar la base de datos (con soporte nativo en el actualizador automático).
 
-## 17. Pendientes y Tareas Futuras
+## 17. Confirmación Rápida de Asistencia por Administración (Versión 3.7.7)
+- [x] **Confirmación Rápida de Asistencia (One-Click):** Añadir botón de acción rápida "Confirmar Asistencia" en la grilla de personal de `EventDetails.jsx` para registrar automáticamente marcas con horas estándar del evento y verificación administrativa.
+- [x] **Registro Manual Omnipresente:** Permitir a los administradores registrar y editar marcas de asistencia manualmente en `EventDetails.jsx` mediante el formulario de corrección sin importar si el control de asistencia automático estaba activo para el evento.
+- [x] **Actualización Visual de la Versión:** Incrementar la versión del sistema a `v3.7.7` en Login, Sidebar, modal Acerca de la Plataforma y consola del desarrollador.
+
+## 18. Pendientes y Tareas Futuras
 - [ ] **Reportes Visuales y Gráficos de Finanzas (Admin):** Gráficos interactivos de barra/línea sobre egresos mensuales y exportación de informes analíticos en PDF.
 - [ ] **Bitácora de Auditoría Operacional (Logs):** Registro e historial detallado de acciones administrativas críticas (ej: creación de eventos, cambios de estados de pago).
 - [ ] **Documentación Completa:** Escribir archivo README.md completo con instrucciones de configuración local y variables de entorno.

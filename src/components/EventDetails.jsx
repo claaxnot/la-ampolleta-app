@@ -363,6 +363,63 @@ export default function EventDetails({ event, isOpen, onClose }) {
     }
   };
 
+  const handleQuickConfirm = async (staffId, assignmentId) => {
+    setIsSavingCorrection(true);
+    try {
+      const { data: { user: adminUser } } = await supabase.auth.getUser();
+      if (!adminUser) {
+        toast.error("Sesión de administrador no válida.");
+        setIsSavingCorrection(false);
+        return;
+      }
+
+      const dayObj = eventDays.find(d => d.id === selectedDayId);
+      const evDate = dayObj?.date || event.date || new Date().toISOString().split("T")[0];
+      const startTime = dayObj?.start_time || event.time || "10:00";
+      const endTime = dayObj?.end_time || event.end_time || "18:00";
+
+      const checkInISO = new Date(`${evDate}T${startTime.substring(0, 5)}`).toISOString();
+      const checkOutISO = new Date(`${evDate}T${endTime.substring(0, 5)}`).toISOString();
+
+      let finalCheckOutISO = checkOutISO;
+      if (endTime.substring(0, 5) <= startTime.substring(0, 5)) {
+        const d = new Date(`${evDate}T${endTime.substring(0, 5)}`);
+        d.setDate(d.getDate() + 1);
+        finalCheckOutISO = d.toISOString();
+      }
+
+      const diffMs = new Date(finalCheckOutISO) - new Date(checkInISO);
+      const durationMins = Math.max(0, Math.floor(diffMs / 60000));
+
+      const { error } = await supabase
+        .from('event_attendance_logs')
+        .insert([{
+          event_id: event.id,
+          event_day_id: selectedDayId || null,
+          worker_id: staffId,
+          assignment_id: assignmentId || null,
+          check_in_at: checkInISO,
+          check_out_at: finalCheckOutISO,
+          verified_by_admin: true,
+          admin_adjusted_by: adminUser.id,
+          admin_adjustment_notes: "Confirmado automáticamente por administración",
+          is_complete: true,
+          total_duration_minutes: durationMins,
+          check_in_source: 'admin_manual',
+          check_out_source: 'admin_manual'
+        }]);
+
+      if (error) throw error;
+      toast.success("Asistencia confirmada rápidamente.");
+      await fetchAssignedStaff();
+    } catch (err) {
+      console.error("Error doing quick confirm:", err);
+      toast.error(err.message || "Error al confirmar asistencia.");
+    } finally {
+      setIsSavingCorrection(false);
+    }
+  };
+
   if (!event) return null;
 
   const isFinalized = event.status ? ['finalizado', 'completado', 'completed'].includes(event.status.toLowerCase()) : false;
@@ -496,7 +553,7 @@ export default function EventDetails({ event, isOpen, onClose }) {
                                   <span className="px-2 py-0.5 rounded-full border border-emerald-500/20 bg-emerald-500/10 text-emerald-400 text-[9px] font-black font-mono">
                                     Liq: ${s.custom_rate && parseFloat(s.custom_rate) > 0 ? parseFloat(s.custom_rate).toLocaleString("es-CL") : "25.000"}
                                   </span>
-                                  {!isEditing && event.attendance_control_enabled && (
+                                  {!isEditing && (
                                     <button
                                       onClick={() => startEditingAttendance(s.id)}
                                       className="p-1.5 bg-white/5 hover:bg-white/10 rounded-lg text-amber-400 hover:text-amber-300 border border-white/10 transition-colors shadow-sm"
@@ -588,9 +645,19 @@ export default function EventDetails({ event, isOpen, onClose }) {
                                    return (
                                      <div className={`rounded-xl p-3 border flex flex-wrap justify-between items-center gap-3 transition-all ${containerBg}`}>
                                        {!log ? (
-                                         <span className="text-xs font-extrabold text-amber-400/90 bg-amber-500/10 px-2.5 py-1 rounded-lg border border-amber-500/20 shadow-inner flex items-center gap-1">
-                                           ⚠️ Sin registro de asistencia
-                                         </span>
+                                         <div className="flex items-center justify-between w-full">
+                                           <span className="text-xs font-extrabold text-amber-400/90 bg-amber-500/10 px-2.5 py-1 rounded-lg border border-amber-500/20 shadow-inner flex items-center gap-1">
+                                             ⚠️ Sin registro de asistencia
+                                           </span>
+                                           <button
+                                             onClick={() => handleQuickConfirm(s.id, s.assignment_id)}
+                                             disabled={isSavingCorrection}
+                                             className="px-3 py-1.5 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 hover:text-emerald-300 border border-emerald-500/30 rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 active:scale-95 disabled:opacity-50 disabled:pointer-events-none"
+                                           >
+                                             <Clock className="w-3.5 h-3.5 text-emerald-400" />
+                                             <span>Confirmar Asistencia</span>
+                                           </button>
+                                         </div>
                                        ) : (
                                          <>
                                            <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-gray-300">
