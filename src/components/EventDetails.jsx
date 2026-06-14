@@ -373,23 +373,29 @@ export default function EventDetails({ event, isOpen, onClose }) {
         return;
       }
 
-      const dayObj = eventDays.find(d => d.id === selectedDayId);
-      const evDate = dayObj?.date || event.date || new Date().toISOString().split("T")[0];
-      const startTime = dayObj?.start_time || event.time || "10:00";
-      const endTime = dayObj?.end_time || event.end_time || "18:00";
+      let checkInISO = null;
+      let finalCheckOutISO = null;
+      let durationMins = 0;
 
-      const checkInISO = new Date(`${evDate}T${startTime.substring(0, 5)}`).toISOString();
-      const checkOutISO = new Date(`${evDate}T${endTime.substring(0, 5)}`).toISOString();
+      if (event.attendance_control_enabled) {
+        const dayObj = eventDays.find(d => d.id === selectedDayId);
+        const evDate = dayObj?.date || event.date || new Date().toISOString().split("T")[0];
+        const startTime = dayObj?.start_time || event.time || "10:00";
+        const endTime = dayObj?.end_time || event.end_time || "18:00";
 
-      let finalCheckOutISO = checkOutISO;
-      if (endTime.substring(0, 5) <= startTime.substring(0, 5)) {
-        const d = new Date(`${evDate}T${endTime.substring(0, 5)}`);
-        d.setDate(d.getDate() + 1);
-        finalCheckOutISO = d.toISOString();
+        checkInISO = new Date(`${evDate}T${startTime.substring(0, 5)}`).toISOString();
+        const checkOutISO = new Date(`${evDate}T${endTime.substring(0, 5)}`).toISOString();
+
+        finalCheckOutISO = checkOutISO;
+        if (endTime.substring(0, 5) <= startTime.substring(0, 5)) {
+          const d = new Date(`${evDate}T${endTime.substring(0, 5)}`);
+          d.setDate(d.getDate() + 1);
+          finalCheckOutISO = d.toISOString();
+        }
+
+        const diffMs = new Date(finalCheckOutISO) - new Date(checkInISO);
+        durationMins = Math.max(0, Math.floor(diffMs / 60000));
       }
-
-      const diffMs = new Date(finalCheckOutISO) - new Date(checkInISO);
-      const durationMins = Math.max(0, Math.floor(diffMs / 60000));
 
       const { error } = await supabase
         .from('event_attendance_logs')
@@ -658,53 +664,61 @@ export default function EventDetails({ event, isOpen, onClose }) {
                                              <span>Confirmar Asistencia</span>
                                            </button>
                                          </div>
-                                       ) : (
-                                         <>
-                                           <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-gray-300">
-                                             <div className="flex flex-col gap-0.5">
-                                               <span className="text-[9px] text-gray-500 uppercase tracking-wider font-extrabold">Entrada</span>
-                                               <span className="font-semibold text-gray-200">📥 {formatChileDateTime(log.check_in_at)}</span>
-                                               <div className="mt-1">
-                                                 {renderGPSBadge(
-                                                   log.check_in_location_status,
-                                                   log.check_in_distance_meters,
-                                                   log.check_in_accuracy,
-                                                   log.check_in_lat,
-                                                   log.check_in_lng
-                                                 )}
-                                               </div>
-                                             </div>
-                                             <div className="flex flex-col gap-0.5">
-                                               <span className="text-[9px] text-gray-500 uppercase tracking-wider font-extrabold">Salida</span>
-                                               <span className="font-semibold text-gray-200">
-                                                 {log.check_out_at ? `📤 ${formatChileDateTime(log.check_out_at)}` : "En curso ⏳"}
-                                               </span>
-                                               {log.check_out_at && (
-                                                 <div className="mt-1">
-                                                   {renderGPSBadge(
-                                                     log.check_out_location_status,
-                                                     log.check_out_distance_meters,
-                                                     log.check_out_accuracy,
-                                                     log.check_out_lat,
-                                                     log.check_out_lng
-                                                   )}
-                                                 </div>
-                                               )}
-                                             </div>
-                                           </div>
+                                        ) : (
+                                          <>
+                                            {!event.attendance_control_enabled ? (
+                                              <div className="text-xs font-bold text-emerald-400 flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-lg">
+                                                <span>✔️ Asistencia Confirmada</span>
+                                              </div>
+                                            ) : (
+                                              <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-gray-300">
+                                                <div className="flex flex-col gap-0.5">
+                                                  <span className="text-[9px] text-gray-500 uppercase tracking-wider font-extrabold">Entrada</span>
+                                                  <span className="font-semibold text-gray-200">📥 {formatChileDateTime(log.check_in_at)}</span>
+                                                  <div className="mt-1">
+                                                    {renderGPSBadge(
+                                                      log.check_in_location_status,
+                                                      log.check_in_distance_meters,
+                                                      log.check_in_accuracy,
+                                                      log.check_in_lat,
+                                                      log.check_in_lng
+                                                    )}
+                                                  </div>
+                                                </div>
+                                                <div className="flex flex-col gap-0.5">
+                                                  <span className="text-[9px] text-gray-500 uppercase tracking-wider font-extrabold">Salida</span>
+                                                  <span className="font-semibold text-gray-200">
+                                                    {log.check_out_at ? `📤 ${formatChileDateTime(log.check_out_at)}` : "En curso ⏳"}
+                                                  </span>
+                                                  {log.check_out_at && (
+                                                    <div className="mt-1">
+                                                      {renderGPSBadge(
+                                                        log.check_out_location_status,
+                                                        log.check_out_distance_meters,
+                                                        log.check_out_accuracy,
+                                                        log.check_out_lat,
+                                                        log.check_out_lng
+                                                      )}
+                                                    </div>
+                                                  )}
+                                                </div>
+                                              </div>
+                                            )}
 
-                                           <div className="flex items-center gap-2">
-                                             {log.verified_by_admin && (
-                                               <span className="text-[8px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 font-bold uppercase tracking-wider cursor-help" title={`Corregido por admin: ${log.admin_adjustment_notes || 'Sin observaciones'}`}>
-                                                 ✍️ Corregido
-                                               </span>
-                                             )}
-                                             <span className="text-xs font-extrabold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-lg border border-emerald-500/20 shadow-inner">
-                                               {formatDurationMinutes(log.total_duration_minutes)}
-                                             </span>
-                                           </div>
-                                         </>
-                                       )}
+                                            <div className="flex items-center gap-2">
+                                              {log.verified_by_admin && (
+                                                <span className="text-[8px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 font-bold uppercase tracking-wider cursor-help" title={`Corregido por admin: ${log.admin_adjustment_notes || 'Sin observaciones'}`}>
+                                                  ✍️ Corregido
+                                                </span>
+                                              )}
+                                              {event.attendance_control_enabled && (
+                                                <span className="text-xs font-extrabold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-lg border border-emerald-500/20 shadow-inner">
+                                                  {formatDurationMinutes(log.total_duration_minutes)}
+                                                </span>
+                                              )}
+                                            </div>
+                                          </>
+                                        )}
                                      </div>
                                    );
                                  })()

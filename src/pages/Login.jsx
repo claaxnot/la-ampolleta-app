@@ -219,7 +219,7 @@ export default function Login({ onLogin }) {
       {/* Sutil Footer Creds */}
       <div className="mt-6 flex flex-col items-center gap-0.5 text-center pointer-events-none select-none opacity-30 hover:opacity-60 transition-opacity duration-300">
         <span className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">
-          La Ampolleta Platform v3.7.7
+          La Ampolleta Platform v3.7.8
         </span>
         <span className="text-[8px] text-gray-500 font-medium tracking-wider">
           Engineered by Cristopher Vidal

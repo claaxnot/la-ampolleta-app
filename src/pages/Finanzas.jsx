@@ -2872,8 +2872,12 @@ export default function Finanzas() {
                                   <span className={`text-[10px] mt-1 font-bold inline-flex items-center gap-1 cursor-help ${p.attendance_log.is_complete
                                     ? "text-emerald-400"
                                     : "text-amber-400 animate-pulse"
-                                    }`} title={p.attendance_log.is_complete ? "Jornada completa registrada" : "Jornada incompleta o salida pendiente"}>
-                                    ⏱️ {Math.floor(p.attendance_log.total_duration_minutes / 60)}h {p.attendance_log.total_duration_minutes % 60}m
+                                    }`} title={p.attendance_log.check_in_at ? (p.attendance_log.is_complete ? "Jornada completa registrada" : "Jornada incompleta o salida pendiente") : "Asistencia confirmada por administrador"}>
+                                    {p.attendance_log.check_in_at ? (
+                                      <>⏱️ {Math.floor(p.attendance_log.total_duration_minutes / 60)}h {p.attendance_log.total_duration_minutes % 60}m</>
+                                    ) : (
+                                      <>✔️ Asistencia Confirmada</>
+                                    )}
                                     {p.attendance_log.verified_by_admin && " (✍️)"}
                                   </span>
                                 )}
@@ -3086,7 +3090,11 @@ export default function Finanzas() {
                                 ? "text-emerald-400"
                                 : "text-amber-400 animate-pulse"
                                 }`}>
-                                ⏱️ {Math.floor(p.attendance_log.total_duration_minutes / 60)}h {p.attendance_log.total_duration_minutes % 60}m
+                                {p.attendance_log.check_in_at ? (
+                                  <>⏱️ {Math.floor(p.attendance_log.total_duration_minutes / 60)}h {p.attendance_log.total_duration_minutes % 60}m</>
+                                ) : (
+                                  <>✔️ Asistencia Confirmada</>
+                                )}
                                 {p.attendance_log.verified_by_admin && " (corregido)"}
                               </span>
                             )}

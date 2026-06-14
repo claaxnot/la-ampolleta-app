@@ -166,7 +166,13 @@
 - [x] **Registro Manual Omnipresente:** Permitir a los administradores registrar y editar marcas de asistencia manualmente en `EventDetails.jsx` mediante el formulario de corrección sin importar si el control de asistencia automático estaba activo para el evento.
 - [x] **Actualización Visual de la Versión:** Incrementar la versión del sistema a `v3.7.7` en Login, Sidebar, modal Acerca de la Plataforma y consola del desarrollador.
 
-## 18. Pendientes y Tareas Futuras
+## 18. Simplificación de Confirmación de Asistencia sin Control de Horario (Versión 3.7.8)
+- [x] **Confirmación Directa sin Horas:** Permitir la confirmación rápida (One-Click) en eventos sin control de asistencia habilitado, registrando la marca en la base de datos con timestamps nulos y duración de 0 minutos.
+- [x] **Visualización Simplificada en Detalles de Evento:** Ocultar secciones de hora de entrada/salida y GPS para las marcas simplificadas, mostrando únicamente un distintivo premium de `✔️ Asistencia Confirmada`.
+- [x] **Integración con Tablas de Finanzas:** Ajustar las vistas y listados de pagos en `Finanzas.jsx` para que reconozcan asistencias simplificadas y muestren el indicador `✔️ Asistencia Confirmada` en lugar de una duración de jornada en cero.
+- [x] **Actualización Visual de la Versión:** Incrementar la versión del sistema a `v3.7.8` en Login, Sidebar, modal Acerca de la Plataforma y consola del desarrollador.
+
+## 19. Pendientes y Tareas Futuras
 - [ ] **Reportes Visuales y Gráficos de Finanzas (Admin):** Gráficos interactivos de barra/línea sobre egresos mensuales y exportación de informes analíticos en PDF.
 - [ ] **Bitácora de Auditoría Operacional (Logs):** Registro e historial detallado de acciones administrativas críticas (ej: creación de eventos, cambios de estados de pago).
 - [ ] **Documentación Completa:** Escribir archivo README.md completo con instrucciones de configuración local y variables de entorno.
