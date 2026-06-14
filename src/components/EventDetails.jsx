@@ -644,7 +644,10 @@ export default function EventDetails({ event, isOpen, onClose }) {
                                 </div>
                               ) : (
                                  (() => {
-                                   if (!event.attendance_control_enabled && !log) return null;
+                                   if (!event.attendance_control_enabled && !log) {
+                                     const isAcceptedOrConfirmed = s.status === 'Confirmado' || s.status === 'Aceptado';
+                                     if (isAcceptedOrConfirmed) return null;
+                                   }
                                    const isOutOfRange = log && (log.check_in_location_status === 'out_of_range' || log.check_out_location_status === 'out_of_range');
                                    const containerBg = isOutOfRange 
                                      ? 'bg-red-500/5 border-red-500/20 shadow-[0_0_15px_rgba(239,68,68,0.07)]' 
@@ -652,10 +655,12 @@ export default function EventDetails({ event, isOpen, onClose }) {
                                    return (
                                      <div className={`rounded-xl p-3 border flex flex-wrap justify-between items-center gap-3 transition-all ${containerBg}`}>
                                        {!log ? (
-                                         <div className="flex items-center justify-between w-full">
-                                           <span className="text-xs font-extrabold text-amber-400/90 bg-amber-500/10 px-2.5 py-1 rounded-lg border border-amber-500/20 shadow-inner flex items-center gap-1">
-                                             ⚠️ Sin registro de asistencia
-                                           </span>
+                                         <div className={`flex items-center justify-between w-full ${!event.attendance_control_enabled ? 'justify-end' : ''}`}>
+                                           {event.attendance_control_enabled && (
+                                             <span className="text-xs font-extrabold text-amber-400/90 bg-amber-500/10 px-2.5 py-1 rounded-lg border border-amber-500/20 shadow-inner flex items-center gap-1">
+                                               ⚠️ Sin registro de asistencia
+                                             </span>
+                                           )}
                                            <button
                                              onClick={() => handleQuickConfirm(s.id, s.assignment_id)}
                                              disabled={isSavingCorrection}
