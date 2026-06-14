@@ -644,6 +644,7 @@ export default function EventDetails({ event, isOpen, onClose }) {
                                 </div>
                               ) : (
                                  (() => {
+                                   if (!event.attendance_control_enabled && !log) return null;
                                    const isOutOfRange = log && (log.check_in_location_status === 'out_of_range' || log.check_out_location_status === 'out_of_range');
                                    const containerBg = isOutOfRange 
                                      ? 'bg-red-500/5 border-red-500/20 shadow-[0_0_15px_rgba(239,68,68,0.07)]' 
