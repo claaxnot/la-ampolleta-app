@@ -135,6 +135,7 @@ export default function Events({ user }) {
     // Extraer y borrar bandera del panel avanzado
     const isAdvancedActive = eventData.isAdvancedActive;
     delete eventData.isAdvancedActive;
+    delete eventData.ends_next_day;
 
     // Map camelCase to snake_case for Supabase
     eventData.required_staff = eventData.requiredStaff;
