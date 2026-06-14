@@ -347,6 +347,14 @@ export default function EventDetails({ event, isOpen, onClose }) {
         toast.success("Asistencia manual registrada.");
       }
 
+      if (assignmentId) {
+        await supabase
+          .from("event_assignments")
+          .update({ status: "Confirmado" })
+          .eq("id", assignmentId);
+      }
+
+
       setEditingStaffId(null);
       setEditNotes("");
       setEditCheckInDate("");
@@ -416,6 +424,13 @@ export default function EventDetails({ event, isOpen, onClose }) {
         }]);
 
       if (error) throw error;
+      if (assignmentId) {
+        await supabase
+          .from("event_assignments")
+          .update({ status: "Confirmado" })
+          .eq("id", assignmentId);
+      }
+
       toast.success("Asistencia confirmada rápidamente.");
       await fetchAssignedStaff();
     } catch (err) {
