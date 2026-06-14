@@ -156,7 +156,12 @@
 - [x] **Automatización de Estados por Jornada (Cierre Automático):** Rediseñar la función de base de datos `auto_update_event_statuses` para procesar y finalizar jornadas individuales (`event_days`) e integrarlas recursivamente con el estado del evento principal (`events`).
 - [x] **Reloj en Formato 24 Horas:** Rediseñar visualmente el componente `ClockPicker` a formato 24 horas usando dos anillos concéntricos (exterior para 1-12, interior para 13-23 y 00), removiendo el selector AM/PM y manteniendo el ajuste fino de minutos.
 
-## 16. Pendientes y Tareas Futuras
+## 16. Flexibilidad de Fechas de Término y Horarios Cruzados (Versión 3.7.6)
+- [x] **Cruce de Medianoche / Jornadas de Día Siguiente:** Incorporar soporte dinámico en `EventModal.jsx` para eventos que terminan al día siguiente o posterior (cruzan medianoche), relajando el bloqueo estricto de Zod de `end_time > time` mediante un parámetro `ends_next_day` en el esquema.
+- [x] **Panel Preventivo y Checkbox de Confirmación:** Diseñar una advertencia estilizada en ámbar que detecta automáticamente si `end_time <= time` y solicita confirmación mediante un checkbox para autorizar el ingreso correctivo de la jornada.
+- [x] **Sincronización Bidireccional en Carga y Reseteo:** Ajustar los parsers de `initialData` en modo de edición y duplicación para calcular la bandera `ends_next_day` al vuelo y asegurar persistencia sin modificar la base de datos (con soporte nativo en el actualizador automático).
+
+## 17. Pendientes y Tareas Futuras
 - [ ] **Reportes Visuales y Gráficos de Finanzas (Admin):** Gráficos interactivos de barra/línea sobre egresos mensuales y exportación de informes analíticos en PDF.
 - [ ] **Bitácora de Auditoría Operacional (Logs):** Registro e historial detallado de acciones administrativas críticas (ej: creación de eventos, cambios de estados de pago).
 - [ ] **Documentación Completa:** Escribir archivo README.md completo con instrucciones de configuración local y variables de entorno.

@@ -63,6 +63,7 @@ const eventSchema = z.object({
   latitude: z.string().nullable().optional(),
   longitude: z.string().nullable().optional(),
   allowed_radius_meters: z.preprocess((val) => val === "" || val === null || val === undefined ? 300 : Number(val), z.number().default(300)),
+  ends_next_day: z.boolean().default(false),
 }).refine((data) => {
   // Validar: hora presentación < hora inicio
   if (!data.call_time || !data.time || !data.call_time.includes(":") || !data.time.includes(":")) return true;
@@ -78,8 +79,9 @@ const eventSchema = z.object({
   message: "La hora de montaje debe ser anterior o igual a la de presentación",
   path: ["setup_time"]
 }).refine((data) => {
-  // Validar: hora finalización > inicio
+  // Validar: hora finalización > inicio, a menos que termine el día siguiente (cruce de medianoche)
   if (!data.end_time || !data.time || !data.end_time.includes(":") || !data.time.includes(":")) return true;
+  if (data.ends_next_day) return true;
   return data.end_time > data.time;
 }, {
   message: "La hora de finalización debe ser posterior a la de inicio del evento",
@@ -118,7 +120,8 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
       attendance_require_confirmed: true,
       latitude: "",
       longitude: "",
-      allowed_radius_meters: 300
+      allowed_radius_meters: 300,
+      ends_next_day: false
     }
   });
 
@@ -141,10 +144,10 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
   const [customRates, setCustomRates] = useState({});
 
   const [days, setDays] = useState([
-    { date: "", time: "10:00", end_time: "18:00", call_time: "", setup_time: "", status: "Planificado", notes: "" }
+    { date: "", time: "10:00", end_time: "18:00", ends_next_day: false, call_time: "", setup_time: "", status: "Planificado", notes: "" }
   ]);
   const [staffDays, setStaffDays] = useState({});
-
+ 
   const handleDayChange = (index, field, value) => {
     setDays(prev => {
       const copy = [...prev];
@@ -152,7 +155,7 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
       return copy;
     });
   };
-
+ 
   const addDay = () => {
     const lastDay = days[days.length - 1];
     let nextDateStr = "";
@@ -167,13 +170,14 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
         nextDateStr = `${y}-${m}-${dayVal}`;
       }
     }
-
+ 
     setDays(prev => [
       ...prev,
       {
         date: nextDateStr,
         time: lastDay?.time || "10:00",
         end_time: lastDay?.end_time || "18:00",
+        ends_next_day: false,
         call_time: lastDay?.call_time || "",
         setup_time: lastDay?.setup_time || "",
         status: "Planificado",
@@ -181,7 +185,7 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
       }
     ]);
   };
-
+ 
   const removeDay = (index) => {
     if (days.length <= 1) return;
     setDays(prev => prev.filter((_, idx) => idx !== index));
@@ -197,12 +201,13 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
       return copy;
     });
   };
-
+ 
   // Sync first day details back to React Hook Form for backwards-compatible schema validations
   useEffect(() => {
     if (days[0]) {
       setValue("date", days[0].date || "", { shouldValidate: true, shouldDirty: true });
       setValue("time", days[0].time || "", { shouldValidate: true, shouldDirty: true });
+      setValue("ends_next_day", !!days[0].ends_next_day, { shouldValidate: true });
       if (days[0].end_time) setValue("end_time", days[0].end_time, { shouldValidate: true });
       if (days[0].call_time) setValue("call_time", days[0].call_time, { shouldValidate: true });
       if (days[0].setup_time) setValue("setup_time", days[0].setup_time, { shouldValidate: true });
@@ -421,16 +426,21 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
           supabase.from('event_days').select('*').eq('event_id', targetIdForAssignments).order('date', { ascending: true }).then(({ data: daysData }) => {
             let loadedDays = [];
             if (daysData && daysData.length > 0) {
-              loadedDays = daysData.map(d => ({
-                id: d.id,
-                date: d.date,
-                time: d.start_time ? d.start_time.substring(0, 5) : "10:00",
-                end_time: d.end_time ? d.end_time.substring(0, 5) : "18:00",
-                call_time: d.call_time ? d.call_time.substring(0, 5) : "",
-                setup_time: d.setup_time ? d.setup_time.substring(0, 5) : "",
-                status: d.status,
-                notes: d.notes || ""
-              }));
+              loadedDays = daysData.map(d => {
+                const startTimeStr = d.start_time ? d.start_time.substring(0, 5) : "10:00";
+                const endTimeStr = d.end_time ? d.end_time.substring(0, 5) : "18:00";
+                return {
+                  id: d.id,
+                  date: d.date,
+                  time: startTimeStr,
+                  end_time: endTimeStr,
+                  ends_next_day: startTimeStr > endTimeStr,
+                  call_time: d.call_time ? d.call_time.substring(0, 5) : "",
+                  setup_time: d.setup_time ? d.setup_time.substring(0, 5) : "",
+                  status: d.status,
+                  notes: d.notes || ""
+                };
+              });
               if (initialData.isDuplicate) {
                 // Clear the day IDs so they are inserted as new days instead of updating original ones
                 setDays(loadedDays.map(d => ({ ...d, id: undefined })));
@@ -438,10 +448,13 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
                 setDays(loadedDays);
               }
             } else {
+              const initialTime = initialData.time || "10:00";
+              const initialEndTime = initialData.end_time || "18:00";
               loadedDays = [{
                 date: initialData.date || "",
-                time: initialData.time || "10:00",
-                end_time: initialData.end_time || "18:00",
+                time: initialTime,
+                end_time: initialEndTime,
+                ends_next_day: initialTime > initialEndTime,
                 call_time: initialData.call_time || "",
                 setup_time: initialData.setup_time || "",
                 status: initialData.status || "Planificado",
@@ -454,6 +467,7 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
             if (loadedDays[0]) {
               setValue("date", loadedDays[0].date || "");
               setValue("time", loadedDays[0].time || "");
+              setValue("ends_next_day", !!loadedDays[0].ends_next_day);
             }
 
             // Fetch assignments
@@ -487,7 +501,7 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
         setCustomRates({});
         setStaffDays({});
         const defaultDay = {
-          date: "", time: "10:00", end_time: "18:00", call_time: "", setup_time: "", status: "Planificado", notes: ""
+          date: "", time: "10:00", end_time: "18:00", ends_next_day: false, call_time: "", setup_time: "", status: "Planificado", notes: ""
         };
         setDays([defaultDay]);
         reset({
@@ -500,7 +514,8 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
           attendance_require_confirmed: true,
           latitude: "",
           longitude: "",
-          allowed_radius_meters: 300
+          allowed_radius_meters: 300,
+          ends_next_day: false
         });
       }
     }
@@ -508,6 +523,15 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
 
   const onSubmitForm = async (data) => {
     console.log("3️⃣ [VALIDATIONS PASSED] - Formulario válido. Preparando datos para el controlador padre:", data);
+
+    // Validar manualmente que si la hora de término es anterior o igual a la de inicio, se haya confirmado que termina al día siguiente
+    for (let i = 0; i < days.length; i++) {
+      const d = days[i];
+      if (d.time && d.end_time && d.end_time <= d.time && !d.ends_next_day) {
+        toast.error(`Error de validación: En la Jornada ${i + 1}, la hora de término es anterior o igual a la de inicio. Debes confirmar si termina al día siguiente.`);
+        return;
+      }
+    }
 
     const eventData = { ...data };
     if (initialData.id) eventData.id = initialData.id;
@@ -772,6 +796,25 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
                                 />
                               </div>
                             </div>
+
+                            {day.time && day.end_time && day.end_time <= day.time && (
+                              <div className="bg-amber-500/10 border border-amber-500/20 text-amber-300 rounded-xl p-3 text-xs flex items-start gap-2.5 shadow-md">
+                                <AlertTriangle className="w-4.5 h-4.5 text-amber-400 shrink-0 mt-0.5 animate-pulse" />
+                                <div className="flex-1">
+                                  <p className="font-extrabold text-amber-200">Hora de término anterior o igual a la de inicio</p>
+                                  <p className="text-gray-400 mt-0.5">Esto indica que la jornada se extiende hasta el día siguiente (cruce de medianoche).</p>
+                                  <label className="flex items-center gap-2 mt-2.5 cursor-pointer text-amber-400 hover:text-amber-300 font-black select-none">
+                                    <input
+                                      type="checkbox"
+                                      checked={!!day.ends_next_day}
+                                      onChange={(e) => handleDayChange(idx, "ends_next_day", e.target.checked)}
+                                      className="rounded bg-gray-950 border-amber-500/30 text-amber-500 focus:ring-amber-500/30 w-4 h-4"
+                                    />
+                                    <span>Confirmar que la jornada termina al día siguiente (+1 día)</span>
+                                  </label>
+                                </div>
+                              </div>
+                            )}
 
                             {showAdvanced && (
                               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-white/[0.02]">

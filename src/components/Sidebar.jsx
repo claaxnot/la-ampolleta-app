@@ -96,8 +96,8 @@ export default function Sidebar({ user, onLogout, isOpen, setIsOpen }) {
                     to={link.to}
                     onClick={() => setIsOpen(false)}
                     className={`flex items-center gap-3 py-3 px-4 rounded-xl transition-all duration-300 ${active
-                        ? "bg-accent/10 text-accent font-medium shadow-[inset_0_0_0_1px_rgba(245,158,11,0.2)]"
-                        : "text-gray-400 hover:bg-gray-800 hover:text-gray-200"
+                      ? "bg-accent/10 text-accent font-medium shadow-[inset_0_0_0_1px_rgba(245,158,11,0.2)]"
+                      : "text-gray-400 hover:bg-gray-800 hover:text-gray-200"
                       }`}
                   >
                     <link.icon className="w-5 h-5" />
@@ -123,8 +123,8 @@ export default function Sidebar({ user, onLogout, isOpen, setIsOpen }) {
                       to={link.to}
                       onClick={() => setIsOpen(false)}
                       className={`flex items-center gap-3 py-3 px-4 rounded-xl transition-all duration-300 ${active
-                          ? "bg-accent/10 text-accent font-medium shadow-[inset_0_0_0_1px_rgba(245,158,11,0.2)]"
-                          : "text-gray-400 hover:bg-gray-800 hover:text-gray-200"
+                        ? "bg-accent/10 text-accent font-medium shadow-[inset_0_0_0_1px_rgba(245,158,11,0.2)]"
+                        : "text-gray-400 hover:bg-gray-800 hover:text-gray-200"
                         }`}
                     >
                       <link.icon className="w-5 h-5" />
@@ -149,8 +149,8 @@ export default function Sidebar({ user, onLogout, isOpen, setIsOpen }) {
                       to={link.to}
                       onClick={() => setIsOpen(false)}
                       className={`flex items-center gap-3 py-3 px-4 rounded-xl transition-all duration-300 ${active
-                          ? "bg-accent/10 text-accent font-medium shadow-[inset_0_0_0_1px_rgba(245,158,11,0.2)]"
-                          : "text-gray-400 hover:bg-gray-800 hover:text-gray-200"
+                        ? "bg-accent/10 text-accent font-medium shadow-[inset_0_0_0_1px_rgba(245,158,11,0.2)]"
+                        : "text-gray-400 hover:bg-gray-800 hover:text-gray-200"
                         }`}
                     >
                       <link.icon className="w-5 h-5" />
@@ -183,7 +183,7 @@ export default function Sidebar({ user, onLogout, isOpen, setIsOpen }) {
             title="Ver detalles del sistema"
           >
             <span className="text-[9px] text-gray-500 group-hover:text-amber-400/90 transition-colors font-extrabold uppercase tracking-widest">
-              La Ampolleta Platform v3.7.6
+              La Ampolleta Platform v3.7.7
             </span>
             <span className="text-[8px] text-gray-600 group-hover:text-gray-400 transition-colors font-medium tracking-wider">
               Engineered by Cristopher Vidal
