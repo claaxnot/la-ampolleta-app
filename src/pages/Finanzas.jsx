@@ -434,10 +434,12 @@ export default function Finanzas() {
           invoice_required,
           invoice_received,
           event_days (
-            date
+            date,
+            status
           ),
           events:event_id (
-            date
+            date,
+            status
           ),
           profiles:staff_id (
             id,
@@ -458,7 +460,11 @@ export default function Finanzas() {
         const isPeriodMatch = assignmentPeriod === periodKey;
         const isPending = a.invoice_required && !a.invoice_received && a.status !== "Pagado" && (a.status === "Confirmado" || a.status === "Aceptado");
 
-        return isPeriodMatch && isPending;
+        const dayStatus = a.event_days?.status?.toLowerCase() || "";
+        const parentStatus = a.events?.status?.toLowerCase() || "";
+        const isCancelled = dayStatus === "cancelado" || dayStatus === "cancelled" || parentStatus === "cancelado" || parentStatus === "cancelled";
+
+        return isPeriodMatch && isPending && !isCancelled;
       });
 
       if (pendingAssignments.length === 0) {
@@ -479,8 +485,13 @@ export default function Finanzas() {
 
       // 3. Si tiene cobros, calcular montos
       const totalPendingLiquid = pendingAssignments.reduce((sum, a) => {
-        const defaultRate = a.profiles?.monto_transferencia ? parseFloat(a.profiles.monto_transferencia) : 25000;
-        const rate = a.custom_rate ? parseFloat(a.custom_rate) : defaultRate;
+        const rawMonto = a.profiles?.monto_transferencia;
+        const parsedMonto = rawMonto ? parseFloat(rawMonto) : NaN;
+        const defaultRate = !isNaN(parsedMonto) ? parsedMonto : 25000;
+
+        const rawCustom = a.custom_rate;
+        const parsedCustom = rawCustom ? parseFloat(rawCustom) : NaN;
+        const rate = !isNaN(parsedCustom) ? parsedCustom : defaultRate;
         return sum + rate;
       }, 0);
       const rateVal = parseFloat(retentionRateSetting || 15.25);
@@ -535,8 +546,13 @@ export default function Finanzas() {
 
           // Crear items del lote
           const batchItems = pendingAssignments.map(a => {
-            const defaultRate = a.profiles?.monto_transferencia ? parseFloat(a.profiles.monto_transferencia) : 25000;
-            const rate = a.custom_rate ? parseFloat(a.custom_rate) : defaultRate;
+            const rawMonto = a.profiles?.monto_transferencia;
+            const parsedMonto = rawMonto ? parseFloat(rawMonto) : NaN;
+            const defaultRate = !isNaN(parsedMonto) ? parsedMonto : 25000;
+
+            const rawCustom = a.custom_rate;
+            const parsedCustom = rawCustom ? parseFloat(rawCustom) : NaN;
+            const rate = !isNaN(parsedCustom) ? parsedCustom : defaultRate;
             return {
               batch_id: batchId,
               assignment_id: a.id,
@@ -1328,8 +1344,13 @@ export default function Finanzas() {
       if (assignments) {
         // Formatear y calcular montos de eventos
         const formatted = assignments.map(a => {
-          const defaultRate = a.profiles?.monto_transferencia ? parseFloat(a.profiles.monto_transferencia) : 25000;
-          const rate = a.custom_rate ? parseFloat(a.custom_rate) : defaultRate;
+          const rawMonto = a.profiles?.monto_transferencia;
+          const parsedMonto = rawMonto ? parseFloat(rawMonto) : NaN;
+          const defaultRate = !isNaN(parsedMonto) ? parsedMonto : 25000;
+
+          const rawCustom = a.custom_rate;
+          const parsedCustom = rawCustom ? parseFloat(rawCustom) : NaN;
+          const rate = !isNaN(parsedCustom) ? parsedCustom : defaultRate;
 
           const day = a.event_days;
           const parent = a.events || {};
@@ -1349,6 +1370,7 @@ export default function Finanzas() {
             id: a.id,
             event_name: parent.name || "Sin Nombre",
             event_date: dayDate || "",
+            event_status: eventStatus,
             is_finished: isFinished,
             staff_id: a.profiles?.id || "",
             staff_name: a.profiles?.name || "Personal Desconocido",
@@ -1374,7 +1396,11 @@ export default function Finanzas() {
             invoice_verified_by_name: a.verifier?.name || null,
             invoice_notes: a.invoice_notes || null
           };
-        }).filter(a => a.assignment_status === "Confirmado" || a.assignment_status === "Aceptado");
+        }).filter(a => 
+          (a.assignment_status === "Confirmado" || a.assignment_status === "Aceptado") && 
+          a.event_status !== "cancelado" && 
+          a.event_status !== "cancelled"
+        );
 
         // Consolidación transparente
         const consolidated = [...formatted, ...formattedExpenses];
@@ -1416,7 +1442,10 @@ export default function Finanzas() {
 
       if (assignments) {
         const formatted = assignments.map(a => {
-          const defaultRate = a.profiles?.monto_transferencia ? parseFloat(a.profiles.monto_transferencia) : 25000;
+          const rawMonto = a.profiles?.monto_transferencia;
+          const parsedMonto = rawMonto ? parseFloat(rawMonto) : NaN;
+          const defaultRate = !isNaN(parsedMonto) ? parsedMonto : 25000;
+
           const eventStatus = a.events?.status ? a.events.status.toLowerCase() : "";
           const todayStr = new Date().toLocaleDateString("en-CA");
           const isDateFinished = a.events?.date ? a.events.date <= todayStr : false;
@@ -1426,6 +1455,7 @@ export default function Finanzas() {
             id: a.id,
             event_name: a.events?.name || "Sin Nombre",
             event_date: a.events?.date || "",
+            event_status: eventStatus,
             is_finished: isFinished,
             staff_id: a.profiles?.id || "",
             staff_name: a.profiles?.name || "Personal Desconocido",
@@ -1450,7 +1480,11 @@ export default function Finanzas() {
             invoice_verified_by_name: null,
             invoice_notes: null
           };
-        }).filter(a => a.assignment_status === "Confirmado" || a.assignment_status === "Aceptado");
+        }).filter(a => 
+          (a.assignment_status === "Confirmado" || a.assignment_status === "Aceptado") && 
+          a.event_status !== "cancelado" && 
+          a.event_status !== "cancelled"
+        );
 
         setPayments(formatted);
       }

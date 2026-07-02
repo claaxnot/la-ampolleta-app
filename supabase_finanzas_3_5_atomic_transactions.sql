@@ -57,8 +57,14 @@ BEGIN
   FOREACH v_assignment_id IN ARRAY p_assignment_ids LOOP
     -- Obtener tarifa de la asignación o el default por perfil
     SELECT COALESCE(
-      ea.custom_rate::NUMERIC, 
-      p.monto_transferencia::NUMERIC, 
+      CASE 
+        WHEN ea.custom_rate IS NULL OR TRIM(ea.custom_rate::text) = '' THEN NULL
+        ELSE ea.custom_rate::NUMERIC
+      END, 
+      CASE 
+        WHEN p.monto_transferencia IS NULL OR TRIM(p.monto_transferencia) = '' THEN NULL
+        ELSE p.monto_transferencia::NUMERIC
+      END,
       25000
     ) INTO v_assignment_rate
     FROM public.event_assignments ea

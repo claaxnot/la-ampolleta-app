@@ -622,8 +622,8 @@ serve(async (req: Request) => {
             invoice_received,
             event_day_id,
             event_id,
-            event_days ( date ),
-            events ( date ),
+            event_days ( date, status ),
+            events ( date, status ),
             profiles:staff_id ( id, name, monto_transferencia )
           `)
           .in("staff_id", staffIds)
@@ -645,14 +645,26 @@ serve(async (req: Request) => {
             // Excluir si explícitamente se configuró que NO requiere boleta
             if (a.invoice_required === false) continue;
 
+            // Excluir si el evento o el día del evento están cancelados
+            const eventDayStatus = a.event_days?.status?.toLowerCase() || "";
+            const eventStatus = a.events?.status?.toLowerCase() || "";
+            if (eventDayStatus === "cancelado" || eventDayStatus === "cancelled" || eventStatus === "cancelado" || eventStatus === "cancelled") {
+              continue;
+            }
+
             // Obtener fecha del evento (priorizando event_days.date)
             const dateStr = a.event_days?.date || a.events?.date || "";
             if (!dateStr) continue;
 
             const periodKey = dateStr.substring(0, 7); // "YYYY-MM"
             if (periodKey === invoicePeriod) {
-              const defaultRate = a.profiles?.monto_transferencia ? parseFloat(a.profiles.monto_transferencia) : 25000;
-              const rate = a.custom_rate ? parseFloat(a.custom_rate) : defaultRate;
+              const rawMonto = a.profiles?.monto_transferencia;
+              const parsedMonto = rawMonto ? parseFloat(rawMonto) : NaN;
+              const defaultRate = !isNaN(parsedMonto) ? parsedMonto : 25000;
+
+              const rawCustom = a.custom_rate;
+              const parsedCustom = rawCustom ? parseFloat(rawCustom) : NaN;
+              const rate = !isNaN(parsedCustom) ? parsedCustom : defaultRate;
 
               totalLiquid += rate;
               pendingGroup.push({

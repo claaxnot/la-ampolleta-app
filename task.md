@@ -171,8 +171,13 @@
 - [x] **Visualización Simplificada en Detalles de Evento:** Ocultar secciones de hora de entrada/salida y GPS para las marcas simplificadas, mostrando únicamente un distintivo premium de `✔️ Asistencia Confirmada`.
 - [x] **Integración con Tablas de Finanzas:** Ajustar las vistas y listados de pagos en `Finanzas.jsx` para que reconozcan asistencias simplificadas y muestren el indicador `✔️ Asistencia Confirmada` en lugar de una duración de jornada en cero.
 - [x] **Actualización Visual de la Versión:** Incrementar la versión del sistema a `v3.7.8` en Login, Sidebar, modal Acerca de la Plataforma y consola del desarrollador.
+## 19. Optimización Financiera y Robustez en Sincronización SII (Versión 3.7.9)
+- [x] **Exclusión de Eventos Cancelados:** Omitir eventos con estado "cancelado" o "cancelled" del cálculo de egresos, lotes y vistas del panel financiero.
+- [x] **Integridad en Carga de Boletas:** Prevenir errores de casteo `numeric: ""` controlando campos vacíos y aplicando `TRIM` en SQL para `custom_rate` y `monto_transferencia`.
+- [x] **Parseo Defensivo en JS:** Validar y mitigar valores `NaN` en cálculos financieros en el backend y frontend.
+- [x] **Actualización Visual de la Versión:** Incrementar la versión a `v3.7.9` en Login, Sidebar, modal Acerca del Sistema y consola.
 
-## 19. Pendientes y Tareas Futuras
+## 20. Pendientes y Tareas Futuras
 - [ ] **Reportes Visuales y Gráficos de Finanzas (Admin):** Gráficos interactivos de barra/línea sobre egresos mensuales y exportación de informes analíticos en PDF.
 - [ ] **Bitácora de Auditoría Operacional (Logs):** Registro e historial detallado de acciones administrativas críticas (ej: creación de eventos, cambios de estados de pago).
 - [ ] **Documentación Completa:** Escribir archivo README.md completo con instrucciones de configuración local y variables de entorno.
