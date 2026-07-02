@@ -7,12 +7,14 @@ import GlassCard from "../GlassCard.jsx";
 import Button from "../Button.jsx";
 
 // Inactivity constants (ms)
-const INACTIVITY_LIMIT = 5 * 60 * 1000; // 5 minutes
 const WARNING_TIME = 60 * 1000; // 1 minute before logout
 
 export default function SessionTimeout() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+
+  const isAdmin = user?.systemRole === "admin" || user?.role === "admin";
+  const inactivityLimit = isAdmin ? 10 * 60 * 1000 : 5 * 60 * 1000;
 
   const [showWarning, setShowWarning] = useState(false);
   const [showToast, setShowToast] = useState(false);
@@ -49,14 +51,14 @@ export default function SessionTimeout() {
     setShowWarning(false);
     // store last activity timestamp
     localStorage.setItem("lastActivity", Date.now().toString());
-    // Show warning after (INACTIVITY_LIMIT - WARNING_TIME)
+    // Show warning after (inactivityLimit - WARNING_TIME)
     warningTimer.current = setTimeout(() => {
       setShowWarning(true);
-    }, INACTIVITY_LIMIT - WARNING_TIME);
+    }, inactivityLimit - WARNING_TIME);
     // Logout after full limit
     logoutTimer.current = setTimeout(() => {
       performLogout(true);
-    }, INACTIVITY_LIMIT);
+    }, inactivityLimit);
   };
 
   // Register activity listeners
@@ -82,22 +84,47 @@ export default function SessionTimeout() {
     };
     window.addEventListener("beforeunload", beforeUnload);
 
+    // Sync between tabs/windows
+    const handleStorageChange = (e) => {
+      if (e.key === "lastActivity") {
+        const lastVal = parseInt(e.newValue, 10);
+        if (lastVal && !isNaN(lastVal)) {
+          const elapsed = Date.now() - lastVal;
+          if (elapsed < inactivityLimit) {
+            clearTimers();
+            const hasReachedWarning = elapsed >= (inactivityLimit - WARNING_TIME);
+            setShowWarning(hasReachedWarning);
+
+            const remainingWarning = Math.max(0, inactivityLimit - WARNING_TIME - elapsed);
+            const remainingLogout = Math.max(0, inactivityLimit - elapsed);
+
+            warningTimer.current = setTimeout(() => setShowWarning(true), remainingWarning);
+            logoutTimer.current = setTimeout(() => performLogout(true), remainingLogout);
+          } else {
+            // Already expired in another tab
+            performLogout(false);
+          }
+        }
+      }
+    };
+    window.addEventListener("storage", handleStorageChange);
+
     // Initial timer setup (also check previous timestamp)
     const last = parseInt(localStorage.getItem("lastActivity"), 10);
     if (last && !isNaN(last)) {
       const elapsed = Date.now() - last;
-      if (elapsed >= INACTIVITY_LIMIT) {
+      if (elapsed >= inactivityLimit) {
         // session already expired while tab was closed
         performLogout(false);
         return; // no need to set timers
       } else {
         // start clean and adjust remaining timers based on elapsed time without overlaps
         clearTimers();
-        const hasReachedWarning = elapsed >= (INACTIVITY_LIMIT - WARNING_TIME);
+        const hasReachedWarning = elapsed >= (inactivityLimit - WARNING_TIME);
         setShowWarning(hasReachedWarning);
 
-        const remainingWarning = Math.max(0, INACTIVITY_LIMIT - WARNING_TIME - elapsed);
-        const remainingLogout = Math.max(0, INACTIVITY_LIMIT - elapsed);
+        const remainingWarning = Math.max(0, inactivityLimit - WARNING_TIME - elapsed);
+        const remainingLogout = Math.max(0, inactivityLimit - elapsed);
 
         warningTimer.current = setTimeout(() => setShowWarning(true), remainingWarning);
         logoutTimer.current = setTimeout(() => performLogout(true), remainingLogout);
@@ -110,10 +137,11 @@ export default function SessionTimeout() {
     return () => {
       events.forEach((ev) => window.removeEventListener(ev, handler));
       window.removeEventListener("beforeunload", beforeUnload);
+      window.removeEventListener("storage", handleStorageChange);
       clearTimers();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]);
+  }, [user, inactivityLimit]);
 
   // Toast auto‑dismiss after 5 seconds
   useEffect(() => {
