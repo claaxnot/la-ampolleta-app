@@ -32,7 +32,8 @@ const mallLocations = [
   { code: "CON", address: "Av. Portal San Pedro 4850, San Pedro de la Paz, Bío Bío", latitude: -36.8664577, longitude: -73.1368322, allowed_radius_meters: 300 },
   { code: "BUIN", address: "Kilómetro 37 de la Ruta 5 Sur, Buin", latitude: -33.7612571, longitude: -70.7429046, allowed_radius_meters: 300 },
   { code: "CHICUREO", address: "Avenida Chicureo 125, Chicureo, Colina", latitude: -33.2858607, longitude: -70.6785264, allowed_radius_meters: 300 },
-  { code: "QUILIN", address: "Av. Américo Vespucio 3300 / Av. Quilín, Peñalolén", latitude: -33.4875358, longitude: -70.5776595, allowed_radius_meters: 300 }
+  { code: "QUILIN", address: "Av. Américo Vespucio 3300 / Av. Quilín, Peñalolén", latitude: -33.4875358, longitude: -70.5776595, allowed_radius_meters: 300 },
+  { code: "LAAMP", address: "Mahuida 956, San Bernardo", latitude: -33.5991537, longitude: -70.7119985, allowed_radius_meters: 300 }
 ];
 
 // Zod Schema tolerante y flexible para evitar bloqueos silenciosos
