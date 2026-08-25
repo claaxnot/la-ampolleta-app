@@ -498,6 +498,7 @@ export default function Staff() {
         onSubmit={handleStaffSubmit}
         initialData={editingStaff || {}}
         isLoading={isSaving}
+        userRole={user?.systemRole}
       />
 
       {/* Modal de Foto Ampliada */}

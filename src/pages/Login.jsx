@@ -75,7 +75,7 @@ export default function Login({ onLogin }) {
 
       onLogin(userInfo);
 
-      if (userInfo.systemRole === 'admin') {
+      if (userInfo.systemRole !== 'worker') {
         navigate("/dashboard");
       } else {
         navigate("/worker-dashboard");

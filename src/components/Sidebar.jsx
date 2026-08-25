@@ -115,7 +115,7 @@ export default function Sidebar({ user, onLogout, isOpen, setIsOpen }) {
                 </span>
               </div>
 
-              {adminLinks.map((link) => {
+              {adminLinks.filter(link => !(link.to === "/finanzas" && user?.systemRole === 'productor')).map((link) => {
                 const active = isLinkActive(link.to);
                 return (
                   <li key={link.to}>

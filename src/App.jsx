@@ -31,7 +31,7 @@ function App() {
 
   const AdminRoute = ({ children }) => {
     if (!user) return <Navigate to="/login" replace />;
-    if (user.systemRole !== 'admin' && user.systemRole !== 'viewer') return <Navigate to="/worker-dashboard" replace />;
+    if (user.systemRole !== 'admin' && user.systemRole !== 'viewer' && user.systemRole !== 'productor') return <Navigate to="/worker-dashboard" replace />;
     return children;
   };
 
@@ -144,7 +144,7 @@ function App() {
               path="/finanzas"
               element={
                 <AdminRoute>
-                  <Finanzas />
+                  {user?.systemRole === 'productor' ? <Navigate to="/dashboard" replace /> : <Finanzas />}
                 </AdminRoute>
               }
             />

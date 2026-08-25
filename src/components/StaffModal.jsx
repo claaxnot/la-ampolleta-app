@@ -26,7 +26,7 @@ const staffSchema = z.object({
   mensaje_beneficiario: z.string().optional(),
 });
 
-export default function StaffModal({ isOpen, onClose, onSubmit, initialData = {}, isLoading = false }) {
+export default function StaffModal({ isOpen, onClose, onSubmit, initialData = {}, isLoading = false, userRole }) {
   const {
     register,
     handleSubmit,
@@ -188,27 +188,29 @@ export default function StaffModal({ isOpen, onClose, onSubmit, initialData = {}
                   </div>
                 </div>
 
-                <div className="mt-6 border-t border-gray-700 pt-4">
-                  <h3 className="text-lg font-semibold text-amber-500 mb-4">Datos Bancarios</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="flex flex-col">
-                      <label htmlFor="cuenta_origen" className="text-gray-300 mb-1 text-sm">Cuenta Origen</label>
-                      <input id="cuenta_origen" {...register("cuenta_origen")} className="w-full bg-gray-800/50 border border-gray-700 rounded-xl p-2 text-white placeholder-gray-500" />
-                    </div>
-                    <div className="flex flex-col">
-                      <label htmlFor="cuenta_destino" className="text-gray-300 mb-1 text-sm">Cuenta Destino</label>
-                      <input id="cuenta_destino" {...register("cuenta_destino")} className="w-full bg-gray-800/50 border border-gray-700 rounded-xl p-2 text-white placeholder-gray-500" />
-                    </div>
-                    <div className="flex flex-col">
-                      <label htmlFor="codigo_banco_destino" className="text-gray-300 mb-1 text-sm">Código Banco Destino</label>
-                      <input id="codigo_banco_destino" {...register("codigo_banco_destino")} className="w-full bg-gray-800/50 border border-gray-700 rounded-xl p-2 text-white placeholder-gray-500" />
-                    </div>
-                    <div className="flex flex-col">
-                      <label htmlFor="glosa_transferencia" className="text-gray-300 mb-1 text-sm">Glosa Transferencia</label>
-                      <input id="glosa_transferencia" {...register("glosa_transferencia")} className="w-full bg-gray-800/50 border border-gray-700 rounded-xl p-2 text-white placeholder-gray-500" />
+                {userRole !== 'productor' && (
+                  <div className="mt-6 border-t border-gray-700 pt-4">
+                    <h3 className="text-lg font-semibold text-amber-500 mb-4">Datos Bancarios</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="flex flex-col">
+                        <label htmlFor="cuenta_origen" className="text-gray-300 mb-1 text-sm">Cuenta Origen</label>
+                        <input id="cuenta_origen" {...register("cuenta_origen")} className="w-full bg-gray-800/50 border border-gray-700 rounded-xl p-2 text-white placeholder-gray-500" />
+                      </div>
+                      <div className="flex flex-col">
+                        <label htmlFor="cuenta_destino" className="text-gray-300 mb-1 text-sm">Cuenta Destino</label>
+                        <input id="cuenta_destino" {...register("cuenta_destino")} className="w-full bg-gray-800/50 border border-gray-700 rounded-xl p-2 text-white placeholder-gray-500" />
+                      </div>
+                      <div className="flex flex-col">
+                        <label htmlFor="codigo_banco_destino" className="text-gray-300 mb-1 text-sm">Código Banco Destino</label>
+                        <input id="codigo_banco_destino" {...register("codigo_banco_destino")} className="w-full bg-gray-800/50 border border-gray-700 rounded-xl p-2 text-white placeholder-gray-500" />
+                      </div>
+                      <div className="flex flex-col">
+                        <label htmlFor="glosa_transferencia" className="text-gray-300 mb-1 text-sm">Glosa Transferencia</label>
+                        <input id="glosa_transferencia" {...register("glosa_transferencia")} className="w-full bg-gray-800/50 border border-gray-700 rounded-xl p-2 text-white placeholder-gray-500" />
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
 
                 <div className="flex justify-end space-x-3 mt-6">
                   <Button type="button" variant="secondary" onClick={onClose} disabled={isLoading}>Cancelar</Button>

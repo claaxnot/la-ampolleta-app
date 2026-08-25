@@ -154,7 +154,7 @@
 - [x] **Actualización de Versión Global en UI:** Actualizar el indicativo de versión de la aplicación a `v3.7.4` en la firma de consola, pantalla de Login y barra lateral.
 - [x] **Control de Respaldos Git (Tags):** Crear y subir etiquetas de versión (`v3.7.4-stable-push` y `v3.7.4-auth-backup`) para facilitar reversiones rápidas ante regresiones.
 - [x] **Automatización de Estados por Jornada (Cierre Automático):** Rediseñar la función de base de datos `auto_update_event_statuses` para procesar y finalizar jornadas individuales (`event_days`) e integrarlas recursivamente con el estado del evento principal (`events`).
-- [x] **Reloj en Formato 24 Horas:** Rediseñar visualmente el componente `ClockPicker` a formato 24 horas usando dos anillos concéntricos (exterior para 1-12, interior para 13-23 y 00), removiendo el selector AM/PM y manteniendo el ajuste fino de minutos.
+- [x] **Reloj en Formato 24 Horas:** Rediseñar visualmente el componente `ClockPicker` a formato 24 horas usando dos anillos concéntricos (exterior para 1-12, interior para 13-23 y 00), removiendo el selector AM/PM y manteniendo el ajuste fino de minutos. (v3.7.6)
 
 ## 16. Flexibilidad de Fechas de Término y Horarios Cruzados (Versión 3.7.6)
 - [x] **Cruce de Medianoche / Jornadas de Día Siguiente:** Incorporar soporte dinámico en `EventModal.jsx` para eventos que terminan al día siguiente o posterior (cruzan medianoche), relajando el bloqueo estricto de Zod de `end_time > time` mediante un parámetro `ends_next_day` en el esquema.
@@ -171,13 +171,20 @@
 - [x] **Visualización Simplificada en Detalles de Evento:** Ocultar secciones de hora de entrada/salida y GPS para las marcas simplificadas, mostrando únicamente un distintivo premium de `✔️ Asistencia Confirmada`.
 - [x] **Integración con Tablas de Finanzas:** Ajustar las vistas y listados de pagos en `Finanzas.jsx` para que reconozcan asistencias simplificadas y muestren el indicador `✔️ Asistencia Confirmada` en lugar de una duración de jornada en cero.
 - [x] **Actualización Visual de la Versión:** Incrementar la versión del sistema a `v3.7.8` en Login, Sidebar, modal Acerca de la Plataforma y consola del desarrollador.
+
 ## 19. Optimización Financiera y Robustez en Sincronización SII (Versión 3.7.9)
 - [x] **Exclusión de Eventos Cancelados:** Omitir eventos con estado "cancelado" o "cancelled" del cálculo de egresos, lotes y vistas del panel financiero.
 - [x] **Integridad en Carga de Boletas:** Prevenir errores de casteo `numeric: ""` controlando campos vacíos y aplicando `TRIM` en SQL para `custom_rate` y `monto_transferencia`.
 - [x] **Parseo Defensivo en JS:** Validar y mitigar valores `NaN` en cálculos financieros en el backend y frontend.
 - [x] **Actualización Visual de la Versión:** Incrementar la versión a `v3.7.9` en Login, Sidebar, modal Acerca del Sistema y consola.
 
-## 20. Pendientes y Tareas Futuras
+## 20. Implementación del Rol Productor (Nuevas tareas)
+- [x] **Definición de Permisos (Frontend):** Crear el rol `productor` con capacidades completas para crear/editar eventos y staff, pero con restricciones absolutas para eliminar registros (`canDelete: false`).
+- [x] **Control de Rutas Protegidas:** Permitir el acceso de `productor` a las vistas de administración (`/events`, `/staff`, `/calendar`, `/dashboard`) y restringir su acceso a `/finanzas` mediante redirección forzada.
+- [x] **Filtrado del Menú Lateral (Sidebar):** Ocultar dinámicamente el enlace a "Finanzas" en el Sidebar para los productores.
+- [x] **Visualización de Datos Bancarios:** Ocultar el formulario y la sección de Datos Bancarios en `StaffModal` para los productores.
+
+## 21. Pendientes y Tareas Futuras
 - [ ] **Reportes Visuales y Gráficos de Finanzas (Admin):** Gráficos interactivos de barra/línea sobre egresos mensuales y exportación de informes analíticos en PDF.
 - [ ] **Bitácora de Auditoría Operacional (Logs):** Registro e historial detallado de acciones administrativas críticas (ej: creación de eventos, cambios de estados de pago).
 - [ ] **Documentación Completa:** Escribir archivo README.md completo con instrucciones de configuración local y variables de entorno.

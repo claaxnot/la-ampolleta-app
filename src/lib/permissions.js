@@ -4,6 +4,11 @@ export const permissions = {
     canDelete: true,
     canCreate: true,
   },
+  productor: {
+    canEdit: true,
+    canDelete: false,
+    canCreate: true,
+  },
   viewer: {
     canEdit: false,
     canDelete: false,
