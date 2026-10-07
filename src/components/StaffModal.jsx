@@ -18,6 +18,7 @@ const staffSchema = z.object({
     }),
   email: z.string().email("Debe ser un correo electrónico válido"),
   role: z.string().min(2, "El rol es obligatorio"),
+  system_role: z.enum(["admin", "productor", "worker", "viewer"]).optional(),
   cuenta_origen: z.string().optional(),
   cuenta_destino: z.string().optional(),
   codigo_banco_destino: z.string().optional(),
@@ -41,6 +42,7 @@ export default function StaffModal({ isOpen, onClose, onSubmit, initialData = {}
       rut: "",
       email: "",
       role: "",
+      system_role: "worker",
       cuenta_origen: "72052242",
       cuenta_destino: "",
       codigo_banco_destino: "",
@@ -70,6 +72,7 @@ export default function StaffModal({ isOpen, onClose, onSubmit, initialData = {}
           rut: initialData.rut || "",
           email: initialData.email || "",
           role: initialData.role || "",
+          system_role: initialData.system_role || "worker",
           cuenta_origen: initialData.cuenta_origen || "72052242",
           cuenta_destino: initialData.cuenta_destino || "",
           codigo_banco_destino: initialData.codigo_banco_destino || "",
@@ -78,7 +81,7 @@ export default function StaffModal({ isOpen, onClose, onSubmit, initialData = {}
           mensaje_beneficiario: initialData.mensaje_beneficiario || "",
         });
       } else {
-        reset({ name: "", rut: "", email: "", role: "", cuenta_origen: "72052242", cuenta_destino: "", codigo_banco_destino: "", monto_transferencia: "", glosa_transferencia: "", mensaje_beneficiario: "" });
+        reset({ name: "", rut: "", email: "", role: "", system_role: "worker", cuenta_origen: "72052242", cuenta_destino: "", codigo_banco_destino: "", monto_transferencia: "", glosa_transferencia: "", mensaje_beneficiario: "" });
       }
     }
   }, [initialData, isOpen, reset]);
@@ -186,6 +189,23 @@ export default function StaffModal({ isOpen, onClose, onSubmit, initialData = {}
                     />
                     {errors.role && <span className="text-red-400 text-xs mt-1">{errors.role.message}</span>}
                   </div>
+
+                  {userRole === 'admin' && (
+                    <div className="flex flex-col">
+                      <label htmlFor="system_role" className="text-gray-300 mb-1">Acceso al Sistema</label>
+                      <select
+                        id="system_role"
+                        {...register("system_role")}
+                        className="w-full bg-gray-800/50 border border-gray-700 rounded-xl p-2.5 text-white focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/30 transition-all duration-300"
+                      >
+                        <option value="worker">Worker (Trabajador)</option>
+                        <option value="productor">Productor (Gestión)</option>
+                        <option value="admin">Admin (Total)</option>
+                        <option value="viewer">Viewer (Lectura)</option>
+                      </select>
+                      {errors.system_role && <span className="text-red-400 text-xs mt-1">{errors.system_role.message}</span>}
+                    </div>
+                  )}
                 </div>
 
                 {userRole !== 'productor' && (
