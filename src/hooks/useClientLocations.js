@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "../lib/supabase.js";
-import toast from "react-hot-toast";
 
 export const DEFAULT_MALL_LOCATIONS = [
   { code: "PAK", name: "Mall Parque Arauco Kennedy", address: "Av. Pdte. Kennedy 5413, Las Condes, Santiago", latitude: -33.4033686, longitude: -70.5787967, allowed_radius_meters: 300 },
@@ -77,29 +76,46 @@ export function useClientLocations() {
         .order("code", { ascending: true });
 
       if (error) {
-        // Si la tabla no existe aún, se usan los defaults silenciosamente
-        console.warn("Tabla client_locations no disponible, usando catálogo local por defecto.", error.message);
+        console.warn("Tabla client_locations no disponible aún, usando catálogo local por defecto.", error.message);
         setLocations(DEFAULT_MALL_LOCATIONS);
         return;
       }
 
       if (data && data.length > 0) {
-        // Normalizar tipos numéricos
+        // La base de datos es la única fuente de verdad
         const normalized = data.map(item => ({
           ...item,
           latitude: parseFloat(item.latitude),
           longitude: parseFloat(item.longitude),
           allowed_radius_meters: parseInt(item.allowed_radius_meters, 10) || 300
         }));
-
-        // Combinar con los defaults para asegurar que no falte ninguno si la tabla no se sembró completa
-        const mergedMap = new Map();
-        DEFAULT_MALL_LOCATIONS.forEach(loc => mergedMap.set(loc.code.toUpperCase(), loc));
-        normalized.forEach(loc => mergedMap.set(loc.code.toUpperCase(), loc));
-
-        const result = Array.from(mergedMap.values()).sort((a, b) => a.code.localeCompare(b.code));
-        setLocations(result);
+        setLocations(normalized);
       } else {
+        // Si la tabla existe pero no tiene filas, auto-sembrar los 17 predeterminados
+        try {
+          const { error: seedError } = await supabase
+            .from("client_locations")
+            .upsert(DEFAULT_MALL_LOCATIONS, { onConflict: "code" });
+
+          if (!seedError) {
+            const { data: seeded } = await supabase
+              .from("client_locations")
+              .select("*")
+              .order("code", { ascending: true });
+
+            if (seeded && seeded.length > 0) {
+              setLocations(seeded.map(item => ({
+                ...item,
+                latitude: parseFloat(item.latitude),
+                longitude: parseFloat(item.longitude),
+                allowed_radius_meters: parseInt(item.allowed_radius_meters, 10) || 300
+              })));
+              return;
+            }
+          }
+        } catch (seedErr) {
+          console.warn("No se pudo sembrar automáticamente client_locations:", seedErr);
+        }
         setLocations(DEFAULT_MALL_LOCATIONS);
       }
     } catch (err) {
@@ -116,6 +132,8 @@ export function useClientLocations() {
 
   const saveLocation = async (locationData) => {
     const code = (locationData.code || "").trim().toUpperCase();
+    const originalCode = (locationData.originalCode || "").trim().toUpperCase();
+
     if (!code) throw new Error("El código de cliente es obligatorio.");
     if (!locationData.address) throw new Error("La dirección es obligatoria.");
     if (isNaN(locationData.latitude) || isNaN(locationData.longitude)) {
@@ -133,18 +151,50 @@ export function useClientLocations() {
     };
 
     if (locationData.id) {
-      // Edición
+      // Edición por ID existente en Supabase
       const { error } = await supabase
         .from("client_locations")
         .update(payload)
         .eq("id", locationData.id);
       if (error) throw error;
+    } else if (originalCode) {
+      // Edición por Código Previo si no tenía ID
+      const { data: existing } = await supabase
+        .from("client_locations")
+        .select("id")
+        .eq("code", originalCode)
+        .maybeSingle();
+
+      if (existing) {
+        const { error } = await supabase
+          .from("client_locations")
+          .update(payload)
+          .eq("id", existing.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from("client_locations")
+          .upsert(payload, { onConflict: "code" });
+        if (error) throw error;
+      }
     } else {
-      // Creación
+      // Creación nueva
       const { error } = await supabase
         .from("client_locations")
         .upsert(payload, { onConflict: "code" });
       if (error) throw error;
+    }
+
+    // Si el código cambió, sincronizar automáticamente los eventos que usaban el código anterior
+    if (originalCode && originalCode !== code) {
+      try {
+        await supabase
+          .from("events")
+          .update({ client: code })
+          .eq("client", originalCode);
+      } catch (evErr) {
+        console.warn("Aviso: No se pudieron sincronizar eventos antiguos:", evErr);
+      }
     }
 
     await fetchLocations();

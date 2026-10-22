@@ -19,11 +19,12 @@ CREATE TABLE IF NOT EXISTS public.client_locations (
 ALTER TABLE public.client_locations ENABLE ROW LEVEL SECURITY;
 
 -- 3. Políticas de Seguridad (RLS)
--- Lectura pública para cualquier usuario autenticado (Admins, Productores y Trabajadores para autocompletar)
+-- Lectura pública para cualquier usuario (Admins, Productores y Trabajadores para autocompletar)
 DROP POLICY IF EXISTS "Permitir lectura de clientes a usuarios autenticados" ON public.client_locations;
-CREATE POLICY "Permitir lectura de clientes a usuarios autenticados"
+DROP POLICY IF EXISTS "Permitir lectura pública de clientes" ON public.client_locations;
+CREATE POLICY "Permitir lectura pública de clientes"
 ON public.client_locations FOR SELECT
-TO authenticated
+TO public
 USING (true);
 
 -- Escritura, edición y eliminación EXCLUSIVAS para Administradores (los Productores NO tienen acceso)

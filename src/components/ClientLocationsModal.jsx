@@ -21,6 +21,7 @@ export default function ClientLocationsModal({
 
   // Form State
   const [currentId, setCurrentId] = useState(null);
+  const [originalCode, setOriginalCode] = useState("");
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
   const [address, setAddress] = useState("");
@@ -36,6 +37,7 @@ export default function ClientLocationsModal({
 
   const handleOpenCreate = () => {
     setCurrentId(null);
+    setOriginalCode("");
     setCode("");
     setName("");
     setAddress("");
@@ -48,6 +50,7 @@ export default function ClientLocationsModal({
 
   const handleOpenEdit = (loc) => {
     setCurrentId(loc.id || null);
+    setOriginalCode(loc.code || "");
     setCode(loc.code || "");
     setName(loc.name || "");
     setAddress(loc.address || "");
@@ -61,6 +64,7 @@ export default function ClientLocationsModal({
   const handleCancelForm = () => {
     setIsEditing(false);
     setCurrentId(null);
+    setOriginalCode("");
   };
 
   // Asistente Inteligente de Google Maps
@@ -104,6 +108,7 @@ export default function ClientLocationsModal({
 
     const payload = {
       id: currentId,
+      originalCode: originalCode,
       code: code.trim().toUpperCase(),
       name: name.trim() || code.trim().toUpperCase(),
       address: address.trim(),
