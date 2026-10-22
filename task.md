@@ -190,7 +190,15 @@
 - [x] **Eliminación de WebSockets Persistentes:** Reemplazo de todas las suscripciones Realtime por consultas PostgREST HTTP, llevando el consumo de conexiones concurrentes de Supabase de ~150-200 a exactamente 0.
 - [x] **Garantía Free Tier $0 USD:** Prevención absoluta de bloqueos de cuota, alertas de cobro o degradación por sobregiro del límite de 200 conexiones concurrentes.
 
-## 22. Pendientes y Tareas Futuras
+## 22. Gestor Dinámico de Clientes y Locaciones (Exclusivo Administradores)
+- [x] **Tabla de Base de Datos (`client_locations`):** Creada con esquema para código, nombre, dirección, coordenadas GPS (lat/long) y radio de tolerancia, con RLS bloqueando escrituras a no-administradores.
+- [x] **Migración con Seed Completo:** Script `supabase_client_locations_migration.sql` precargado con los 17 clientes/malls existentes.
+- [x] **Asistente Inteligente de Google Maps:** Parser en `useClientLocations.js` que extrae automáticamente latitud y longitud al pegar cualquier URL de Google Maps o coordenadas directas.
+- [x] **Modal de Gestión (`ClientLocationsModal.jsx`):** Interfaz completa para crear, buscar, editar y eliminar clientes/locaciones.
+- [x] **Restricción Estricta de Rol (Admin Only):** Acceso y botones completamente ocultos e inaccesibles para el rol `productor`, garantizando control administrativo absoluto.
+- [x] **Autocompletado Dinámico en Eventos:** Integración con `EventModal.jsx` para alimentar el `<datalist>` y autocompletar automáticamente dirección, GPS y radio en base a Supabase y catálogo de respaldo.
+
+## 23. Pendientes y Tareas Futuras
 - [ ] **Reportes Visuales y Gráficos de Finanzas (Admin):** Gráficos interactivos de barra/línea sobre egresos mensuales y exportación de informes analíticos en PDF.
 - [ ] **Bitácora de Auditoría Operacional (Logs):** Registro e historial detallado de acciones administrativas críticas (ej: creación de eventos, cambios de estados de pago).
 - [ ] **Documentación Completa:** Escribir archivo README.md completo con instrucciones de configuración local y variables de entorno.

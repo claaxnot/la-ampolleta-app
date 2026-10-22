@@ -8,6 +8,8 @@ import { permissions } from "../lib/permissions.js";
 import { toast } from "react-hot-toast";
 import { Copy } from "lucide-react";
 import { useSmartPolling } from "../hooks/useSmartPolling.js";
+import ClientLocationsModal from "../components/ClientLocationsModal.jsx";
+import { useClientLocations } from "../hooks/useClientLocations.js";
 
 export default function Events({ user }) {
   const [events, setEvents] = useState([]);
@@ -18,6 +20,8 @@ export default function Events({ user }) {
   const [editingEvent, setEditingEvent] = useState(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState(null);
+  const [isClientModalOpen, setIsClientModalOpen] = useState(false);
+  const { locations, saveLocation, deleteLocation } = useClientLocations();
   
   const currentYearStr = String(new Date().getFullYear());
   const currentMonthStr = String(new Date().getMonth() + 1).padStart(2, '0');
@@ -421,7 +425,9 @@ export default function Events({ user }) {
         onSearch={handleSearch} 
         onFilter={handleFilter} 
         onAdd={() => openModal()} 
-        canCreate={rolePermissions.canCreate} 
+        canCreate={rolePermissions.canCreate}
+        canManageClients={user?.systemRole === "admin"}
+        onManageClients={() => setIsClientModalOpen(true)} 
         selectedYear={selectedYear}
         onYearChange={setSelectedYear}
         yearOptions={yearsWithEvents}
@@ -495,6 +501,9 @@ export default function Events({ user }) {
           isOpen={isModalOpen}
           onClose={closeModal}
           onSubmit={handleSubmit}
+          userRole={user?.systemRole}
+          onOpenClientManager={() => setIsClientModalOpen(true)}
+          clientLocations={locations}
           initialData={editingEvent || {
             name: "",
             client: "",
@@ -509,6 +518,16 @@ export default function Events({ user }) {
       )}
       {detailsOpen && selectedEvent && (
         <EventDetails event={selectedEvent} isOpen={detailsOpen} onClose={closeDetails} />
+      )}
+      {isClientModalOpen && user?.systemRole === 'admin' && (
+        <ClientLocationsModal
+          isOpen={isClientModalOpen}
+          onClose={() => setIsClientModalOpen(false)}
+          locations={locations}
+          onSave={saveLocation}
+          onDelete={deleteLocation}
+          userRole={user?.systemRole}
+        />
       )}
     </div>
   );

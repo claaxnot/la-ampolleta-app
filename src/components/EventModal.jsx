@@ -89,7 +89,7 @@ const eventSchema = z.object({
   path: ["end_time"]
 });
 
-export default function EventModal({ isOpen, onClose, onSubmit, initialData = {} }) {
+export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}, userRole = "", onOpenClientManager = null, clientLocations = null }) {
   const {
     register,
     handleSubmit,
@@ -275,7 +275,8 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
     }
 
     const codeTrimmed = clientValue.trim().toUpperCase();
-    const match = mallLocations.find(loc => loc.code === codeTrimmed);
+    const activeLocations = clientLocations && clientLocations.length > 0 ? clientLocations : mallLocations;
+    const match = activeLocations.find(loc => loc.code.toUpperCase() === codeTrimmed);
 
     if (match) {
       // Autocompletar datos del catálogo base
@@ -711,18 +712,33 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
                     </div>
 
                     <div className="flex flex-col">
-                      <label className="text-gray-300 mb-1.5 text-xs font-semibold" htmlFor="client">Cliente (Código)</label>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <label className="text-gray-300 text-xs font-semibold" htmlFor="client">
+                          Cliente (Código)
+                        </label>
+                        {userRole === 'admin' && onOpenClientManager && (
+                          <button
+                            type="button"
+                            onClick={onOpenClientManager}
+                            className="text-amber-400 hover:text-amber-300 text-[11px] font-medium flex items-center gap-1 transition-colors"
+                            title="Gestionar catálogo de clientes y recintos"
+                          >
+                            <Settings className="w-3 h-3" />
+                            <span>Gestionar Clientes</span>
+                          </button>
+                        )}
+                      </div>
                       <input
                         id="client"
-                        placeholder="Ej: PAK, MAM o nombre de cliente..."
+                        placeholder="Ej: PAK, MAM, LAAMP o nombre de cliente..."
                         list="mall-codes"
                         {...register("client")}
                         className={`w-full bg-gray-800/50 border rounded-xl p-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-amber-500/50 transition-colors ${errors.client ? 'border-red-500 focus:ring-red-500' : 'border-gray-700'}`}
                       />
                       <datalist id="mall-codes">
-                        {mallLocations.map((loc) => (
+                        {(clientLocations && clientLocations.length > 0 ? clientLocations : mallLocations).map((loc) => (
                           <option key={loc.code} value={loc.code}>
-                            {loc.code} - {loc.address.split(',')[0]}
+                            {loc.code} - {loc.name || loc.address.split(',')[0]}
                           </option>
                         ))}
                       </datalist>

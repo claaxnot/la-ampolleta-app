@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { motion } from "framer-motion";
-import { Search, Plus } from "lucide-react";
+import { Search, Plus, Building2 } from "lucide-react";
 import Button from "./Button.jsx";
 
 /**
@@ -10,12 +10,16 @@ import Button from "./Button.jsx";
  *   onFilter(status: string)
  *   onAdd()
  *   canCreate(boolean)
+ *   onManageClients()
+ *   canManageClients(boolean)
  */
 export default function EventToolbar({ 
   onSearch, 
   onFilter, 
   onAdd, 
   canCreate = true, 
+  canManageClients = false,
+  onManageClients,
   selectedYear,
   onYearChange,
   yearOptions = [],
@@ -107,6 +111,19 @@ export default function EventToolbar({
             <option value="cancelado">Cancelado</option>
           </select>
         </div>
+
+        {/* Botón Gestión de Clientes (Solo Admin) */}
+        {canManageClients && (
+          <Button 
+            variant="secondary" 
+            className="w-full sm:w-auto flex items-center justify-center gap-2 shrink-0 border border-amber-500/30 hover:border-amber-500/60 text-amber-300 hover:text-white"
+            onClick={onManageClients}
+            title="Administrar catálogo de clientes y recintos"
+          >
+            <Building2 className="w-4 h-4 text-amber-400" />
+            <span>Clientes & Locaciones</span>
+          </Button>
+        )}
 
         {/* Botón Nuevo Evento */}
         <Button 
