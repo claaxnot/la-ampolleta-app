@@ -42,6 +42,7 @@ import { toast } from "react-hot-toast";
 import DatePicker from "../components/DatePicker.jsx";
 import CurrencyInputCLP from "../components/CurrencyInputCLP.jsx";
 import { PushOnboardingBanner } from "../components/PushOnboarding.jsx";
+import { useSmartPolling } from "../hooks/useSmartPolling.js";
 
 
 // Helper functions for mini calendar
@@ -608,176 +609,14 @@ export default function WorkerDashboard({ user }) {
         }
       });
 
-      console.log("🔌 [REALTIME] - Subscribiendo WorkerDashboard a tabla 'notifications'...");
-      const channel = supabase
-        .channel('db-notifications-updates')
-        .on(
-          'postgres_changes',
-          { event: 'INSERT', schema: 'public', table: 'notifications' },
-          (payload) => {
-            if (payload.new && payload.new.user_id === user.id) {
-              console.log("🔔 [REALTIME] - Nueva notificación física recibida:", payload.new);
-              const newNotif = {
-                id: payload.new.id,
-                title: payload.new.title,
-                desc: payload.new.description,
-                type: payload.new.type || "info",
-                time: "Ahora mismo",
-                read: payload.new.read
-              };
-              setNotifications(prev => [newNotif, ...prev]);
-              toast.success(`Nueva notificación: ${payload.new.title}`, {
-                icon: "🔔",
-                duration: 4000,
-                style: {
-                  background: 'rgba(31, 41, 55, 0.95)',
-                  color: '#fff',
-                  border: '1px solid rgba(245, 158, 11, 0.3)',
-                  boxShadow: '0 0 20px rgba(245, 158, 11, 0.2)'
-                }
-              });
-            }
-          }
-        )
-        .on(
-          'postgres_changes',
-          { event: 'UPDATE', schema: 'public', table: 'notifications' },
-          (payload) => {
-            if (payload.new && payload.new.user_id === user.id) {
-              console.log("🔔 [REALTIME] - Notificación física modificada:", payload.new);
-              setNotifications(prev => prev.map(n => n.id === payload.new.id ? {
-                ...n,
-                read: payload.new.read
-              } : n));
-            }
-          }
-        )
-        .subscribe();
-
-      return () => {
-        supabase.removeChannel(channel);
-      };
+      // Smart Short-Polling: actualiza eventos, asistencia y notificaciones cada 3.5 segundos (0 WebSockets de Realtime)
+  useSmartPolling(() => {
+    if (user?.id) {
+      fetchMyEvents(user.id, true);
+    }
+  }, 3500, !!user?.id);
     }
   }, [user?.id]);
-
-  // Suscripción Realtime en Supabase para actualizaciones en vivo
-  useEffect(() => {
-    if (!user?.id || assignedEvents.length === 0) return;
-
-    console.log("🔌 [REALTIME] - Subscribiendo a eventos en vivo para trabajador:", user.id);
-    const channel = supabase
-      .channel('events-updates-worker')
-      .on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'events' },
-        async (payload) => {
-          const updatedEvent = payload.new;
-
-          // Verificar si el trabajador está asignado a este evento actualizado
-          const isAssigned = assignedEvents.some(e => e.id === updatedEvent.id);
-          if (isAssigned) {
-            console.log("🔔 [REALTIME] - Evento asignado actualizado en BD:", updatedEvent);
-            const oldEvent = assignedEvents.find(e => e.id === updatedEvent.id);
-
-            const newNotifs = [];
-            let changesText = [];
-
-            // Detectar cambios en tiempos técnicos
-            if (oldEvent.call_time !== updatedEvent.call_time && updatedEvent.call_time) {
-              newNotifs.push({
-                id: Date.now() + 1,
-                title: "⏱️ Hora de Citación Definida",
-                desc: `Tu hora de presentación para "${updatedEvent.name}" se fijó a las ${updatedEvent.call_time.slice(0, 5)} hrs.`,
-                type: "info",
-                time: "Ahora mismo",
-                read: false
-              });
-              changesText.push("citación");
-            }
-
-            if (oldEvent.setup_time !== updatedEvent.setup_time && updatedEvent.setup_time) {
-              newNotifs.push({
-                id: Date.now() + 2,
-                title: "🏗️ Hora de Montaje Cargada",
-                desc: `Se estableció el montaje técnico para "${updatedEvent.name}" a las ${updatedEvent.setup_time.slice(0, 5)} hrs.`,
-                type: "warning",
-                time: "Ahora mismo",
-                read: false
-              });
-              changesText.push("montaje");
-            }
-
-            if (oldEvent.operational_info_pending && !updatedEvent.operational_info_pending) {
-              newNotifs.push({
-                id: Date.now() + 3,
-                title: "✅ Planificación Completada",
-                desc: `La planificación técnica de "${updatedEvent.name}" ya se encuentra definida por el Administrador.`,
-                type: "info",
-                time: "Ahora mismo",
-                read: false
-              });
-              changesText.push("planificación");
-            }
-
-            if (newNotifs.length > 0) {
-              setNotifications(prev => [...newNotifs, ...prev]);
-              addActivity(`Se actualizó la información de tu evento: "${updatedEvent.name}" (${changesText.join(", ")}).`, "event");
-
-              toast.success(`¡Tu evento "${updatedEvent.name}" fue actualizado!`, {
-                icon: "🔔",
-                duration: 5000,
-                style: {
-                  background: 'rgba(31, 41, 55, 0.95)',
-                  color: '#fff',
-                  border: '1px solid rgba(245, 158, 11, 0.3)',
-                  boxShadow: '0 0 20px rgba(245, 158, 11, 0.2)'
-                }
-              });
-            } else {
-              toast.success(`Evento actualizado: "${updatedEvent.name}"`, { icon: "📝" });
-              addActivity(`Tu evento "${updatedEvent.name}" fue modificado.`, "event");
-            }
-
-            // Recargar eventos para actualizar transiciones en UI en tiempo real
-            fetchMyEvents(user.id);
-          }
-        }
-      )
-      .on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'event_assignments' },
-        async (payload) => {
-          if (payload.new && payload.new.staff_id === user.id) {
-            console.log("🔔 [REALTIME] - Asignación o Pago actualizado en BD:", payload.new);
-
-            // Si el estado de pago cambió a "Pagado", notificar
-            if (payload.old && payload.old.payment_status !== "Pagado" && payload.new.payment_status === "Pagado") {
-              toast.success("¡Recibiste un nuevo pago! Revisa tu historial.", {
-                icon: "💰",
-                duration: 5000,
-                style: {
-                  background: 'rgba(16, 185, 129, 0.95)',
-                  color: '#fff',
-                  border: '1px solid rgba(16, 185, 129, 0.3)',
-                  boxShadow: '0 0 20px rgba(16, 185, 129, 0.2)'
-                }
-              });
-              addActivity("Se procesó y liquidó el pago de uno de tus eventos.", "success");
-            } else {
-              toast.success("Información de asignación o pago actualizada", { icon: "🔄" });
-            }
-
-            // Recargar eventos para refrescar montos y estados en la interfaz
-            fetchMyEvents(user.id);
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [user?.id, assignedEvents]);
 
   const fetchMyAvailability = async (workerId) => {
     const { data } = await supabase

@@ -7,6 +7,7 @@ import GlassCard from "../components/GlassCard.jsx";
 import { permissions } from "../lib/permissions.js";
 import { toast } from "react-hot-toast";
 import { Copy } from "lucide-react";
+import { useSmartPolling } from "../hooks/useSmartPolling.js";
 
 export default function Events({ user }) {
   const [events, setEvents] = useState([]);
@@ -68,24 +69,10 @@ export default function Events({ user }) {
 
   React.useEffect(() => {
     fetchEvents();
-
-    console.log("🔌 [REALTIME EVENTS] - Subscribiendo a cambios en tabla events...");
-    const channel = supabase
-      .channel('events-list-changes')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'events' },
-        (payload) => {
-          console.log("🔔 [REALTIME EVENTS] - Cambio detectado en tabla events:", payload);
-          fetchEvents();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
   }, []);
+
+  // Smart Short-Polling: sincroniza listado de eventos cada 4 segundos (0 conexiones Realtime)
+  useSmartPolling(() => fetchEvents(true), 4000, true);
 
   const handleSubmit = async (eventData) => {
     if (eventData.id && !rolePermissions.canEdit) {

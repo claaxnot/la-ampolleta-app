@@ -9,6 +9,7 @@ import StaffModal from "../components/StaffModal.jsx";
 import { useAuth } from "../hooks/useAuth.js";
 import { permissions } from "../lib/permissions.js";
 import { toast } from "react-hot-toast";
+import { useSmartPolling } from "../hooks/useSmartPolling.js";
 
 const translateAuthError = (message) => {
   if (!message) return "Error desconocido";
@@ -78,23 +79,10 @@ export default function Staff() {
 
   React.useEffect(() => {
     fetchStaff();
-
-    // Suscribir a cambios en tiempo real de la tabla profiles
-    const channel = supabase
-      .channel("profiles-realtime")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "profiles" },
-        () => {
-          fetchStaff(true); // silent update
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
   }, []);
+
+  // Smart Short-Polling: sincroniza staff cada 4 segundos (0 conexiones Realtime)
+  useSmartPolling(() => fetchStaff(true), 4000, true);
 
   const fetchStaff = async (silent = false) => {
     if (!silent) setIsLoading(true);

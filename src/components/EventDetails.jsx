@@ -7,6 +7,7 @@ import { supabase } from "../lib/supabase.js";
 import { toast } from "react-hot-toast";
 import DatePicker from "./DatePicker.jsx";
 import ClockPicker from "./ClockPicker.jsx";
+import { useSmartPolling } from "../hooks/useSmartPolling.js";
 
 /**
  * EventDetails – shows full information for a selected event.
@@ -195,44 +196,17 @@ export default function EventDetails({ event, isOpen, onClose }) {
 
   React.useEffect(() => {
     if (!isOpen || !event?.id) return;
-
     fetchAssignedStaff();
+  }, [isOpen, event?.id]);
 
-    // Suscribirse a cambios en tiempo real de asignaciones y logs
-    const channel = supabase
-      .channel(`event-details-realtime-${event.id}`)
-      .on(
-        'postgres_changes',
-        { 
-          event: '*', 
-          schema: 'public', 
-          table: 'event_assignments', 
-          filter: `event_id=eq.${event.id}` 
-        },
-        () => {
-          console.log("🔔 [REALTIME EVENT DETAILS] - Cambio de asignaciones detectado. Actualizando...");
-          fetchAssignedStaff();
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'event_attendance_logs',
-          filter: `event_id=eq.${event.id}`
-        },
-        () => {
-          console.log("🔔 [REALTIME EVENT DETAILS] - Cambio de asistencia detectado. Actualizando...");
-          fetchAssignedStaff();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [isOpen, event]);
+  // Smart Short-Polling: sincroniza asistencia en vivo cada 3 segundos solo cuando el modal está abierto (0 conexiones Realtime)
+  useSmartPolling(
+    () => {
+      fetchAssignedStaff();
+    },
+    3000,
+    isOpen && !!event?.id
+  );
 
   const startEditingAttendance = (staffId) => {
     const log = attendance[staffId];

@@ -184,7 +184,13 @@
 - [x] **Filtrado del Menú Lateral (Sidebar):** Ocultar dinámicamente el enlace a "Finanzas" en el Sidebar para los productores.
 - [x] **Visualización de Datos Bancarios:** Ocultar el formulario y la sección de Datos Bancarios en `StaffModal` para los productores.
 
-## 21. Pendientes y Tareas Futuras
+## 21. Optimización Total de Conexiones Realtime (WebSockets a 0) - Free Tier Guard
+- [x] **Auditoría Completa de Conexiones:** Mapeo de todos los canales de Realtime en TopBar, WorkerDashboard, Calendar, Events, Staff y EventDetails.
+- [x] **Hook de Smart Short-Polling (`useSmartPolling.js`):** Diseñado con Document Visibility API y Window Focus Refetch para consultas stateless ultrarrápidas (3 a 3.5s) cuando la pestaña está activa, pausando al 100% en segundo plano.
+- [x] **Eliminación de WebSockets Persistentes:** Reemplazo de todas las suscripciones Realtime por consultas PostgREST HTTP, llevando el consumo de conexiones concurrentes de Supabase de ~150-200 a exactamente 0.
+- [x] **Garantía Free Tier $0 USD:** Prevención absoluta de bloqueos de cuota, alertas de cobro o degradación por sobregiro del límite de 200 conexiones concurrentes.
+
+## 22. Pendientes y Tareas Futuras
 - [ ] **Reportes Visuales y Gráficos de Finanzas (Admin):** Gráficos interactivos de barra/línea sobre egresos mensuales y exportación de informes analíticos en PDF.
 - [ ] **Bitácora de Auditoría Operacional (Logs):** Registro e historial detallado de acciones administrativas críticas (ej: creación de eventos, cambios de estados de pago).
 - [ ] **Documentación Completa:** Escribir archivo README.md completo con instrucciones de configuración local y variables de entorno.

@@ -4,6 +4,7 @@ import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock } from "luci
 import GlassCard from "../components/GlassCard.jsx";
 import { supabase } from "../lib/supabase.js";
 import EventDetails from "../components/EventDetails.jsx";
+import { useSmartPolling } from "../hooks/useSmartPolling.js";
 
 // Helper functions for calendar grid logic
 const getDaysInMonth = (year, month) => new Date(year, month + 1, 0).getDate();
@@ -28,32 +29,10 @@ export default function Calendar() {
 
   React.useEffect(() => {
     fetchEvents();
-
-    console.log("🔌 [REALTIME CALENDAR] - Subscribiendo a cambios en tablas events y event_days...");
-    const channel = supabase
-      .channel('calendar-events-changes')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'events' },
-        (payload) => {
-          console.log("🔔 [REALTIME CALENDAR] - Cambio detectado en tabla events:", payload);
-          fetchEvents();
-        }
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'event_days' },
-        (payload) => {
-          console.log("🔔 [REALTIME CALENDAR] - Cambio detectado en tabla event_days:", payload);
-          fetchEvents();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
   }, []);
+
+  // Smart Short-Polling: sincroniza calendario cada 4 segundos (0 conexiones Realtime)
+  useSmartPolling(fetchEvents, 4000, true);
 
   const fetchEvents = async () => {
     const { data, error } = await supabase
