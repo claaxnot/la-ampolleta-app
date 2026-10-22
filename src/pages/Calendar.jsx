@@ -27,13 +27,6 @@ export default function Calendar() {
   const [events, setEvents] = useState([]);
   const [selectedDay, setSelectedDay] = useState(new Date().getDate());
 
-  React.useEffect(() => {
-    fetchEvents();
-  }, []);
-
-  // Smart Short-Polling: sincroniza calendario cada 4 segundos (0 conexiones Realtime)
-  useSmartPolling(fetchEvents, 4000, true);
-
   const fetchEvents = async () => {
     const { data, error } = await supabase
       .from('event_days')
@@ -65,6 +58,13 @@ export default function Calendar() {
       setEvents(mapped);
     }
   };
+
+  React.useEffect(() => {
+    fetchEvents();
+  }, []);
+
+  // Smart Short-Polling: sincroniza calendario cada 4 segundos (0 conexiones Realtime)
+  useSmartPolling(() => fetchEvents(), 4000, true);
   
   const currentYear = currentDate.getFullYear();
   const currentMonth = currentDate.getMonth();

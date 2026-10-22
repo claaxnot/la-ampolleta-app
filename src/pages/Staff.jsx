@@ -77,13 +77,6 @@ export default function Staff() {
   const [roleFilter, setRoleFilter] = useState("");
   const [selectedPhoto, setSelectedPhoto] = useState(null);
 
-  React.useEffect(() => {
-    fetchStaff();
-  }, []);
-
-  // Smart Short-Polling: sincroniza staff cada 4 segundos (0 conexiones Realtime)
-  useSmartPolling(() => fetchStaff(true), 4000, true);
-
   const fetchStaff = async (silent = false) => {
     if (!silent) setIsLoading(true);
     // Filtrar para que no aparezcan el administrador
@@ -98,6 +91,13 @@ export default function Staff() {
     }
     if (!silent) setIsLoading(false);
   };
+
+  React.useEffect(() => {
+    fetchStaff();
+  }, []);
+
+  // Smart Short-Polling: sincroniza staff cada 4 segundos (0 conexiones Realtime)
+  useSmartPolling(() => fetchStaff(true), 4000, true);
 
   const rolePermissions = permissions[user?.systemRole] || permissions.viewer;
 

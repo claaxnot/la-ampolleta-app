@@ -23,15 +23,6 @@ export default function TopBar({ user, onToggleMenu }) {
     return `Hace ${Math.floor(diffInSeconds / 86400)} días`;
   };
 
-  useEffect(() => {
-    if (user?.id) {
-      fetchNotifications();
-    }
-  }, [user?.id]);
-
-  // Smart Short-Polling: cada 3.5 segundos solo cuando la pestaña esté activa (0 conexiones Realtime)
-  useSmartPolling(fetchNotifications, 3500, !!user?.id);
-
   const fetchNotifications = async () => {
     if (!user) return;
     
@@ -63,6 +54,15 @@ export default function TopBar({ user, onToggleMenu }) {
       setNotifications([]);
     }
   };
+
+  useEffect(() => {
+    if (user?.id) {
+      fetchNotifications();
+    }
+  }, [user?.id]);
+
+  // Smart Short-Polling: cada 3.5 segundos solo cuando la pestaña esté activa (0 conexiones Realtime)
+  useSmartPolling(() => fetchNotifications(), 3500, !!user?.id);
 
   const unreadCount = notifications.filter(n => !n.read).length;
 

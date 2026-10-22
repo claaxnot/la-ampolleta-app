@@ -609,14 +609,15 @@ export default function WorkerDashboard({ user }) {
         }
       });
 
-      // Smart Short-Polling: actualiza eventos, asistencia y notificaciones cada 3.5 segundos (0 WebSockets de Realtime)
+    }
+  }, [user?.id]);
+
+  // Smart Short-Polling: actualiza eventos, asistencia y notificaciones cada 3.5 segundos (0 WebSockets de Realtime)
   useSmartPolling(() => {
     if (user?.id) {
       fetchMyEvents(user.id, true);
     }
   }, 3500, !!user?.id);
-    }
-  }, [user?.id]);
 
   const fetchMyAvailability = async (workerId) => {
     const { data } = await supabase
