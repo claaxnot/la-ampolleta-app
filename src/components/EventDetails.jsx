@@ -199,13 +199,13 @@ export default function EventDetails({ event, isOpen, onClose }) {
     fetchAssignedStaff();
   }, [isOpen, event?.id]);
 
-  // Smart Short-Polling: sincroniza asistencia en vivo cada 3 segundos solo cuando el modal está abierto (0 conexiones Realtime)
+  // Smart Short-Polling: sincroniza asistencia en vivo cada 6 segundos solo cuando el modal está abierto y no se esté editando (0 conexiones Realtime)
   useSmartPolling(
     () => {
       fetchAssignedStaff();
     },
-    3000,
-    isOpen && !!event?.id
+    6000,
+    isOpen && !!event?.id && !editingStaffId
   );
 
   const startEditingAttendance = (staffId) => {

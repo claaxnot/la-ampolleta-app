@@ -63,8 +63,8 @@ export default function Calendar() {
     fetchEvents();
   }, []);
 
-  // Smart Short-Polling: sincroniza calendario cada 4 segundos (0 conexiones Realtime)
-  useSmartPolling(() => fetchEvents(), 4000, true);
+  // Smart Short-Polling: sincroniza calendario cada 8 segundos cuando el modal está cerrado (0 conexiones Realtime)
+  useSmartPolling(() => fetchEvents(), 8000, !isDetailsOpen);
   
   const currentYear = currentDate.getFullYear();
   const currentMonth = currentDate.getMonth();

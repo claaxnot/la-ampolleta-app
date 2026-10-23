@@ -612,12 +612,12 @@ export default function WorkerDashboard({ user }) {
     }
   }, [user?.id]);
 
-  // Smart Short-Polling: actualiza eventos, asistencia y notificaciones cada 3.5 segundos (0 WebSockets de Realtime)
+  // Smart Short-Polling: actualiza eventos cada 6 segundos de forma silenciosa (0 WebSockets de Realtime)
   useSmartPolling(() => {
     if (user?.id) {
       fetchMyEvents(user.id, true);
     }
-  }, 3500, !!user?.id);
+  }, 6000, !!user?.id && !selectedDetailedEvent);
 
   const fetchMyAvailability = async (workerId) => {
     const { data } = await supabase
@@ -884,9 +884,9 @@ export default function WorkerDashboard({ user }) {
     return `${minutes}m`;
   };
 
-  const fetchMyEvents = async (workerId) => {
+  const fetchMyEvents = async (workerId, silent = false) => {
     if (!workerId) return;
-    setIsLoading(true);
+    if (!silent) setIsLoading(true);
     try {
       const { data, error } = await supabase
         .from('event_assignments')
@@ -983,7 +983,7 @@ export default function WorkerDashboard({ user }) {
     } catch (err) {
       console.error("❌ Error loading worker events:", err);
     } finally {
-      setIsLoading(false);
+      if (!silent) setIsLoading(false);
     }
   };
 

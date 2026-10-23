@@ -61,22 +61,22 @@ export default function Events({ user }) {
     setEditingEvent(null);
   };
 
-  const fetchEvents = async () => {
-    setIsLoading(true);
+  const fetchEvents = async (silent = false) => {
+    if (!silent) setIsLoading(true);
     const { data, error } = await supabase
       .from('events')
       .select('*')
       .order('date', { ascending: true });
     if (data) setEvents(data);
-    setIsLoading(false);
+    if (!silent) setIsLoading(false);
   };
 
   React.useEffect(() => {
     fetchEvents();
   }, []);
 
-  // Smart Short-Polling: sincroniza listado de eventos cada 4 segundos (0 conexiones Realtime)
-  useSmartPolling(() => fetchEvents(true), 4000, true);
+  // Smart Short-Polling: sincroniza listado de eventos cada 6 segundos cuando no hay modales abiertos (0 conexiones Realtime)
+  useSmartPolling(() => fetchEvents(true), 6000, !isModalOpen && !isClientModalOpen && !detailsOpen);
 
   const handleSubmit = async (eventData) => {
     if (eventData.id && !rolePermissions.canEdit) {
@@ -504,16 +504,7 @@ export default function Events({ user }) {
           userRole={user?.systemRole}
           onOpenClientManager={() => setIsClientModalOpen(true)}
           clientLocations={locations}
-          initialData={editingEvent || {
-            name: "",
-            client: "",
-            date: "",
-            time: "",
-            location: "",
-            description: "",
-            status: "Planificado",
-            assignedStaff: []
-          }}
+          initialData={editingEvent}
         />
       )}
       {detailsOpen && selectedEvent && (

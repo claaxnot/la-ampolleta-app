@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -63,32 +63,58 @@ export default function StaffModal({ isOpen, onClose, onSubmit, initialData = {}
     setValue("rut", formatted, { shouldValidate: true });
   };
 
+  const prevOpenRef = useRef(false);
+  const prevInitialIdRef = useRef(null);
+
   // Sync initial data for edit mode or reset on open/close
   useEffect(() => {
     if (isOpen) {
-      if (initialData && Object.keys(initialData).length > 0) {
-        reset({
-          name: initialData.name || "",
-          rut: initialData.rut || "",
-          email: initialData.email || "",
-          role: initialData.role || "",
-          system_role: initialData.system_role || "worker",
-          cuenta_origen: initialData.cuenta_origen || "72052242",
-          cuenta_destino: initialData.cuenta_destino || "",
-          codigo_banco_destino: initialData.codigo_banco_destino || "",
-          monto_transferencia: initialData.monto_transferencia || "",
-          glosa_transferencia: initialData.glosa_transferencia || "",
-          mensaje_beneficiario: initialData.mensaje_beneficiario || "",
-        });
-      } else {
-        reset({ name: "", rut: "", email: "", role: "", system_role: "worker", cuenta_origen: "72052242", cuenta_destino: "", codigo_banco_destino: "", monto_transferencia: "", glosa_transferencia: "", mensaje_beneficiario: "" });
+      const initialId = initialData?.id || null;
+      const isFirstOpen = !prevOpenRef.current;
+      const isDifferentRecord = initialId !== prevInitialIdRef.current;
+
+      if (isFirstOpen || isDifferentRecord) {
+        prevInitialIdRef.current = initialId;
+        if (initialData && Object.keys(initialData).length > 0) {
+          reset({
+            name: initialData.name || "",
+            rut: initialData.rut || "",
+            email: initialData.email || "",
+            role: initialData.role || "",
+            system_role: initialData.system_role || "worker",
+            cuenta_origen: initialData.cuenta_origen || "72052242",
+            cuenta_destino: initialData.cuenta_destino || "",
+            codigo_banco_destino: initialData.codigo_banco_destino || "",
+            monto_transferencia: initialData.monto_transferencia || "",
+            glosa_transferencia: initialData.glosa_transferencia || "",
+            mensaje_beneficiario: initialData.mensaje_beneficiario || "",
+          });
+        } else {
+          reset({
+            name: "",
+            rut: "",
+            email: "",
+            role: "",
+            system_role: "worker",
+            cuenta_origen: "72052242",
+            cuenta_destino: "",
+            codigo_banco_destino: "",
+            monto_transferencia: "",
+            glosa_transferencia: "",
+            mensaje_beneficiario: "",
+          });
+        }
       }
     }
-  }, [initialData, isOpen, reset]);
+    prevOpenRef.current = isOpen;
+    if (!isOpen) {
+      prevInitialIdRef.current = null;
+    }
+  }, [isOpen, initialData?.id, reset]);
 
   const onSubmitForm = (data) => {
     const staffData = { ...data };
-    if (initialData.id) staffData.id = initialData.id;
+    if (initialData?.id) staffData.id = initialData.id;
     onSubmit(staffData);
     onClose();
   };

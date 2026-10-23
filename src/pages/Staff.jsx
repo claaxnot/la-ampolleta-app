@@ -96,8 +96,8 @@ export default function Staff() {
     fetchStaff();
   }, []);
 
-  // Smart Short-Polling: sincroniza staff cada 4 segundos (0 conexiones Realtime)
-  useSmartPolling(() => fetchStaff(true), 4000, true);
+  // Smart Short-Polling: sincroniza staff cada 6 segundos cuando el modal está cerrado (0 conexiones Realtime)
+  useSmartPolling(() => fetchStaff(true), 6000, !isModalOpen);
 
   const rolePermissions = permissions[user?.systemRole] || permissions.viewer;
 
@@ -486,7 +486,7 @@ export default function Staff() {
         isOpen={isModalOpen}
         onClose={closeModal}
         onSubmit={handleStaffSubmit}
-        initialData={editingStaff || {}}
+        initialData={editingStaff}
         isLoading={isSaving}
         userRole={user?.systemRole}
       />

@@ -384,9 +384,18 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
 
   const selectedSupervisor = dbStaff.find(s => s.id === selectedSupervisorId);
 
+  const prevOpenRef = useRef(false);
+  const prevInitialIdRef = useRef(null);
+
   // Sync initial data for edit mode or reset when opening
   useEffect(() => {
     if (isOpen) {
+      const initialId = initialData?.id || initialData?.duplicateFromId || null;
+      const isFirstOpen = !prevOpenRef.current;
+      const isDifferentRecord = initialId !== prevInitialIdRef.current;
+
+      if (isFirstOpen || isDifferentRecord) {
+        prevInitialIdRef.current = initialId;
       setSupervisorSearch("");
       setIsSupervisorDropdownOpen(false);
       setIsSubmittingForm(false);
@@ -520,8 +529,13 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
           ends_next_day: false
         });
       }
+      }
     }
-  }, [initialData, isOpen, reset, setValue]);
+    prevOpenRef.current = isOpen;
+    if (!isOpen) {
+      prevInitialIdRef.current = null;
+    }
+  }, [isOpen, initialData?.id, initialData?.duplicateFromId, reset, setValue]);
 
   const onSubmitForm = async (data) => {
     console.log("3️⃣ [VALIDATIONS PASSED] - Formulario válido. Preparando datos para el controlador padre:", data);

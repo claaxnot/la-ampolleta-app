@@ -61,8 +61,8 @@ export default function TopBar({ user, onToggleMenu }) {
     }
   }, [user?.id]);
 
-  // Smart Short-Polling: cada 3.5 segundos solo cuando la pestaña esté activa (0 conexiones Realtime)
-  useSmartPolling(() => fetchNotifications(), 3500, !!user?.id);
+  // Smart Short-Polling: cada 12 segundos solo cuando la pestaña esté activa (0 conexiones Realtime)
+  useSmartPolling(() => fetchNotifications(), 12000, !!user?.id);
 
   const unreadCount = notifications.filter(n => !n.read).length;
 
