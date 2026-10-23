@@ -504,7 +504,7 @@ export default function Events({ user }) {
           userRole={user?.systemRole}
           onOpenClientManager={() => setIsClientModalOpen(true)}
           clientLocations={locations}
-          initialData={editingEvent}
+          initialData={editingEvent || undefined}
         />
       )}
       {detailsOpen && selectedEvent && (

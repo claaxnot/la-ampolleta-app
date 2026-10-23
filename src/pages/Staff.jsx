@@ -486,7 +486,7 @@ export default function Staff() {
         isOpen={isModalOpen}
         onClose={closeModal}
         onSubmit={handleStaffSubmit}
-        initialData={editingStaff}
+        initialData={editingStaff || undefined}
         isLoading={isSaving}
         userRole={user?.systemRole}
       />

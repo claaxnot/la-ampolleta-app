@@ -89,7 +89,8 @@ const eventSchema = z.object({
   path: ["end_time"]
 });
 
-export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}, userRole = "", onOpenClientManager = null, clientLocations = null }) {
+export default function EventModal({ isOpen, onClose, onSubmit, initialData: rawInitialData = {}, userRole = "", onOpenClientManager = null, clientLocations = null }) {
+  const initialData = rawInitialData || {};
   const {
     register,
     handleSubmit,
@@ -338,7 +339,7 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
 
           if (assignmentsOnDate) {
             assignmentsOnDate.forEach(a => {
-              if (!initialData?.id || a.event_id !== initialData.id) {
+              if (!initialData?.id || a.event_id !== initialData?.id) {
                 newAssignedMap[a.staff_id] = true;
               }
             });
@@ -400,7 +401,7 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
       setIsSupervisorDropdownOpen(false);
       setIsSubmittingForm(false);
 
-      const hasAdvancedFields = initialData.supervisor_id || initialData.call_time || initialData.setup_time || initialData.operational_notes;
+      const hasAdvancedFields = initialData?.supervisor_id || initialData?.call_time || initialData?.setup_time || initialData?.operational_notes;
       setShowAdvanced(!!hasAdvancedFields);
       setShowAdvancedFinished(!!hasAdvancedFields);
 
@@ -431,7 +432,7 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
           allowed_radius_meters: initialData.allowed_radius_meters !== null && initialData.allowed_radius_meters !== undefined ? initialData.allowed_radius_meters : 300
         });
 
-        const targetIdForAssignments = initialData.id || initialData.duplicateFromId;
+        const targetIdForAssignments = initialData?.id || initialData?.duplicateFromId;
         if (targetIdForAssignments) {
           // Fetch event days first, then fetch and map staff assignments to indices
           supabase.from('event_days').select('*').eq('event_id', targetIdForAssignments).order('date', { ascending: true }).then(({ data: daysData }) => {
@@ -550,7 +551,7 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
     }
 
     const eventData = { ...data };
-    if (initialData.id) eventData.id = initialData.id;
+    if (initialData?.id) eventData.id = initialData.id;
     eventData.staffIds = data.staffIds || [];
     eventData.customRates = customRates;
     eventData.isAdvancedActive = showAdvanced;
@@ -675,7 +676,7 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
                 <span className="p-2 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20">
                   <Calendar className="w-6 h-6" />
                 </span>
-                {initialData.id ? "Editar Evento" : initialData.isDuplicate ? "Duplicar Evento" : "Crear Nuevo Evento"}
+                {initialData?.id ? "Editar Evento" : initialData?.isDuplicate ? "Duplicar Evento" : "Crear Nuevo Evento"}
               </h2>
 
               <form onSubmit={handleFormSubmit} className="space-y-6">
@@ -1331,7 +1332,7 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData = {}
                         Guardando...
                       </span>
                     ) : (
-                      initialData.id ? "Actualizar Evento" : "Crear Evento"
+                      initialData?.id ? "Actualizar Evento" : "Crear Evento"
                     )}
                   </Button>
                 </div>
