@@ -8,7 +8,8 @@ import Button from "../components/Button.jsx";
 import {
   X, Search, Filter, Calendar, Clock, MapPin,
   Users, UserCheck, Shield, ChevronDown, Check,
-  AlertCircle, FileText, Activity, AlertTriangle, Settings, Sliders
+  AlertCircle, FileText, Activity, AlertTriangle, Settings, Sliders,
+  Trash2, Plus
 } from "lucide-react";
 import { supabase } from "../lib/supabase.js";
 import { toast } from "react-hot-toast";
@@ -146,7 +147,7 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData: raw
   const [customRates, setCustomRates] = useState({});
 
   const [days, setDays] = useState([
-    { date: "", time: "10:00", end_time: "18:00", ends_next_day: false, call_time: "", setup_time: "", status: "Planificado", notes: "Turno 1" }
+    { date: "", time: "10:00", end_time: "18:00", ends_next_day: false, call_time: "", setup_time: "", status: "Planificado", notes: "" }
   ]);
   const [staffDays, setStaffDays] = useState({});
   const [activeShiftTab, setActiveShiftTab] = useState(0);
@@ -165,24 +166,31 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData: raw
     const lastDay = days[days.length - 1];
     const dateVal = lastDay?.date || new Date().toISOString().split('T')[0];
     const lastEndTime = lastDay?.end_time || "14:00";
-    const [h, m] = lastEndTime.split(':');
+    const [h, m] = (lastEndTime || "14:00").split(':');
     const endH = Math.min(23, parseInt(h || "14", 10) + 6);
     const suggestedEndTime = `${String(endH).padStart(2, '0')}:${m || '00'}`;
 
     const newIdx = days.length;
-    setDays(prev => [
-      ...prev,
-      {
-        date: dateVal,
-        time: lastEndTime,
-        end_time: suggestedEndTime,
-        ends_next_day: false,
-        call_time: "",
-        setup_time: "",
-        status: "Planificado",
-        notes: `Turno ${newIdx + 1}`
+    setDays(prev => {
+      const updated = [...prev];
+      // Si el primer día no tiene nombre explícito, asignamos Turno AM para mayor claridad
+      if (updated.length === 1 && (!updated[0].notes || updated[0].notes === "Turno 1")) {
+        updated[0] = { ...updated[0], notes: "Turno AM", time: updated[0].time || "08:00", end_time: updated[0].end_time || "14:00" };
       }
-    ]);
+      return [
+        ...updated,
+        {
+          date: dateVal,
+          time: lastEndTime,
+          end_time: suggestedEndTime,
+          ends_next_day: false,
+          call_time: "",
+          setup_time: "",
+          status: "Planificado",
+          notes: updated.length === 1 && updated[0].notes === "Turno AM" ? "Turno PM" : `Turno ${newIdx + 1}`
+        }
+      ];
+    });
     setActiveShiftTab(newIdx);
   };
 
@@ -851,83 +859,136 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData: raw
                     </div>
 
                     {/* JORNADAS Y TURNOS DEL EVENTO */}
-                    <div className="col-span-full bg-black/10 border border-white/5 rounded-2xl p-4 mt-2 space-y-4 shadow-xl backdrop-blur-md">
-                      <div className="flex flex-wrap items-center justify-between border-b border-white/5 pb-2.5 gap-2">
-                        <div className="flex items-center gap-2">
-                          <Calendar className="w-4 h-4 text-amber-400" />
-                          <h4 className="text-xs font-black text-amber-300 uppercase tracking-wider">Jornadas y Turnos del Evento</h4>
+                    <div className="col-span-full bg-black/20 border border-white/10 rounded-2xl p-4 mt-2 space-y-4 shadow-xl backdrop-blur-md">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-3">
+                        <div className="flex items-center gap-2.5">
+                          <div className="p-2 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                            <Calendar className="w-4 h-4" />
+                          </div>
+                          <div>
+                            <h4 className="text-xs font-black text-amber-300 uppercase tracking-wider">
+                              Jornadas y Turnos del Evento
+                            </h4>
+                            <p className="text-[10px] text-gray-400 font-medium">
+                              {days.length === 1 ? "1 jornada configurada" : `${days.length} jornadas/turnos configurados`}
+                            </p>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-2">
+
+                        <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 w-full sm:w-auto">
                           <button
                             type="button"
                             onClick={addShiftSameDay}
-                            className="px-2.5 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/20 rounded-xl text-xs font-bold transition-all shadow-md flex items-center gap-1"
-                            title="Agrega otro turno en la misma fecha (ej: Turno PM)"
+                            className="px-3 py-2 bg-amber-500/15 hover:bg-amber-500/25 active:bg-amber-500/35 text-amber-300 border border-amber-500/30 rounded-xl text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-1.5"
+                            title="Agrega otro turno en la misma fecha (ej: Turno AM y Turno PM)"
                           >
+                            <Plus className="w-3.5 h-3.5 text-amber-400 shrink-0" />
                             <span>+ Turno mismo día</span>
                           </button>
                           <button
                             type="button"
                             onClick={addDayNextDay}
-                            className="px-2.5 py-1.5 bg-white/5 hover:bg-white/10 text-gray-200 border border-white/10 rounded-xl text-xs font-bold transition-all shadow-md flex items-center gap-1"
+                            className="px-3 py-2 bg-white/5 hover:bg-white/10 active:bg-white/15 text-gray-200 border border-white/10 rounded-xl text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-1.5"
                             title="Agrega una jornada para el día siguiente (+1 día)"
                           >
+                            <Plus className="w-3.5 h-3.5 text-gray-400 shrink-0" />
                             <span>+ Día siguiente</span>
                           </button>
                         </div>
                       </div>
 
-                      <div className="space-y-4 pr-1">
+                      <div className="space-y-4">
                         {days.map((day, idx) => (
-                          <div key={idx} className="bg-white/[0.02] border border-white/5 rounded-xl p-3.5 relative space-y-3">
-                            <div className="flex flex-wrap items-center justify-between border-b border-white/5 pb-2 gap-2">
-                              <div className="flex items-center gap-2 flex-1 min-w-[200px]">
-                                <span className="text-xs font-black text-amber-400 uppercase tracking-wider shrink-0">
-                                  Jornada ${idx + 1}:
+                          <div key={idx} className="bg-gradient-to-b from-white/[0.04] to-black/30 border border-white/10 rounded-2xl p-4 relative space-y-3.5 shadow-lg">
+                            {/* Cabecera de la Jornada */}
+                            <div className="flex items-center justify-between border-b border-white/5 pb-2.5">
+                              <div className="flex items-center gap-2">
+                                <span className="px-2.5 py-1 rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-black uppercase tracking-wider">
+                                  Jornada {idx + 1}
                                 </span>
-                                <input
-                                  type="text"
-                                  placeholder="Nombre / Turno (ej: Turno AM, Montaje...)"
-                                  value={day.notes || ""}
-                                  onChange={(e) => handleDayChange(idx, "notes", e.target.value)}
-                                  className="bg-gray-900/60 border border-gray-700/60 rounded-lg px-2.5 py-1 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-amber-500/50 flex-1 max-w-xs"
-                                />
-                                <div className="hidden sm:flex items-center gap-1">
-                                  {["Turno AM", "Turno PM", "Completo", "Montaje"].map(tag => (
-                                    <button
-                                      key={tag}
-                                      type="button"
-                                      onClick={() => handleDayChange(idx, "notes", tag)}
-                                      className={`px-1.5 py-0.5 rounded text-[10px] font-semibold transition-colors border ${
-                                        day.notes === tag
-                                          ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
-                                          : 'bg-white/5 text-gray-400 border-white/5 hover:bg-white/10 hover:text-white'
-                                      }`}
-                                    >
-                                      {tag.replace('Turno ', '')}
-                                    </button>
-                                  ))}
-                                </div>
+                                {day.notes && (
+                                  <span className="text-xs text-gray-300 font-semibold truncate max-w-[150px] sm:max-w-none">
+                                    • {day.notes}
+                                  </span>
+                                )}
                               </div>
                               {days.length > 1 && (
                                 <button
                                   type="button"
                                   onClick={() => removeDay(idx)}
-                                  className="text-red-400 hover:text-red-300 text-xs font-bold transition-colors ml-auto"
+                                  className="flex items-center gap-1.5 text-red-400 hover:text-red-300 hover:bg-red-500/10 px-2.5 py-1 rounded-lg text-xs font-bold transition-all border border-red-500/20 ml-auto"
+                                  title="Eliminar este turno o jornada"
                                 >
-                                  Eliminar Turno
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                  <span>Eliminar Turno</span>
                                 </button>
                               )}
                             </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {/* Nombre del Turno y Accesos Rápidos */}
+                            <div className="space-y-2">
+                              <div className="flex items-center justify-between">
+                                <label className="text-[10px] font-extrabold text-gray-400 uppercase tracking-widest">
+                                  Nombre o Tipo de Turno
+                                </label>
+                                <span className="text-[10px] text-gray-500">Ej: Turno AM, Turno PM, Montaje</span>
+                              </div>
+                              <input
+                                type="text"
+                                placeholder="Escribe el nombre o usa los accesos rápidos abajo..."
+                                value={day.notes || ""}
+                                onChange={(e) => handleDayChange(idx, "notes", e.target.value)}
+                                className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-amber-500/50 transition-all font-medium"
+                              />
+                              <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                                <span className="text-[10px] text-gray-400 font-semibold mr-1">Turnos rápidos:</span>
+                                {[
+                                  { label: "Turno AM", time: "08:00", endTime: "14:00" },
+                                  { label: "Turno PM", time: "14:00", endTime: "20:00" },
+                                  { label: "Completo", time: "09:00", endTime: "18:00" },
+                                  { label: "Montaje", time: "20:00", endTime: "02:00", nextDay: true }
+                                ].map(preset => {
+                                  const isSelected = day.notes === preset.label;
+                                  return (
+                                    <button
+                                      key={preset.label}
+                                      type="button"
+                                      onClick={() => {
+                                        setDays(prev => {
+                                          const updated = [...prev];
+                                          updated[idx] = {
+                                            ...updated[idx],
+                                            notes: preset.label,
+                                            time: preset.time,
+                                            end_time: preset.endTime,
+                                            ends_next_day: !!preset.nextDay
+                                          };
+                                          return updated;
+                                        });
+                                      }}
+                                      className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all border flex items-center gap-1 ${
+                                        isSelected
+                                          ? 'bg-amber-500/25 text-amber-300 border-amber-500/50 shadow-sm ring-1 ring-amber-500/30'
+                                          : 'bg-white/5 text-gray-400 border-white/5 hover:bg-white/10 hover:text-white'
+                                      }`}
+                                      title={`Aplicar ${preset.label} (${preset.time} a ${preset.endTime})`}
+                                    >
+                                      <span>{preset.label}</span>
+                                      <span className="opacity-60 text-[9px] font-normal">({preset.time}-{preset.endTime})</span>
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
                               <DatePicker
                                 value={day.date}
                                 onChange={(val) => handleDayChange(idx, "date", val)}
                                 label={`Fecha Jornada ${idx + 1}`}
                                 id={`day-date-${idx}`}
                               />
-                              <div className="grid grid-cols-2 gap-3">
+                              <div className="grid grid-cols-2 gap-2.5">
                                 <ClockPicker
                                   value={day.time}
                                   onChange={(val) => handleDayChange(idx, "time", val)}
