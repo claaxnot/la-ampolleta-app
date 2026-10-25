@@ -146,9 +146,12 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData: raw
   const [customRates, setCustomRates] = useState({});
 
   const [days, setDays] = useState([
-    { date: "", time: "10:00", end_time: "18:00", ends_next_day: false, call_time: "", setup_time: "", status: "Planificado", notes: "" }
+    { date: "", time: "10:00", end_time: "18:00", ends_next_day: false, call_time: "", setup_time: "", status: "Planificado", notes: "Turno 1" }
   ]);
   const [staffDays, setStaffDays] = useState({});
+  const [activeShiftTab, setActiveShiftTab] = useState(0);
+
+  const safeShiftTab = Math.max(0, Math.min(activeShiftTab, days.length - 1));
  
   const handleDayChange = (index, field, value) => {
     setDays(prev => {
@@ -158,7 +161,32 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData: raw
     });
   };
  
-  const addDay = () => {
+  const addShiftSameDay = () => {
+    const lastDay = days[days.length - 1];
+    const dateVal = lastDay?.date || new Date().toISOString().split('T')[0];
+    const lastEndTime = lastDay?.end_time || "14:00";
+    const [h, m] = lastEndTime.split(':');
+    const endH = Math.min(23, parseInt(h || "14", 10) + 6);
+    const suggestedEndTime = `${String(endH).padStart(2, '0')}:${m || '00'}`;
+
+    const newIdx = days.length;
+    setDays(prev => [
+      ...prev,
+      {
+        date: dateVal,
+        time: lastEndTime,
+        end_time: suggestedEndTime,
+        ends_next_day: false,
+        call_time: "",
+        setup_time: "",
+        status: "Planificado",
+        notes: `Turno ${newIdx + 1}`
+      }
+    ]);
+    setActiveShiftTab(newIdx);
+  };
+
+  const addDayNextDay = () => {
     const lastDay = days[days.length - 1];
     let nextDateStr = "";
     if (lastDay && lastDay.date) {
@@ -171,8 +199,11 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData: raw
         const dayVal = String(d.getDate()).padStart(2, '0');
         nextDateStr = `${y}-${m}-${dayVal}`;
       }
+    } else {
+      nextDateStr = new Date().toISOString().split('T')[0];
     }
- 
+
+    const newIdx = days.length;
     setDays(prev => [
       ...prev,
       {
@@ -180,12 +211,13 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData: raw
         time: lastDay?.time || "10:00",
         end_time: lastDay?.end_time || "18:00",
         ends_next_day: false,
-        call_time: lastDay?.call_time || "",
-        setup_time: lastDay?.setup_time || "",
+        call_time: "",
+        setup_time: "",
         status: "Planificado",
-        notes: ""
+        notes: `Día ${newIdx + 1}`
       }
     ]);
+    setActiveShiftTab(newIdx);
   };
  
   const removeDay = (index) => {
@@ -198,10 +230,34 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData: raw
         const updated = assigned
           .filter(idx => idx !== index)
           .map(idx => (idx > index ? idx - 1 : idx));
-        copy[staffId] = updated;
+        if (updated.length > 0) {
+          copy[staffId] = updated;
+        }
       });
       return copy;
     });
+    setActiveShiftTab(prev => Math.max(0, Math.min(prev, days.length - 2)));
+  };
+
+  const copyStaffFromTab = (fromIdx, toIdx) => {
+    setStaffDays(prev => {
+      const copy = { ...prev };
+      const staffInFrom = Object.keys(copy).filter(id => (copy[id] || []).includes(fromIdx));
+      Object.keys(copy).forEach(id => {
+        const list = copy[id] || [];
+        if (staffInFrom.includes(id)) {
+          if (!list.includes(toIdx)) copy[id] = [...list, toIdx];
+        } else {
+          copy[id] = list.filter(d => d !== toIdx);
+        }
+      });
+      const all = Object.keys(copy).filter(sId => (copy[sId] || []).length > 0);
+      setValue("staffIds", all, { shouldDirty: true, shouldValidate: true });
+      return copy;
+    });
+    const fromName = days[fromIdx]?.notes || `Jornada ${fromIdx + 1}`;
+    const toName = days[toIdx]?.notes || `Jornada ${toIdx + 1}`;
+    toast.success(`Personal de "${fromName}" copiado a "${toName}"`);
   };
  
   // Sync first day details back to React Hook Form for backwards-compatible schema validations
@@ -370,9 +426,9 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData: raw
     const matchesSearch = s.name?.toLowerCase().includes(staffSearch.toLowerCase());
     const matchesRole = staffRole === "" ? true : s.role?.toLowerCase() === staffRole;
 
-    const isChecked = selectedStaffIds.includes(s.id);
+    const isCheckedInTab = (staffDays[s.id] || []).includes(safeShiftTab);
     const status = getStaffStatus(s.id);
-    const passesAvailability = !showOnlyAvailable || !eventDate || isChecked || status === "Disponible";
+    const passesAvailability = !showOnlyAvailable || !eventDate || isCheckedInTab || status === "Disponible";
 
     return matchesSearch && matchesRole && passesAvailability;
   });
@@ -618,14 +674,32 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData: raw
   };
 
   const toggleStaff = (id) => {
-    const current = selectedStaffIds || [];
-    if (current.includes(id)) {
-      setValue("staffIds", current.filter(sId => sId !== id), { shouldDirty: true });
-      setCustomRates(prev => {
-        const copy = { ...prev };
-        delete copy[id];
-        return copy;
-      });
+    const currDays = staffDays[id] || [];
+    const isAssignedInTab = currDays.includes(safeShiftTab);
+
+    if (isAssignedInTab) {
+      // Remove from current shift tab
+      const nextDays = currDays.filter(idx => idx !== safeShiftTab);
+      const updatedStaffDays = { ...staffDays, [id]: nextDays };
+      setStaffDays(updatedStaffDays);
+
+      const allSelected = Object.keys(updatedStaffDays).filter(sId => (updatedStaffDays[sId] || []).length > 0);
+      setValue("staffIds", allSelected, { shouldDirty: true, shouldValidate: true });
+
+      if (nextDays.length === 0) {
+        setCustomRates(prev => {
+          const copy = { ...prev };
+          delete copy[id];
+          delete copy[`${id}_${safeShiftTab}`];
+          return copy;
+        });
+      } else {
+        setCustomRates(prev => {
+          const copy = { ...prev };
+          delete copy[`${id}_${safeShiftTab}`];
+          return copy;
+        });
+      }
     } else {
       const staff = dbStaff.find(s => s.id === id);
       const status = getStaffStatus(id);
@@ -642,7 +716,12 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData: raw
         if (!confirmAssign) return;
       }
 
-      setValue("staffIds", [...current, id], { shouldDirty: true });
+      const nextDays = [...currDays, safeShiftTab];
+      const updatedStaffDays = { ...staffDays, [id]: nextDays };
+      setStaffDays(updatedStaffDays);
+
+      const allSelected = Object.keys(updatedStaffDays).filter(sId => (updatedStaffDays[sId] || []).length > 0);
+      setValue("staffIds", allSelected, { shouldDirty: true, shouldValidate: true });
     }
   };
 
@@ -771,36 +850,72 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData: raw
                       {errors.location && <span className="text-red-400 text-xs mt-1">{errors.location.message}</span>}
                     </div>
 
-                    {/* JORNADAS / DIAS DEL EVENTO */}
+                    {/* JORNADAS Y TURNOS DEL EVENTO */}
                     <div className="col-span-full bg-black/10 border border-white/5 rounded-2xl p-4 mt-2 space-y-4 shadow-xl backdrop-blur-md">
-                      <div className="flex items-center justify-between border-b border-white/5 pb-2.5">
+                      <div className="flex flex-wrap items-center justify-between border-b border-white/5 pb-2.5 gap-2">
                         <div className="flex items-center gap-2">
                           <Calendar className="w-4 h-4 text-amber-400" />
-                          <h4 className="text-xs font-black text-amber-300 uppercase tracking-wider">Jornadas / Días del Evento</h4>
+                          <h4 className="text-xs font-black text-amber-300 uppercase tracking-wider">Jornadas y Turnos del Evento</h4>
                         </div>
-                        <button
-                          type="button"
-                          onClick={addDay}
-                          className="px-3 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/20 rounded-xl text-xs font-bold transition-all shadow-md"
-                        >
-                          + Agregar Jornada
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={addShiftSameDay}
+                            className="px-2.5 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/20 rounded-xl text-xs font-bold transition-all shadow-md flex items-center gap-1"
+                            title="Agrega otro turno en la misma fecha (ej: Turno PM)"
+                          >
+                            <span>+ Turno mismo día</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={addDayNextDay}
+                            className="px-2.5 py-1.5 bg-white/5 hover:bg-white/10 text-gray-200 border border-white/10 rounded-xl text-xs font-bold transition-all shadow-md flex items-center gap-1"
+                            title="Agrega una jornada para el día siguiente (+1 día)"
+                          >
+                            <span>+ Día siguiente</span>
+                          </button>
+                        </div>
                       </div>
 
                       <div className="space-y-4 pr-1">
                         {days.map((day, idx) => (
                           <div key={idx} className="bg-white/[0.02] border border-white/5 rounded-xl p-3.5 relative space-y-3">
-                            <div className="flex items-center justify-between border-b border-white/5 pb-2">
-                              <span className="text-xs font-black text-amber-400 uppercase tracking-wider">
-                                Jornada {idx + 1}
-                              </span>
+                            <div className="flex flex-wrap items-center justify-between border-b border-white/5 pb-2 gap-2">
+                              <div className="flex items-center gap-2 flex-1 min-w-[200px]">
+                                <span className="text-xs font-black text-amber-400 uppercase tracking-wider shrink-0">
+                                  Jornada ${idx + 1}:
+                                </span>
+                                <input
+                                  type="text"
+                                  placeholder="Nombre / Turno (ej: Turno AM, Montaje...)"
+                                  value={day.notes || ""}
+                                  onChange={(e) => handleDayChange(idx, "notes", e.target.value)}
+                                  className="bg-gray-900/60 border border-gray-700/60 rounded-lg px-2.5 py-1 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-amber-500/50 flex-1 max-w-xs"
+                                />
+                                <div className="hidden sm:flex items-center gap-1">
+                                  {["Turno AM", "Turno PM", "Completo", "Montaje"].map(tag => (
+                                    <button
+                                      key={tag}
+                                      type="button"
+                                      onClick={() => handleDayChange(idx, "notes", tag)}
+                                      className={`px-1.5 py-0.5 rounded text-[10px] font-semibold transition-colors border ${
+                                        day.notes === tag
+                                          ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                                          : 'bg-white/5 text-gray-400 border-white/5 hover:bg-white/10 hover:text-white'
+                                      }`}
+                                    >
+                                      {tag.replace('Turno ', '')}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
                               {days.length > 1 && (
                                 <button
                                   type="button"
                                   onClick={() => removeDay(idx)}
-                                  className="text-red-400 hover:text-red-300 text-xs font-bold transition-colors"
+                                  className="text-red-400 hover:text-red-300 text-xs font-bold transition-colors ml-auto"
                                 >
-                                  Eliminar Día
+                                  Eliminar Turno
                                 </button>
                               )}
                             </div>
@@ -1137,188 +1252,268 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData: raw
                   </AnimatePresence>
                 </div>
 
-                {/* 3️⃣ SECCIÓN: ASIGNACIÓN DE STAFF CON VALIDACIÓN DE DISPONIBILIDAD (SIEMPRE VISIBLE) */}
-                <div>
-                  <h3 className="text-xs font-extrabold text-amber-400 uppercase tracking-widest mb-4 flex items-center gap-2">
-                    <Users className="w-4 h-4" /> Asignación de Staff
-                  </h3>
+                {/* 3️⃣ SECCIÓN: ASIGNACIÓN DE STAFF POR TURNO / JORNADA */}
+                  <div className="col-span-full bg-black/10 border border-white/5 rounded-2xl p-4 mt-2 space-y-4 shadow-xl backdrop-blur-md">
+                    <div className="flex flex-col md:flex-row items-start md:items-center justify-between pb-2 border-b border-white/5 gap-3">
+                      <div className="flex items-center gap-2">
+                        <Users className="w-4 h-4 text-amber-400" />
+                        <h4 className="text-xs font-black text-amber-300 uppercase tracking-wider">Asignación de Staff</h4>
+                        <span className="text-xs bg-amber-500/10 text-amber-300 border border-amber-500/20 px-2 py-0.5 rounded-full font-bold">
+                          {selectedStaffIds.length} en total
+                        </span>
+                      </div>
 
-                  <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-3 gap-2">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-gray-300 font-semibold">Trabajadores Disponibles:</span>
-                      {eventDate ? (
-                        <span className="text-xs bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 px-2 py-0.5 rounded-full font-bold shadow-inner">
-                          {availableCount} {availableCount === 1 ? 'disponible' : 'disponibles'}
-                        </span>
+                      <div className="flex flex-wrap gap-2 w-full md:w-auto items-center">
+                        <label className="flex items-center gap-1.5 cursor-pointer bg-white/5 hover:bg-white/10 px-2.5 py-1.5 rounded-lg border border-white/5 text-[11px] font-bold text-gray-300 transition-all select-none">
+                          <input
+                            type="checkbox"
+                            checked={showOnlyAvailable}
+                            onChange={(e) => setShowOnlyAvailable(e.target.checked)}
+                            className="form-checkbox h-3.5 w-3.5 text-amber-500 bg-gray-700 border-gray-600 rounded focus:ring-amber-500/30"
+                          />
+                          <span>Solo disponibles</span>
+                        </label>
+
+                        <div className="relative flex-1 md:flex-initial">
+                          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+                          <input
+                            type="text"
+                            placeholder="Buscar por nombre..."
+                            value={staffSearch}
+                            onChange={(e) => setStaffSearch(e.target.value)}
+                            className="w-full pl-8 pr-2 py-1.5 bg-gray-800/80 border border-gray-700 rounded-lg text-xs text-white placeholder-gray-500 focus:outline-none focus:border-amber-500/50"
+                          />
+                        </div>
+
+                        <div className="relative flex-1 md:flex-initial">
+                          <Filter className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+                          <select
+                            value={staffRole}
+                            onChange={(e) => setStaffRole(e.target.value)}
+                            className="w-full pl-8 pr-6 py-1.5 bg-gray-800/80 border border-gray-700 rounded-lg text-xs text-white focus:outline-none focus:border-amber-500/50 appearance-none capitalize"
+                          >
+                            <option value="">Todos los roles</option>
+                            {uniqueRoles.map(role => (
+                              <option key={role} value={role} className="capitalize">{role}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Pestañas de Turno / Jornada si hay más de 1 */}
+                    {days.length > 1 && (
+                      <div className="bg-black/25 p-3 rounded-xl border border-white/5 space-y-2.5">
+                        <div className="flex items-center justify-between flex-wrap gap-2">
+                          <span className="text-[11px] font-extrabold text-gray-300 uppercase tracking-wider flex items-center gap-1.5">
+                            <Calendar className="w-3.5 h-3.5 text-amber-400" /> Selecciona el Turno a Asignar:
+                          </span>
+                          {days.length > 1 && (
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[10px] text-gray-400">Copiar equipo desde:</span>
+                              <select
+                                defaultValue=""
+                                onChange={(e) => {
+                                  const fromIdx = parseInt(e.target.value, 10);
+                                  if (!isNaN(fromIdx) && fromIdx !== safeShiftTab) {
+                                    copyStaffFromTab(fromIdx, safeShiftTab);
+                                  }
+                                  e.target.value = "";
+                                }}
+                                className="bg-gray-800 border border-gray-700 rounded-lg px-2 py-1 text-[11px] text-amber-300 focus:outline-none"
+                              >
+                                <option value="" disabled>Seleccionar turno...</option>
+                                {days.map((d, dIdx) => {
+                                  if (dIdx === safeShiftTab) return null;
+                                  const shiftName = d.notes || `Jornada ${dIdx + 1}`;
+                                  const count = Object.keys(staffDays).filter(stId => (staffDays[stId] || []).includes(dIdx)).length;
+                                  return (
+                                    <option key={dIdx} value={dIdx}>
+                                      {shiftName} ({count} asignados)
+                                    </option>
+                                  );
+                                })}
+                              </select>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-thin">
+                          {days.map((d, dIdx) => {
+                            const isSelected = safeShiftTab === dIdx;
+                            const shiftName = d.notes || `Jornada ${dIdx + 1}`;
+                            const timeStr = d.time ? `${d.time}-${d.end_time || ''}` : '';
+                            const count = Object.keys(staffDays).filter(stId => (staffDays[stId] || []).includes(dIdx)).length;
+                            return (
+                              <button
+                                key={dIdx}
+                                type="button"
+                                onClick={() => setActiveShiftTab(dIdx)}
+                                className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold transition-all border whitespace-nowrap ${
+                                  isSelected
+                                    ? 'bg-amber-500/20 text-amber-300 border-amber-500/50 shadow-md ring-1 ring-amber-500/30'
+                                    : 'bg-white/5 text-gray-400 border-white/5 hover:bg-white/10 hover:text-white'
+                                }`}
+                              >
+                                <span>{shiftName}</span>
+                                <span className="text-[10px] opacity-75">({d.date ? d.date.substring(5) : '?'} · {timeStr})</span>
+                                <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-extrabold ${
+                                  count > 0 ? 'bg-amber-400/20 text-amber-300' : 'bg-white/10 text-gray-400'
+                                }`}>
+                                  {count}
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Lista de técnicos con checkboxes */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 bg-black/30 p-3.5 rounded-xl border border-white/5 max-h-52 overflow-y-auto">
+                      {isLoadingAvailability ? (
+                        <p className="text-gray-400 text-xs col-span-2 text-center py-4 flex items-center justify-center gap-2">
+                          <svg className="animate-spin h-4 w-4 text-amber-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                          Consultando disponibilidad real...
+                        </p>
+                      ) : filteredStaff.length === 0 ? (
+                        <p className="text-gray-400 text-xs col-span-2 text-center py-4">
+                          No hay trabajadores disponibles que coincidan con la búsqueda.
+                        </p>
                       ) : (
-                        <span className="text-xs bg-white/5 text-gray-400 border border-white/5 px-2 py-0.5 rounded-full font-medium">
-                          Selecciona una fecha
-                        </span>
+                        filteredStaff.map((staff) => {
+                          const isCheckedInTab = (staffDays[staff.id] || []).includes(safeShiftTab);
+                          const otherAssignedTabs = (staffDays[staff.id] || []).filter(idx => idx !== safeShiftTab);
+                          const status = getStaffStatus(staff.id);
+                          let badgeColor = "bg-emerald-500/20 text-emerald-300 border-emerald-500/30";
+                          if (status === "En evento") badgeColor = "bg-amber-500/20 text-amber-300 border-amber-500/30";
+                          if (status === "No disponible") badgeColor = "bg-red-500/20 text-red-300 border-red-500/30";
+
+                          return (
+                            <label key={staff.id} className="flex items-center justify-between text-gray-200 cursor-pointer hover:bg-white/5 p-2 rounded-lg transition-colors border border-transparent hover:border-white/5">
+                              <div className="flex items-center space-x-3 min-w-0">
+                                <input
+                                  type="checkbox"
+                                  checked={isCheckedInTab}
+                                  onChange={() => toggleStaff(staff.id)}
+                                  className="form-checkbox h-4 w-4 text-amber-500 bg-gray-700 border-gray-600 rounded focus:ring-amber-500/50 shrink-0"
+                                />
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <img src={staff.avatar || "https://ui-avatars.com/api/?name=" + staff.name} alt="" className="w-6 h-6 rounded-full shrink-0" />
+                                  <div className="flex flex-col min-w-0">
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="truncate max-w-[120px] text-xs font-semibold">{staff.name}</span>
+                                      <span className="text-[10px] text-gray-400 capitalize">({staff.role})</span>
+                                    </div>
+                                    {otherAssignedTabs.length > 0 && (
+                                      <span className="text-[9px] text-amber-300/80 font-medium truncate">
+                                        ✓ En: {otherAssignedTabs.map(idx => days[idx]?.notes || `Jornada ${idx + 1}`).join(', ')}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                              {eventDate && (
+                                <span className={`px-2 py-0.5 text-[9px] rounded-full border font-bold shrink-0 ml-2 ${badgeColor}`}>
+                                  {status}
+                                </span>
+                              )}
+                            </label>
+                          );
+                        })
                       )}
                     </div>
 
-                    <div className="flex flex-wrap gap-2 w-full md:w-auto items-center">
-                      <label className="flex items-center gap-1.5 cursor-pointer bg-white/5 hover:bg-white/10 px-2.5 py-1.5 rounded-lg border border-white/5 text-[11px] font-bold text-gray-300 transition-all select-none">
-                        <input
-                          type="checkbox"
-                          checked={showOnlyAvailable}
-                          onChange={(e) => setShowOnlyAvailable(e.target.checked)}
-                          className="form-checkbox h-3.5 w-3.5 text-amber-500 bg-gray-700 border-gray-600 rounded focus:ring-amber-500/30"
-                        />
-                        <span>Solo disponibles</span>
-                      </label>
+                    {/* Detalle y Tarifas del Personal Seleccionado */}
+                    {selectedStaffIds.length > 0 && (
+                      <div className="mt-4 p-3.5 bg-black/40 rounded-xl border border-white/5">
+                        <div className="flex items-center justify-between mb-3">
+                          <h4 className="text-[11px] font-extrabold text-amber-400 uppercase tracking-widest flex items-center gap-1.5">
+                            <Sliders className="w-3.5 h-3.5 text-amber-400" /> Detalle de Asignación y Tarifas ({selectedStaffIds.length})
+                          </h4>
+                          <span className="text-[10px] text-gray-400">Puedes ajustar los turnos y tarifas por persona</span>
+                        </div>
+                        <div className="space-y-3 max-h-60 overflow-y-auto pr-1">
+                          {selectedStaffIds.map(id => {
+                            const staff = dbStaff.find(s => s.id === id);
+                            if (!staff) return null;
+                            const baseline = staff.monto_transferencia ? parseInt(staff.monto_transferencia, 10) : 25000;
+                            const assignedDaysList = staffDays[id] || [];
 
-                      <div className="relative flex-1 md:flex-initial">
-                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
-                        <input
-                          type="text"
-                          placeholder="Buscar por nombre..."
-                          value={staffSearch}
-                          onChange={(e) => setStaffSearch(e.target.value)}
-                          className="w-full pl-8 pr-2 py-1.5 bg-gray-800/80 border border-gray-700 rounded-lg text-xs text-white placeholder-gray-500 focus:outline-none focus:border-amber-500/50"
-                        />
+                            return (
+                              <div key={id} className="bg-gray-900/40 p-3 rounded-lg border border-white/5 space-y-2.5">
+                                <div className="flex flex-wrap items-center justify-between gap-3">
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <img src={staff.avatar || "https://ui-avatars.com/api/?name=" + staff.name} alt="" className="w-5 h-5 rounded-full shrink-0" />
+                                    <div className="flex flex-col min-w-0">
+                                      <span className="text-[11px] font-semibold text-gray-200 truncate">{staff.name}</span>
+                                      <span className="text-[9px] text-gray-400 font-medium">Tarifa base: $${baseline.toLocaleString('es-CL')}</span>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-2 shrink-0">
+                                    <span className="text-[10px] text-gray-400">Tarifa por turno:</span>
+                                    <CurrencyInputCLP
+                                      compact
+                                      placeholder={String(baseline)}
+                                      value={customRates[id] || ""}
+                                      onChange={(val) => {
+                                        setCustomRates(prev => ({
+                                          ...prev,
+                                          [id]: val
+                                        }));
+                                      }}
+                                    />
+                                  </div>
+                                </div>
+
+                                {days.length > 1 && (
+                                  <div className="space-y-1 pt-1 border-t border-white/5">
+                                    <div className="text-[9px] font-bold text-gray-400 uppercase tracking-wide">Turnos asignados a este trabajador:</div>
+                                    <div className="flex flex-wrap gap-1.5">
+                                      {days.map((day, dayIdx) => {
+                                        const isAssigned = assignedDaysList.includes(dayIdx);
+                                        const shiftName = day.notes || `Jornada ${dayIdx + 1}`;
+                                        const timeStr = day.time ? `${day.time}-${day.end_time || ''}` : '';
+                                        return (
+                                          <button
+                                            key={dayIdx}
+                                            type="button"
+                                            onClick={() => {
+                                              setStaffDays(prev => {
+                                                const curr = prev[id] || [];
+                                                const next = curr.includes(dayIdx) ? curr.filter(x => x !== dayIdx) : [...curr, dayIdx];
+                                                const updated = { ...prev, [id]: next };
+                                                const all = Object.keys(updated).filter(sId => (updated[sId] || []).length > 0);
+                                                setValue("staffIds", all, { shouldDirty: true, shouldValidate: true });
+                                                return updated;
+                                              });
+                                            }}
+                                            className={`px-2 py-0.5 rounded-lg text-[10px] font-bold transition-all border flex items-center gap-1 ${
+                                              isAssigned
+                                                ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                                                : 'bg-white/5 text-gray-500 border-white/5 hover:bg-white/10'
+                                            }`}
+                                            title={isAssigned ? "Asignado (Clic para desasignar)" : "No asignado (Clic para asignar)"}
+                                          >
+                                            <span>{isAssigned ? "✓" : "+"}</span>
+                                            <span>{shiftName}</span>
+                                            <span className="opacity-70 text-[9px]">({timeStr})</span>
+                                          </button>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
                       </div>
-
-                      <div className="relative flex-1 md:flex-initial">
-                        <Filter className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
-                        <select
-                          value={staffRole}
-                          onChange={(e) => setStaffRole(e.target.value)}
-                          className="w-full pl-8 pr-6 py-1.5 bg-gray-800/80 border border-gray-700 rounded-lg text-xs text-white focus:outline-none focus:border-amber-500/50 appearance-none capitalize"
-                        >
-                          <option value="">Todos los roles</option>
-                          {uniqueRoles.map(role => (
-                            <option key={role} value={role} className="capitalize">{role}</option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2 bg-black/30 p-3.5 rounded-xl border border-white/5 max-h-48 overflow-y-auto">
-                    {isLoadingAvailability ? (
-                      <p className="text-gray-400 text-xs col-span-2 text-center py-4 flex items-center justify-center gap-2">
-                        <svg className="animate-spin h-4 w-4 text-amber-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                        Consultando disponibilidad real...
-                      </p>
-                    ) : filteredStaff.length === 0 ? (
-                      <p className="text-gray-400 text-xs col-span-2 text-center py-4">
-                        No hay trabajadores disponibles que coincidan con la búsqueda.
-                      </p>
-                    ) : (
-                      filteredStaff.map((staff) => {
-                        const isChecked = selectedStaffIds.includes(staff.id);
-                        const status = getStaffStatus(staff.id);
-                        let badgeColor = "bg-emerald-500/20 text-emerald-300 border-emerald-500/30";
-                        if (status === "En evento") badgeColor = "bg-amber-500/20 text-amber-300 border-amber-500/30";
-                        if (status === "No disponible") badgeColor = "bg-red-500/20 text-red-300 border-red-500/30";
-
-                        return (
-                          <label key={staff.id} className="flex items-center justify-between text-gray-200 cursor-pointer hover:bg-white/5 p-2 rounded-lg transition-colors border border-transparent hover:border-white/5">
-                            <div className="flex items-center space-x-3">
-                              <input
-                                type="checkbox"
-                                checked={isChecked}
-                                onChange={() => toggleStaff(staff.id)}
-                                className="form-checkbox h-4 w-4 text-amber-500 bg-gray-700 border-gray-600 rounded focus:ring-amber-500/50"
-                              />
-                              <span className="flex items-center gap-2">
-                                <img src={staff.avatar || "https://ui-avatars.com/api/?name=" + staff.name} alt="" className="w-6 h-6 rounded-full" />
-                                <span className="truncate max-w-[125px] text-xs font-semibold">{staff.name}</span>
-                                <span className="text-[10px] text-gray-400 capitalize">({staff.role})</span>
-                              </span>
-                            </div>
-                            {eventDate && (
-                              <span className={`px-2 py-0.5 text-[9px] rounded-full border font-bold ${badgeColor}`}>
-                                {status}
-                              </span>
-                            )}
-                          </label>
-                        );
-                      })
                     )}
                   </div>
-
-                  {selectedStaffIds.length > 0 && (
-                    <div className="mt-4 p-3.5 bg-black/40 rounded-xl border border-white/5">
-                      <h4 className="text-[11px] font-extrabold text-amber-400 uppercase tracking-widest mb-3 flex items-center gap-1.5">
-                        <Sliders className="w-3.5 h-3.5 text-amber-400" /> Detalle de Asignación y Tarifas
-                      </h4>
-                      <div className="space-y-3 max-h-56 overflow-y-auto pr-1">
-                        {selectedStaffIds.map(id => {
-                          const staff = dbStaff.find(s => s.id === id);
-                          if (!staff) return null;
-                          const baseline = staff.monto_transferencia ? parseInt(staff.monto_transferencia) : 25000;
-                          const assigned = staffDays[id] || [];
-
-                          const toggleDayForStaff = (dayIdx) => {
-                            setStaffDays(prev => {
-                              const curr = prev[id] || [];
-                              const next = curr.includes(dayIdx)
-                                ? curr.filter(x => x !== dayIdx)
-                                : [...curr, dayIdx];
-                              return { ...prev, [id]: next };
-                            });
-                          };
-
-                          return (
-                            <div key={id} className="bg-gray-900/40 p-3 rounded-lg border border-white/5 space-y-3">
-                              <div className="flex items-center justify-between gap-3">
-                                <div className="flex items-center gap-2 min-w-0">
-                                  <img src={staff.avatar || "https://ui-avatars.com/api/?name=" + staff.name} alt="" className="w-5 h-5 rounded-full shrink-0" />
-                                  <div className="flex flex-col min-w-0">
-                                    <span className="text-[11px] font-semibold text-gray-200 truncate">{staff.name}</span>
-                                    <span className="text-[9px] text-gray-400 font-medium">Tarifa base: ${baseline.toLocaleString('es-CL')}</span>
-                                  </div>
-                                </div>
-                                <div className="flex items-center shrink-0">
-                                  <CurrencyInputCLP
-                                    compact
-                                    placeholder={String(baseline)}
-                                    value={customRates[id] || ""}
-                                    onChange={(val) => {
-                                      setCustomRates(prev => ({
-                                        ...prev,
-                                        [id]: val
-                                      }));
-                                    }}
-                                  />
-                                </div>
-                              </div>
-
-                              {days.length > 1 && (
-                                <div className="space-y-1">
-                                  <div className="text-[9px] font-bold text-gray-400 uppercase tracking-wide">Jornadas Asignadas:</div>
-                                  <div className="flex flex-wrap gap-1.5">
-                                    {days.map((day, dayIdx) => {
-                                      const isAssigned = assigned.length === 0 || assigned.includes(dayIdx);
-                                      return (
-                                        <button
-                                          key={dayIdx}
-                                          type="button"
-                                          onClick={() => toggleDayForStaff(dayIdx)}
-                                          className={`px-2 py-1 rounded text-[9px] font-bold transition-all border ${isAssigned
-                                              ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
-                                              : 'bg-white/5 text-gray-500 border-white/5 hover:bg-white/10'
-                                            }`}
-                                        >
-                                          Día {dayIdx + 1} ({day.date ? day.date.substring(5) : "?"})
-                                        </button>
-                                      );
-                                    })}
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-                </div>
 
                 <div className="flex justify-end space-x-3 mt-6 pt-4 border-t border-gray-800">
                   <Button type="button" variant="secondary" onClick={onClose} disabled={isSubmittingForm}>Cancelar</Button>

@@ -45,7 +45,7 @@ export default function Calendar() {
           ...d,
           id: d.event_id, // Detalle modal uses parent event_id
           day_id: d.id,
-          name: parent.name || "Sin nombre",
+          name: d.notes ? `${parent.name || "Sin nombre"} (${d.notes})` : (parent.name || "Sin nombre"),
           location: parent.location || "Sin ubicación",
           date: d.date, // Usar la fecha específica de la jornada
           time: d.start_time ? d.start_time.substring(0, 5) : "09:00",

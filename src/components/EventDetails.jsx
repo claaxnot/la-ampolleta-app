@@ -460,7 +460,7 @@ export default function EventDetails({ event, isOpen, onClose }) {
                             : "bg-white/5 text-gray-400 border-white/10 hover:bg-white/10 hover:text-white"
                         }`}
                       >
-                        📅 Día {idx + 1} ({dateStr})
+                        <span>📅 {day.notes || `Jornada ${idx + 1}`}</span><span className="text-[10px] opacity-75 font-normal">({dateStr}{day.start_time ? ` · ${day.start_time.substring(0, 5)}` : ''})</span>
                       </button>
                     );
                   })}

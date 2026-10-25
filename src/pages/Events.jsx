@@ -266,6 +266,9 @@ export default function Events({ user }) {
           // Find staff IDs assigned to this specific day index
           const staffIdsForDay = staffIds.filter(id => {
             const assignedDays = staffDays[id];
+            if (Array.isArray(assignedDays)) {
+              return assignedDays.includes(i);
+            }
             if (!assignedDays) return true; // Default: all days
             return assignedDays.includes(i);
           });
@@ -294,7 +297,8 @@ export default function Events({ user }) {
           const staffIdsToInsert = staffIdsForDay.filter(id => !existingStaffIds.includes(id));
           if (staffIdsToInsert.length > 0) {
             const newAssigns = staffIdsToInsert.map(id => {
-              const rateVal = customRates[id] ? parseFloat(customRates[id]) : null;
+              const rateKey = customRates[`${id}_${i}`] ?? customRates[id];
+              const rateVal = rateKey ? parseFloat(rateKey) : null;
               return {
                 event_id: eventId,
                 event_day_id: dayId,
@@ -309,7 +313,8 @@ export default function Events({ user }) {
           // Update existing custom rates if they changed
           for (const existing of existingAssigns || []) {
             if (staffIdsForDay.includes(existing.staff_id)) {
-              const newRateVal = customRates[existing.staff_id] ? parseFloat(customRates[existing.staff_id]) : null;
+              const rateKey = customRates[`${existing.staff_id}_${i}`] ?? customRates[existing.staff_id];
+              const newRateVal = rateKey ? parseFloat(rateKey) : null;
               const oldRateVal = existing.custom_rate ? parseFloat(existing.custom_rate) : null;
               if (newRateVal !== oldRateVal) {
                 const { error: updError } = await supabase
