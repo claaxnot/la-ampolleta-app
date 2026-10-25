@@ -1,10 +1,9 @@
 -- ==========================================================
 -- SCRIPT DE MIGRACIÓN: Habilitar Permisos RLS para Rol 'Productor'
 -- ==========================================================
--- Este script otorga permisos de escritura en Supabase al nuevo rol 'productor'
--- en las tablas: event_days, event_assignments, event_attendance_logs, notifications y events.
 
 -- 1. Actualizar RLS en 'event_days' para permitir que productores guarden jornadas
+ALTER TABLE public.event_days ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Permitir escritura de jornadas para administradores" ON public.event_days;
 DROP POLICY IF EXISTS "Permitir escritura de jornadas para administradores y productores" ON public.event_days;
 
@@ -35,43 +34,49 @@ WITH CHECK (
   )
 );
 
--- 2. Asegurar que 'event_assignments' permita crear/editar asignaciones de staff a productores
-DO $$
-BEGIN
-  IF EXISTS (
-    SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.id = c.relnamespace
-    WHERE c.relname = 'event_assignments' AND n.nspname = 'public' AND c.relrowsecurity = true
-  ) THEN
-    DROP POLICY IF EXISTS "Permitir escritura de asignaciones para administradores y productores" ON public.event_assignments;
-    CREATE POLICY "Permitir escritura de asignaciones para administradores y productores"
-    ON public.event_assignments
-    FOR ALL
-    TO authenticated
-    USING (
-      EXISTS (
-        SELECT 1 FROM public.profiles
-        WHERE profiles.id = auth.uid()
-        AND (
-          LOWER(profiles.role) IN ('admin', 'viewer', 'superadmin', 'productor')
-          OR LOWER(profiles.system_role) IN ('admin', 'viewer', 'superadmin', 'productor')
-        )
-      )
-    )
-    WITH CHECK (
-      EXISTS (
-        SELECT 1 FROM public.profiles
-        WHERE profiles.id = auth.uid()
-        AND (
-          LOWER(profiles.role) IN ('admin', 'viewer', 'superadmin', 'productor')
-          OR LOWER(profiles.system_role) IN ('admin', 'viewer', 'superadmin', 'productor')
-        )
-      )
-    );
-  END IF;
-END $$;
+-- 2. Asegurar que 'event_assignments' permita asignar personal a productores
+ALTER TABLE public.event_assignments ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Permitir escritura de asignaciones para administradores y productores" ON public.event_assignments;
+DROP POLICY IF EXISTS "Permitir lectura de asignaciones para autenticados" ON public.event_assignments;
 
--- 3. Actualizar RLS en 'event_attendance_logs' para que productores puedan gestionar y confirmar asistencia
+CREATE POLICY "Permitir lectura de asignaciones para autenticados"
+ON public.event_assignments
+FOR SELECT
+TO authenticated
+USING (true);
+
+CREATE POLICY "Permitir escritura de asignaciones para administradores y productores"
+ON public.event_assignments
+FOR ALL
+TO authenticated
+USING (
+  EXISTS (
+    SELECT 1 FROM public.profiles
+    WHERE profiles.id = auth.uid()
+    AND (
+      LOWER(profiles.role) IN ('admin', 'viewer', 'superadmin', 'productor')
+      OR LOWER(profiles.system_role) IN ('admin', 'viewer', 'superadmin', 'productor')
+      OR auth.jwt()->>'email' = 'admin@laampolleta.tv'
+    )
+  )
+)
+WITH CHECK (
+  EXISTS (
+    SELECT 1 FROM public.profiles
+    WHERE profiles.id = auth.uid()
+    AND (
+      LOWER(profiles.role) IN ('admin', 'viewer', 'superadmin', 'productor')
+      OR LOWER(profiles.system_role) IN ('admin', 'viewer', 'superadmin', 'productor')
+      OR auth.jwt()->>'email' = 'admin@laampolleta.tv'
+    )
+  )
+);
+
+-- 3. Actualizar RLS en 'event_attendance_logs' para que productores puedan gestionar asistencia
+ALTER TABLE public.event_attendance_logs ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Admins can view all attendance logs" ON public.event_attendance_logs;
+DROP POLICY IF EXISTS "Admins and producers can view all attendance logs" ON public.event_attendance_logs;
+
 CREATE POLICY "Admins and producers can view all attendance logs"
 ON public.event_attendance_logs
 FOR SELECT
@@ -87,6 +92,8 @@ USING (
 );
 
 DROP POLICY IF EXISTS "Admins can update attendance logs for corrections" ON public.event_attendance_logs;
+DROP POLICY IF EXISTS "Admins and producers can update attendance logs for corrections" ON public.event_attendance_logs;
+
 CREATE POLICY "Admins and producers can update attendance logs for corrections"
 ON public.event_attendance_logs
 FOR UPDATE
@@ -111,6 +118,8 @@ WITH CHECK (
 );
 
 DROP POLICY IF EXISTS "Admins can insert attendance logs for manual registrations" ON public.event_attendance_logs;
+DROP POLICY IF EXISTS "Admins and producers can insert attendance logs for manual registrations" ON public.event_attendance_logs;
+
 CREATE POLICY "Admins and producers can insert attendance logs for manual registrations"
 ON public.event_attendance_logs
 FOR INSERT
@@ -126,7 +135,10 @@ WITH CHECK (
 );
 
 -- 4. Actualizar RLS en 'notifications' para que productores puedan emitir avisos de asignación
+ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Admins can insert notifications" ON public.notifications;
+DROP POLICY IF EXISTS "Admins and producers can insert notifications" ON public.notifications;
+
 CREATE POLICY "Admins and producers can insert notifications"
 ON public.notifications
 FOR INSERT
@@ -147,3 +159,4 @@ WITH CHECK (
 GRANT ALL ON TABLE public.event_days TO authenticated;
 GRANT ALL ON TABLE public.event_assignments TO authenticated;
 GRANT ALL ON TABLE public.event_attendance_logs TO authenticated;
+GRANT ALL ON TABLE public.notifications TO authenticated;
