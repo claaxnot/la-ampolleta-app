@@ -129,20 +129,44 @@ export default function Staff() {
     try {
       if (staffData.id) {
         // Edit mode
+        const normalizedEmail = (staffData.email || "").trim().toLowerCase();
+
+        // Verificar si se cambió el correo y si ya está en uso por otro miembro
+        if (normalizedEmail && editingStaff?.email && normalizedEmail !== editingStaff.email.toLowerCase()) {
+          const { data: existingEmail } = await supabase
+            .from('profiles')
+            .select('id')
+            .eq('email', normalizedEmail)
+            .neq('id', staffData.id)
+            .maybeSingle();
+
+          if (existingEmail) {
+            toast.error("El correo ya está registrado por otro miembro.", { id: loadingToast });
+            setIsSaving(false);
+            return;
+          }
+        }
+
+        const updatePayload = {
+          name: staffData.name,
+          rut: normalizedRut,
+          role: staffData.role,
+          system_role: staffData.system_role,
+          cuenta_origen: staffData.cuenta_origen,
+          cuenta_destino: staffData.cuenta_destino,
+          codigo_banco_destino: staffData.codigo_banco_destino,
+          monto_transferencia: staffData.monto_transferencia,
+          glosa_transferencia: staffData.glosa_transferencia,
+          mensaje_beneficiario: staffData.mensaje_beneficiario
+        };
+
+        if (normalizedEmail) {
+          updatePayload.email = normalizedEmail;
+        }
+
         const { error } = await supabase
           .from('profiles')
-          .update({
-            name: staffData.name,
-            rut: normalizedRut,
-            role: staffData.role,
-            system_role: staffData.system_role,
-            cuenta_origen: staffData.cuenta_origen,
-            cuenta_destino: staffData.cuenta_destino,
-            codigo_banco_destino: staffData.codigo_banco_destino,
-            monto_transferencia: staffData.monto_transferencia,
-            glosa_transferencia: staffData.glosa_transferencia,
-            mensaje_beneficiario: staffData.mensaje_beneficiario
-          })
+          .update(updatePayload)
           .eq('id', staffData.id);
 
         if (error) throw error;
@@ -240,13 +264,16 @@ export default function Staff() {
 
   const handleDelete = async (id) => {
     if (!rolePermissions.canDelete) return;
-    if (window.confirm("¿Estás seguro de que deseas eliminar a este miembro? (Solo se borrará su perfil, no su cuenta de acceso)")) {
-      const { error } = await supabase.from('profiles').delete().eq('id', id);
-      if (!error) {
-        toast.success("Miembro de staff eliminado.");
+    if (window.confirm("¿Estás seguro de que deseas eliminar permanentemente a este miembro de staff?")) {
+      const loadingToast = toast.loading("Eliminando miembro de staff...");
+      try {
+        const { error } = await supabase.from('profiles').delete().eq('id', id);
+        if (error) throw error;
+        toast.success("Miembro de staff eliminado correctamente.", { id: loadingToast });
         fetchStaff();
-      } else {
-        toast.error("Error al eliminar: " + error.message);
+      } catch (err) {
+        console.error("Error al eliminar:", err);
+        toast.error("Error al eliminar: " + (err.message || "Error desconocido"), { id: loadingToast });
       }
     }
   };

@@ -7,7 +7,7 @@ export const permissions = {
   },
   productor: {
     canEdit: true,
-    canDelete: false,
+    canDelete: true,
     canCreate: true,
     canManageClients: false,
   },
