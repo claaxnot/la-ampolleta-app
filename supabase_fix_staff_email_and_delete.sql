@@ -1,11 +1,90 @@
 -- ====================================================================
--- SCRIPT DE MIGRACIÓN: Corrección para Cambio de Correo y Eliminación de Staff
--- Resuelve: Error violates foreign key constraint "notifications_user_id_fkey"
--- Permite: Edición directa del correo y eliminación limpia de funcionarios
+-- SCRIPT DE MIGRACIÓN: Corrección para Cambio de Correo y Eliminación de Staff (V2 - Sin Recursión)
+-- Resuelve: "infinite recursion detected in policy for relation profiles"
 -- ====================================================================
 
--- 1. CORREGIR EL TRIGGER 'notify_on_assignment_delete'
--- Evita que al eliminar un funcionario o sus asignaciones se intente insertar una notificación para un usuario que ya no existe
+-- 1. ELIMINAR CUALQUIER POLÍTICA RECURSIVA PREVIA EN 'public.profiles'
+DROP POLICY IF EXISTS "Admins and producers can update profiles" ON public.profiles;
+DROP POLICY IF EXISTS "Admins and producers can delete profiles" ON public.profiles;
+DROP POLICY IF EXISTS "Users and admins can update profiles" ON public.profiles;
+DROP POLICY IF EXISTS "Enable update for users based on email" ON public.profiles;
+DROP POLICY IF EXISTS "Admins can delete profiles" ON public.profiles;
+DROP POLICY IF EXISTS "Enable read access for all authenticated users" ON public.profiles;
+
+-- 2. FUNCIÓN DE COMPROBACIÓN CON 'SECURITY DEFINER'
+-- Al ser SECURITY DEFINER, ejecuta con permisos de superusuario y NO activa el RLS de 'profiles', evitando cualquier recursión infinita
+CREATE OR REPLACE FUNCTION public.is_admin_or_producer()
+RETURNS boolean
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  v_uid uuid;
+  v_is_auth boolean;
+BEGIN
+  v_uid := auth.uid();
+  IF v_uid IS NULL THEN
+    RETURN false;
+  END IF;
+
+  IF auth.jwt()->>'email' = 'admin@laampolleta.tv' THEN
+    RETURN true;
+  END IF;
+
+  SELECT EXISTS (
+    SELECT 1 FROM public.profiles
+    WHERE id = v_uid
+    AND (
+      LOWER(COALESCE(role, '')) IN ('admin', 'superadmin', 'productor')
+      OR LOWER(COALESCE(system_role, '')) IN ('admin', 'superadmin', 'productor')
+    )
+  ) INTO v_is_auth;
+
+  RETURN COALESCE(v_is_auth, false);
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.is_admin_or_producer() TO authenticated;
+
+
+-- 3. POLÍTICAS RLS LIMPIAS EN 'public.profiles'
+ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+
+-- Lectura para todos los usuarios autenticados
+CREATE POLICY "Enable read access for all authenticated users"
+ON public.profiles
+FOR SELECT
+TO authenticated
+USING (
+  (SELECT auth.uid()) IS NOT NULL
+);
+
+-- Actualización: cada usuario puede editar su propio perfil, y Administradores/Productores pueden editar cualquier perfil
+CREATE POLICY "Admins and producers can update profiles"
+ON public.profiles
+FOR UPDATE
+TO authenticated
+USING (
+  auth.uid() = id OR public.is_admin_or_producer()
+)
+WITH CHECK (
+  auth.uid() = id OR public.is_admin_or_producer()
+);
+
+-- Eliminación: permitida únicamente a Administradores y Productores
+CREATE POLICY "Admins and producers can delete profiles"
+ON public.profiles
+FOR DELETE
+TO authenticated
+USING (
+  public.is_admin_or_producer()
+);
+
+GRANT ALL ON TABLE public.profiles TO authenticated;
+
+
+-- 4. TRIGGER 'notify_on_assignment_delete' PROTEGIDO
 CREATE OR REPLACE FUNCTION public.notify_on_assignment_delete()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -19,7 +98,6 @@ DECLARE
   event_date date;
   event_status text;
 BEGIN
-  -- Verificar si el evento aún existe (evita errores en borrados en cascada)
   SELECT EXISTS(
     SELECT 1 FROM public.events WHERE id = OLD.event_id
   ) INTO event_exists;
@@ -28,7 +106,6 @@ BEGIN
     RETURN OLD;
   END IF;
 
-  -- Verificar si el usuario aún existe en profiles (evita fallos si el funcionario fue eliminado)
   SELECT EXISTS(
     SELECT 1 FROM public.profiles WHERE id = OLD.staff_id
   ) INTO user_exists;
@@ -41,7 +118,6 @@ BEGIN
   FROM public.events 
   WHERE id = OLD.event_id;
   
-  -- Solo notificar si el evento no está cancelado
   IF COALESCE(event_status, '') <> 'Cancelado' THEN
     BEGIN
       INSERT INTO public.notifications (user_id, title, description, type, priority, related_event_id)
@@ -71,7 +147,7 @@ CREATE TRIGGER trg_on_assignment_delete
   EXECUTE FUNCTION public.notify_on_assignment_delete();
 
 
--- 2. ASEGURAR QUE 'notifications' TENGA 'ON DELETE CASCADE' EN user_id
+-- 5. CASCADE EN NOTIFICATIONS (user_id)
 DO $$
 BEGIN
   IF EXISTS (
@@ -90,8 +166,7 @@ EXCEPTION WHEN OTHERS THEN
 END $$;
 
 
--- 3. SINCRONIZAR AUTOMÁTICAMENTE EL CAMBIO DE CORREO DE 'profiles' HACIA 'auth.users'
--- Cuando un admin o productor edita el correo de un funcionario en la app, se actualiza también su login de acceso
+-- 6. SINCRONIZACIÓN DE CAMBIO DE CORREO 'profiles' -> 'auth.users'
 CREATE OR REPLACE FUNCTION public.handle_profile_email_update()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -116,8 +191,7 @@ CREATE TRIGGER trg_on_profile_email_update
   EXECUTE FUNCTION public.handle_profile_email_update();
 
 
--- 4. LIMPIAR LA CUENTA EN 'auth.users' SI SE ELIMINA EL PERFIL DE 'profiles'
--- Libera el correo y el RUT para que puedan volver a registrarse si fue eliminado
+-- 7. LIBERAR CORREO EN 'auth.users' SI SE BORRA EN 'profiles'
 CREATE OR REPLACE FUNCTION public.handle_profile_delete()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -137,74 +211,3 @@ CREATE TRIGGER trg_on_profile_delete
   AFTER DELETE ON public.profiles
   FOR EACH ROW
   EXECUTE FUNCTION public.handle_profile_delete();
-
-
--- 5. POLÍTICAS RLS EN 'public.profiles' PARA ADMINISTRADORES Y PRODUCTORES
-ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
-
--- Lectura para todos los autenticados
-DROP POLICY IF EXISTS "Enable read access for all authenticated users" ON public.profiles;
-CREATE POLICY "Enable read access for all authenticated users"
-ON public.profiles
-FOR SELECT
-TO authenticated
-USING (
-  (SELECT auth.uid()) IS NOT NULL
-);
-
--- Actualización para uno mismo, Administradores y Productores
-DROP POLICY IF EXISTS "Admins and producers can update profiles" ON public.profiles;
-DROP POLICY IF EXISTS "Users and admins can update profiles" ON public.profiles;
-DROP POLICY IF EXISTS "Enable update for users based on email" ON public.profiles;
-
-CREATE POLICY "Admins and producers can update profiles"
-ON public.profiles
-FOR UPDATE
-TO authenticated
-USING (
-  auth.uid() = id
-  OR EXISTS (
-    SELECT 1 FROM public.profiles p
-    WHERE p.id = auth.uid()
-    AND (
-      LOWER(p.role) IN ('admin', 'superadmin', 'productor')
-      OR LOWER(p.system_role) IN ('admin', 'superadmin', 'productor')
-      OR auth.jwt()->>'email' = 'admin@laampolleta.tv'
-    )
-  )
-)
-WITH CHECK (
-  auth.uid() = id
-  OR EXISTS (
-    SELECT 1 FROM public.profiles p
-    WHERE p.id = auth.uid()
-    AND (
-      LOWER(p.role) IN ('admin', 'superadmin', 'productor')
-      OR LOWER(p.system_role) IN ('admin', 'superadmin', 'productor')
-      OR auth.jwt()->>'email' = 'admin@laampolleta.tv'
-    )
-  )
-);
-
--- Eliminación permitida para Administradores y Productores
-DROP POLICY IF EXISTS "Admins and producers can delete profiles" ON public.profiles;
-DROP POLICY IF EXISTS "Admins can delete profiles" ON public.profiles;
-
-CREATE POLICY "Admins and producers can delete profiles"
-ON public.profiles
-FOR DELETE
-TO authenticated
-USING (
-  EXISTS (
-    SELECT 1 FROM public.profiles p
-    WHERE p.id = auth.uid()
-    AND (
-      LOWER(p.role) IN ('admin', 'superadmin', 'productor')
-      OR LOWER(p.system_role) IN ('admin', 'superadmin', 'productor')
-      OR auth.jwt()->>'email' = 'admin@laampolleta.tv'
-    )
-  )
-);
-
--- Otorgar permisos GRANT a authenticated
-GRANT ALL ON TABLE public.profiles TO authenticated;
