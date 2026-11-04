@@ -33,7 +33,7 @@ serve(async (req: Request) => {
     }
 
     const resendApiKey = Deno.env.get("RESEND_API_KEY");
-    const senderEmail = Deno.env.get("SENDER_EMAIL") || "La Ampolleta Producciones <contacto@laampolleta.tv>";
+    const senderEmail = Deno.env.get("SENDER_EMAIL") || "La Ampolleta Producciones <no-reply@laampolleta.tv>";
 
     // Opción 1: Resend si está configurado en las variables de entorno
     if (resendApiKey) {
@@ -65,8 +65,8 @@ serve(async (req: Request) => {
     // Opción 2: Servidor SMTP propio de La Ampolleta (mail.laampolleta.tv:465)
     const smtpHost = Deno.env.get("SMTP_HOST") || "mail.laampolleta.tv";
     const smtpPort = parseInt(Deno.env.get("SMTP_PORT") || "465", 10);
-    const smtpUser = Deno.env.get("SMTP_USER") || "contacto@laampolleta.tv";
-    const smtpPass = Deno.env.get("SMTP_PASS") || "YFdwW1ZHrtzx";
+    const smtpUser = Deno.env.get("SMTP_USER") || "no-reply@laampolleta.tv";
+    const smtpPass = Deno.env.get("SMTP_PASS") || "Kmdqtvc9dkXlMOf2";
 
     const transporter = nodemailer.createTransport({
       host: smtpHost,
