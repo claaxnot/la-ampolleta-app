@@ -27,7 +27,6 @@ import { supabase } from "../lib/supabase.js";
 import { validateRut, formatRut, sanitizeRut } from "../utils/validateRut.js";
 import { formatChileanPhone, validateChileanPhone, getCleanWhatsAppPhone } from "../utils/formatPhone.js";
 import { BANCOS_CHILE, TIPOS_CUENTA, getBankName } from "../utils/banks.js";
-import { sendPostulacionRecibidaEmail } from "../services/emailService.js";
 import { toast } from "react-hot-toast";
 
 export default function RegisterStaff() {
@@ -265,19 +264,9 @@ export default function RegisterStaff() {
         }
       }
 
-      // 5. Despachar correo automático con la presentación oficial
       const bankName = getBankName(formData.codigo_banco_destino);
-      sendPostulacionRecibidaEmail({
-        name: cleanName,
-        email: normalizedEmail,
-        rut: normalizedRut,
-        phone: formData.phone.trim(),
-        bankName,
-        accountType: formData.tipo_cuenta,
-        accountNumber: formData.cuenta_destino.trim()
-      });
 
-      // 6. Cerrar sesión de Supabase para que no quede logueado en modo 'Pendiente'
+      // 5. Cerrar sesión de Supabase para que no quede logueado en modo 'Pendiente'
       await supabase.auth.signOut();
 
       // 7. Marcar éxito
