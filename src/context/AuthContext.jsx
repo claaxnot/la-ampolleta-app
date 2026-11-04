@@ -39,9 +39,9 @@ export const AuthProvider = ({ children }) => {
 
         if (error) throw error;
 
-        // If inactive, log out immediately (exempting the system superadmin)
-        if (profile?.status === 'Inactivo' && user.email !== 'admin@laampolleta.tv') {
-          console.warn("🔒 [SECURITY]: User account has been deactivated. Logging out.");
+        // If inactive or pending approval, log out immediately (exempting the system superadmin)
+        if ((profile?.status === 'Inactivo' || profile?.status === 'Pendiente') && user.email !== 'admin@laampolleta.tv') {
+          console.warn("🔒 [SECURITY]: User account is not active (Inactivo or Pendiente). Logging out.");
           logout();
           return;
         }

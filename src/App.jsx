@@ -13,6 +13,7 @@ import WorkerDashboard from "./pages/WorkerDashboard.jsx";
 import Profile from "./pages/Profile.jsx";
 import ResetPassword from "./pages/ResetPassword.jsx";
 import Finanzas from "./pages/Finanzas.jsx";
+import RegisterStaff from "./pages/RegisterStaff.jsx";
 
 import { useAuth } from "./hooks/useAuth.js";
 import { Toaster } from "react-hot-toast";
@@ -99,6 +100,8 @@ function App() {
       <div className="flex-1 overflow-auto">
         <Routes>
               <Route path="/login" element={<Login onLogin={handleLogin} />} />
+              <Route path="/registro-staff" element={<RegisterStaff />} />
+              <Route path="/registro-anfitriona" element={<RegisterStaff />} />
               <Route path="/reset-password" element={<ResetPassword />} />
             <Route
               path="/dashboard"

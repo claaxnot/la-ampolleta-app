@@ -57,6 +57,11 @@ export default function Login({ onLogin }) {
         console.warn("Could not fetch profile", profileError);
       }
 
+      if (profile?.status === 'Pendiente' && data.user.email !== 'admin@laampolleta.tv') {
+        await supabase.auth.signOut();
+        throw new Error("Tu postulación se encuentra en proceso de revisión por el equipo de producción. Te notificaremos cuando tu cuenta sea aprobada para que puedas ingresar.");
+      }
+
       if (profile?.status === 'Inactivo' && data.user.email !== 'admin@laampolleta.tv') {
         await supabase.auth.signOut();
         throw new Error("Tu cuenta se encuentra inactiva. Contacta al administrador para habilitar tu acceso.");
@@ -213,6 +218,21 @@ export default function Login({ onLogin }) {
             {isLoading ? "Conectando..." : "Iniciar Sesión"}
             {!isLoading && <ArrowRight className="w-4 h-4 ml-2" />}
           </Button>
+
+          {/* Acceso a postulación de anfitrionas */}
+          <div className="pt-4 mt-2 border-t border-gray-700/50 text-center">
+            <p className="text-xs text-gray-400">
+              ¿Quieres trabajar con nosotros?
+            </p>
+            <button
+              type="button"
+              onClick={() => navigate("/registro-staff")}
+              className="mt-1.5 text-xs text-amber-400 hover:text-amber-300 font-semibold inline-flex items-center gap-1.5 transition-colors bg-transparent border-none cursor-pointer"
+            >
+              <span>Postula aquí como Anfitriona / Staff</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
         </form>
       </GlassCard>
 
