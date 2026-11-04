@@ -25,7 +25,8 @@ import {
   Trash2,
   History,
   Sparkles,
-  ExternalLink
+  ExternalLink,
+  X
 } from "lucide-react";
 import GlassCard from "../components/GlassCard.jsx";
 import Button from "../components/Button.jsx";
@@ -747,11 +748,34 @@ export default function Finanzas() {
   }, [payments, retentionRateSetting, invoiceBatches]);
 
   const workerInvoiceGroups = React.useMemo(() => {
-    if (monthFilter === "all") {
-      return allWorkerInvoiceGroups;
+    let list = allWorkerInvoiceGroups;
+
+    // Filtro por mes/período contable
+    if (monthFilter !== "all") {
+      list = list.filter(g => g.period_key === monthFilter);
     }
-    return allWorkerInvoiceGroups.filter(g => g.period_key === monthFilter);
-  }, [allWorkerInvoiceGroups, monthFilter]);
+
+    // Filtro dinámico por buscador (Nombre del staff, RUT, Correo, Folio de boleta o Eventos del lote)
+    const term = (searchTerm || "").trim().toLowerCase();
+    if (term) {
+      list = list.filter(g => {
+        const matchesStaffName = (g.staff_name || "").toLowerCase().includes(term);
+        const matchesRut = 
+          (g.staff_rut || "").toLowerCase().includes(term) ||
+          (g.staff_rut || "").replace(/\./g, "").toLowerCase().includes(term.replace(/\./g, ""));
+        const matchesEmail = (g.staff_email || "").toLowerCase().includes(term);
+        const matchesBatchInvoice = (g.activeBatch?.invoice_number || "").toString().toLowerCase().includes(term);
+        const matchesEvents = (g.payments || []).some(p => 
+          (p.event_name || "").toLowerCase().includes(term) ||
+          (p.invoice_number || "").toString().toLowerCase().includes(term)
+        );
+
+        return matchesStaffName || matchesRut || matchesEmail || matchesBatchInvoice || matchesEvents;
+      });
+    }
+
+    return list;
+  }, [allWorkerInvoiceGroups, monthFilter, searchTerm]);
 
   const handleToggleInvoiceRequired = async (assignmentId, currentValue) => {
     const loadingToast = toast.loading("Actualizando requerimiento de boleta...");
@@ -2631,8 +2655,18 @@ export default function Finanzas() {
                   placeholder="Buscar por staff o evento..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="bg-gray-800/40 border border-gray-700/60 rounded-xl py-2 pl-9 pr-4 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-amber-500 w-full transition-all duration-300"
+                  className="bg-gray-800/40 border border-gray-700/60 rounded-xl py-2 pl-9 pr-8 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-amber-500 w-full transition-all duration-300"
                 />
+                {searchTerm && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchTerm("")}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition-colors"
+                    title="Limpiar búsqueda"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
               </div>
 
               <div className="relative w-full lg:w-auto">
@@ -2697,6 +2731,11 @@ export default function Finanzas() {
                 <div>
                   <h3 className="text-base font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-amber-200 to-amber-400 flex items-center gap-2 uppercase tracking-wide">
                     📋 Control de Boletas por Trabajador (SII Lotes V3.7)
+                    {searchTerm.trim() && (
+                      <span className="text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded-full font-bold font-mono normal-case">
+                        {workerInvoiceGroups.length} {workerInvoiceGroups.length === 1 ? 'lote encontrado' : 'lotes encontrados'}
+                      </span>
+                    )}
                   </h3>
                   <p className="text-2xs text-gray-400 mt-0.5">
                     Toda la app trabaja visualmente en líquidos, pero aquí puedes verificar la boleta combinada emitida por el total de eventos de cada staff.
@@ -2714,7 +2753,9 @@ export default function Finanzas() {
 
               {workerInvoiceGroups.length === 0 ? (
                 <div className="py-8 text-center text-xs text-gray-500 italic">
-                  No hay trabajadores con pagos de eventos pendientes en este lote.
+                  {searchTerm.trim()
+                    ? `No se encontraron lotes de boletas que coincidan con "${searchTerm}".`
+                    : "No hay trabajadores con pagos de eventos pendientes en este lote."}
                 </div>
               ) : (
                 <div className="overflow-x-auto">
