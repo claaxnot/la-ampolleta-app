@@ -2,11 +2,13 @@
 // SUPABASE EDGE FUNCTION: send-email
 // =========================================================================
 // Despachador de correos transaccionales para La Ampolleta Producciones
-// Admite Resend API y modo fallback de desarrollo
+// Envío directo mediante servidor SMTP mail.laampolleta.tv y soporte Resend
 // =========================================================================
 
 // @ts-ignore
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+// @ts-ignore
+import nodemailer from "npm:nodemailer@6.9.13";
 
 declare const Deno: any;
 
@@ -33,8 +35,8 @@ serve(async (req: Request) => {
     const resendApiKey = Deno.env.get("RESEND_API_KEY");
     const senderEmail = Deno.env.get("SENDER_EMAIL") || "La Ampolleta Producciones <contacto@laampolleta.tv>";
 
+    // Opción 1: Resend si está configurado en las variables de entorno
     if (resendApiKey) {
-      // Envío vía Resend API oficial
       const res = await fetch("https://api.resend.com/emails", {
         method: "POST",
         headers: {
@@ -54,22 +56,49 @@ serve(async (req: Request) => {
         throw new Error(data?.message || "Error al enviar correo con Resend");
       }
 
-      return new Response(JSON.stringify({ success: true, data }), {
+      return new Response(JSON.stringify({ success: true, provider: "resend", data }), {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Modo simulación si aún no han configurado RESEND_API_KEY
-    console.log(`[SIMULACIÓN EMAIL] Para: ${to} | Asunto: ${subject}`);
+    // Opción 2: Servidor SMTP propio de La Ampolleta (mail.laampolleta.tv:465)
+    const smtpHost = Deno.env.get("SMTP_HOST") || "mail.laampolleta.tv";
+    const smtpPort = parseInt(Deno.env.get("SMTP_PORT") || "465", 10);
+    const smtpUser = Deno.env.get("SMTP_USER") || "contacto@laampolleta.tv";
+    const smtpPass = Deno.env.get("SMTP_PASS") || "YFdwW1ZHrtzx";
+
+    const transporter = nodemailer.createTransport({
+      host: smtpHost,
+      port: smtpPort,
+      secure: smtpPort === 465,
+      auth: {
+        user: smtpUser,
+        pass: smtpPass,
+      },
+      tls: {
+        rejectUnauthorized: false
+      }
+    });
+
+    const info = await transporter.sendMail({
+      from: senderEmail,
+      to,
+      subject,
+      html,
+    });
+
+    console.log(`[SMTP EMAIL ENVIADO] MessageId: ${info.messageId} | Para: ${to} | Asunto: ${subject}`);
+
     return new Response(
       JSON.stringify({
         success: true,
-        simulation: true,
-        message: "Correo simulado con éxito (configura RESEND_API_KEY en Supabase Secrets para envío real)",
+        provider: "smtp",
+        messageId: info.messageId,
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
+
   } catch (err: any) {
     console.error("Error in send-email:", err);
     return new Response(

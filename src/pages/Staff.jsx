@@ -33,7 +33,7 @@ import { toast } from "react-hot-toast";
 import { useSmartPolling } from "../hooks/useSmartPolling.js";
 import { getBankName } from "../utils/banks.js";
 import { formatChileanPhone, getCleanWhatsAppPhone } from "../utils/formatPhone.js";
-import { sendCuentaAprobadaEmail } from "../services/emailService.js";
+import { sendCuentaAprobadaEmail, sendCuentaRechazadaEmail } from "../services/emailService.js";
 
 const translateAuthError = (message) => {
   if (!message) return "Error desconocido";
@@ -205,17 +205,27 @@ export default function Staff() {
       return;
     }
 
-    if (!window.confirm(`¿Estás seguro de que deseas rechazar la postulación de ${applicant.name}? Esto eliminará su ficha permanentemente del sistema.`)) {
+    if (!window.confirm(`¿Estás seguro de que deseas rechazar la postulación de ${applicant.name}? Esto enviará un correo de notificación y eliminará su ficha del sistema.`)) {
       return;
     }
 
     setRejectingId(applicant.id);
-    const loadingToast = toast.loading(`Rechazando postulación...`);
+    const loadingToast = toast.loading(`Rechazando postulación y notificando...`);
 
     try {
+      // 1. Notificar por correo con la plantilla oficial
+      if (applicant.email) {
+        await sendCuentaRechazadaEmail({
+          name: applicant.name,
+          email: applicant.email
+        });
+      }
+
+      // 2. Eliminar perfil de la BD (esto activa trg_on_profile_delete y limpia auth.users)
       const { error } = await supabase.from('profiles').delete().eq('id', applicant.id);
       if (error) throw error;
-      toast.success(`Postulación de ${applicant.name} rechazada correctamente.`, { id: loadingToast });
+
+      toast.success(`Postulación de ${applicant.name} rechazada y notificada correctamente.`, { id: loadingToast });
       fetchStaff();
     } catch (err) {
       console.error("Error al rechazar:", err);

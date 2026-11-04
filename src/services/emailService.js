@@ -303,17 +303,123 @@ export const getCuentaAprobadaTemplate = ({
 };
 
 /**
+ * Plantilla HTML: Postulación Rechazada / No Seleccionada
+ */
+export const getCuentaRechazadaTemplate = ({ name }) => {
+  const currentYear = new Date().getFullYear();
+
+  return `
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Actualización de Postulación - La Ampolleta Producciones</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #0b0f19; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #f3f4f6;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #0b0f19; padding: 40px 15px;">
+    <tr>
+      <td align="center">
+        <!-- Main Card Container -->
+        <table role="presentation" width="100%" style="max-width: 580px; background-color: #111827; border: 1px solid rgba(156, 163, 175, 0.2); border-radius: 20px; overflow: hidden; box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);" cellspacing="0" cellpadding="0">
+          
+          <!-- Header with Logo -->
+          <tr>
+            <td align="center" style="background: linear-gradient(180deg, rgba(255, 255, 255, 0.05) 0%, rgba(17, 24, 39, 0) 100%); padding: 36px 30px 24px; border-bottom: 1px solid rgba(255, 255, 255, 0.06);">
+              <div style="width: 72px; height: 72px; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(245, 158, 11, 0.4); border-radius: 18px; margin: 0 auto 16px; padding: 12px; box-sizing: border-box;">
+                <img src="https://laampolleta.tv/logo.png" onerror="this.src='https://raw.githubusercontent.com/crisvidaldev/app-ampolleta/main/public/logo.png'" alt="La Ampolleta Logo" width="48" height="48" style="display: block; margin: 0 auto; object-fit: contain;" />
+              </div>
+              <h1 style="margin: 0; font-size: 22px; font-weight: 800; letter-spacing: 2px; color: #ffffff; text-transform: uppercase;">
+                LA AMPOLLETA
+              </h1>
+              <p style="margin: 4px 0 0; font-size: 11px; font-weight: 700; letter-spacing: 3px; color: #f59e0b; text-transform: uppercase;">
+                PRODUCCIONES & EVENTOS
+              </p>
+            </td>
+          </tr>
+
+          <!-- Body Content -->
+          <tr>
+            <td style="padding: 32px 30px;">
+              <!-- Status Badge -->
+              <div style="display: inline-block; padding: 6px 14px; background-color: rgba(156, 163, 175, 0.12); border: 1px solid rgba(156, 163, 175, 0.3); border-radius: 9999px; margin-bottom: 20px;">
+                <span style="font-size: 12px; font-weight: 700; color: #d1d5db; letter-spacing: 0.5px;">
+                  📋 Proceso de Convocatoria
+                </span>
+              </div>
+
+              <h2 style="margin: 0 0 16px; font-size: 22px; font-weight: 700; color: #ffffff; line-height: 1.3;">
+                Hola, ${name || "Postulante"}
+              </h2>
+
+              <p style="margin: 0 0 16px; font-size: 15px; line-height: 1.6; color: #d1d5db;">
+                Agradecemos sinceramente tu tiempo e interés en formar parte del equipo de <strong style="color: #ffffff;">Anfitrionas y Staff</strong> de <strong style="color: #f59e0b;">La Ampolleta Producciones</strong>.
+              </p>
+
+              <p style="margin: 0 0 20px; font-size: 15px; line-height: 1.6; color: #9ca3af;">
+                Queremos informarte que en esta ocasión hemos completado los cupos disponibles para el ciclo actual de eventos, por lo que tu postulación no ha podido ser seleccionada en esta etapa.
+              </p>
+
+              <!-- Future Consideration Box -->
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 14px; margin-bottom: 24px; overflow: hidden;">
+                <tr>
+                  <td style="padding: 18px 20px;">
+                    <p style="margin: 0 0 8px; font-size: 14px; font-weight: 700; color: #f3f4f6;">
+                      💼 Futuras Oportunidades
+                    </p>
+                    <p style="margin: 0; font-size: 13px; line-height: 1.6; color: #9ca3af;">
+                      Dado el gran volumen de producciones que desarrollamos a lo largo del año, mantendremos tus antecedentes para futuros proyectos y convocatorias acordes a tu perfil.
+                    </p>
+                  </td>
+                </tr>
+              </table>
+
+              <p style="margin: 0 0 24px; font-size: 14px; line-height: 1.6; color: #9ca3af;">
+                Te deseamos el mayor de los éxitos en tus próximos desafíos laborales y personales.
+              </p>
+
+              <div style="border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 18px;">
+                <p style="margin: 0; font-size: 13px; font-weight: 600; color: #ffffff;">
+                  Equipo de Producción & Casting
+                </p>
+                <p style="margin: 2px 0 0; font-size: 12px; color: #f59e0b;">
+                  La Ampolleta Producciones SpA
+                </p>
+              </div>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="background-color: #0b0f19; padding: 24px 30px; text-align: center; border-top: 1px solid rgba(255, 255, 255, 0.06);">
+              <p style="margin: 0 0 6px; font-size: 12px; font-weight: 700; color: #9ca3af; letter-spacing: 0.5px;">
+                La Ampolleta Producciones SpA
+              </p>
+              <p style="margin: 0; font-size: 11px; color: #6b7280;">
+                Santiago de Chile · contacto@laampolleta.tv · © ${currentYear} Todos los derechos reservados.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `.trim();
+};
+
+/**
  * Despacha notificación por correo de "Postulación Recibida"
  */
 export const sendPostulacionRecibidaEmail = async (applicantData) => {
-  const { email, name } = applicantData;
+  const { email } = applicantData;
   if (!email) return;
 
   const subject = "Hemos recibido tu postulación - La Ampolleta Producciones";
   const html = getPostulacionRecibidaTemplate(applicantData);
 
   try {
-    // 1. Invocar Edge Function si existe
     const { data, error } = await supabase.functions.invoke("send-email", {
       body: {
         to: email,
@@ -378,5 +484,34 @@ export const sendCuentaAprobadaEmail = async ({ name, email, userId }) => {
     }
   } catch (err) {
     console.info("ℹ️ [EMAIL SERVICE]: Supabase send-email function not ready yet, logged gracefully.");
+  }
+};
+
+/**
+ * Despacha notificación por correo de "Postulación Rechazada"
+ */
+export const sendCuentaRechazadaEmail = async ({ name, email }) => {
+  if (!email) return;
+
+  const subject = "Actualización sobre tu postulación - La Ampolleta Producciones";
+  const html = getCuentaRechazadaTemplate({ name });
+
+  try {
+    const { data, error } = await supabase.functions.invoke("send-email", {
+      body: {
+        to: email,
+        subject,
+        html,
+        type: "cuenta_rechazada"
+      }
+    });
+
+    if (error) {
+      console.info("ℹ️ [EMAIL SERVICE]: Edge Function send-email returned:", error.message || error);
+    } else {
+      console.log("✅ [EMAIL SERVICE]: Correo de rechazo despachado a", email, data);
+    }
+  } catch (err) {
+    console.info("ℹ️ [EMAIL SERVICE]: Error sending rejection email:", err);
   }
 };
