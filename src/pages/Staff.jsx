@@ -145,6 +145,17 @@ export default function Staff() {
 
   const closeModal = () => setIsModalOpen(false);
 
+  // COPIAR MENSAJE PREDETERMINADO DE BIENVENIDA PARA WHATSAPP
+  const handleCopyWhatsAppMessage = async (name) => {
+    const text = `¡Hola ${name || ""}! Te damos la bienvenida a La Ampolleta Producciones. Tu cuenta ha sido aprobada con éxito. Ya puedes ingresar a nuestra app en https://app.laampolleta.tv con tu correo y contraseña.`;
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success("Mensaje para WhatsApp copiado al portapapeles.", { icon: "📋" });
+    } catch (err) {
+      toast.error("No se pudo copiar el mensaje al portapapeles.");
+    }
+  };
+
   // APROBAR POSTULACIÓN DE ANFITRIONA / STAFF
   const handleApproveApplicant = async (applicant) => {
     if (!rolePermissions.canEdit) {
@@ -171,24 +182,16 @@ export default function Staff() {
         userId: applicant.id
       });
 
-      toast.success(`¡${applicant.name} ha sido aprobada con éxito!`, { id: loadingToast, duration: 4000 });
-      fetchStaff();
-
-      // 3. Ofrecer apertura de WhatsApp con mensaje de bienvenida pre-redactado
-      const rawPhone = applicant.phone || applicant.mensaje_beneficiario || "";
-      const cleanPhone = getCleanWhatsAppPhone(rawPhone);
-
-      if (cleanPhone) {
-        const welcomeText = encodeURIComponent(
-          `¡Hola ${applicant.name}! Te damos la bienvenida a La Ampolleta Producciones. Tu cuenta ha sido aprobada con éxito. Ya puedes ingresar a nuestra app: https://app.laampolleta.tv con tu correo y contraseña.`
-        );
-
-        setTimeout(() => {
-          if (window.confirm(`¿Deseas abrir WhatsApp para enviarle el mensaje de bienvenida a ${applicant.name}?`)) {
-            window.open(`https://wa.me/${cleanPhone}?text=${welcomeText}`, '_blank');
-          }
-        }, 300);
+      // 3. Copiar mensaje de bienvenida para WhatsApp al portapapeles directamente
+      const welcomeText = `¡Hola ${applicant.name}! Te damos la bienvenida a La Ampolleta Producciones. Tu cuenta ha sido aprobada con éxito. Ya puedes ingresar a nuestra app en https://app.laampolleta.tv con tu correo y contraseña.`;
+      try {
+        await navigator.clipboard.writeText(welcomeText);
+        toast.success(`¡${applicant.name} aprobada! Mensaje para WhatsApp copiado al portapapeles.`, { id: loadingToast, duration: 5000 });
+      } catch {
+        toast.success(`¡${applicant.name} ha sido aprobada con éxito!`, { id: loadingToast, duration: 4000 });
       }
+
+      fetchStaff();
 
     } catch (err) {
       console.error("Error al aprobar postulante:", err);
@@ -717,16 +720,15 @@ export default function Staff() {
                                 <span className="text-gray-500 block text-[10px] uppercase">WhatsApp / Celular</span>
                                 <div className="flex items-center gap-2">
                                   <span className="font-semibold text-white font-mono">{formattedPhone}</span>
-                                  {waLink && (
-                                    <a
-                                      href={waLink}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="inline-flex items-center gap-1 text-[11px] text-emerald-400 hover:text-emerald-300 bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20"
-                                      title="Abrir chat en WhatsApp"
+                                  {cleanPhone && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleCopyWhatsAppMessage(applicant.name)}
+                                      className="inline-flex items-center gap-1 text-[11px] text-emerald-400 hover:text-emerald-300 bg-emerald-500/10 hover:bg-emerald-500/20 px-2 py-0.5 rounded-md border border-emerald-500/20 transition-colors"
+                                      title="Copiar mensaje de bienvenida para WhatsApp"
                                     >
-                                      <Phone className="w-3 h-3" /> WhatsApp
-                                    </a>
+                                      <Copy className="w-3 h-3" /> Copiar mensaje
+                                    </button>
                                   )}
                                 </div>
                               </div>
@@ -748,8 +750,19 @@ export default function Staff() {
                           </div>
                         </div>
 
-                        {/* Botones de acción: Aprobar / Rechazar */}
+                        {/* Botones de acción: Copiar mensaje / Rechazar / Aprobar */}
                         <div className="mt-4 pt-3 border-t border-gray-700/60 flex items-center gap-2 justify-end">
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => handleCopyWhatsAppMessage(applicant.name)}
+                            className="border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10 text-xs py-1.5 px-3"
+                            title="Copiar mensaje de bienvenida para pegar en WhatsApp"
+                          >
+                            <Copy className="w-3.5 h-3.5 mr-1.5 text-emerald-400" />
+                            Copiar mensaje WSP
+                          </Button>
+
                           <Button
                             variant="secondary"
                             size="sm"
@@ -834,16 +847,17 @@ export default function Staff() {
                             <td className="px-4 py-2 text-gray-300 text-xs">
                               <div>{member.email || "-"}</div>
                               {cleanPhone && (
-                                <div className="text-[11px] text-gray-400 flex items-center gap-1 mt-0.5">
+                                <div className="text-[11px] text-gray-400 flex items-center gap-1.5 mt-0.5">
                                   <Phone className="w-3 h-3 text-emerald-400" />
-                                  <a 
-                                    href={`https://wa.me/${cleanPhone}`}
-                                    target="_blank" 
-                                    rel="noreferrer"
-                                    className="hover:text-emerald-300 font-mono"
+                                  <span className="font-mono text-gray-300">{formattedPhone}</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleCopyWhatsAppMessage(member.name)}
+                                    className="text-gray-400 hover:text-emerald-400 p-0.5 rounded transition-colors"
+                                    title="Copiar mensaje de bienvenida para WhatsApp"
                                   >
-                                    {formattedPhone}
-                                  </a>
+                                    <Copy className="w-3 h-3" />
+                                  </button>
                                 </div>
                               )}
                             </td>
