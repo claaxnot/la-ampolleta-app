@@ -138,6 +138,8 @@ function getPasswordResetHtml(resetUrl: string, name?: string) {
   `.trim();
 }
 
+
+
 // Plantilla HTML: Postulación Recibida
 function getPostulacionHtml(data: {
   name: string;
@@ -271,6 +273,146 @@ function getPostulacionHtml(data: {
             </td>
           </tr>
 
+          <tr>
+            <td style="background-color: #0b0f19; padding: 24px 30px; text-align: center; border-top: 1px solid rgba(255, 255, 255, 0.06);">
+              <p style="margin: 0 0 6px; font-size: 12px; font-weight: 700; color: #9ca3af; letter-spacing: 0.5px;">
+                La Ampolleta Producciones SpA
+              </p>
+              <p style="margin: 0; font-size: 11px; color: #6b7280;">
+                Santiago de Chile · contacto@laampolleta.tv · © ${currentYear} Todos los derechos reservados.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `.trim();
+}
+
+// Plantilla HTML: Cuenta Creada Manualmente por Producción (con credenciales)
+function getManualStaffWelcomeHtml(data: {
+  name: string;
+  email: string;
+  password?: string;
+  role?: string;
+  loginUrl?: string;
+}) {
+  const currentYear = new Date().getFullYear();
+  const loginUrl = data.loginUrl || "https://app.laampolleta.tv/login";
+
+  return `
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bienvenida al Equipo - La Ampolleta Producciones</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #0b0f19; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #f3f4f6;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #0b0f19; padding: 40px 15px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" style="max-width: 580px; background-color: #111827; border: 1px solid rgba(245, 158, 11, 0.4); border-radius: 20px; overflow: hidden; box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);" cellspacing="0" cellpadding="0">
+          
+          <!-- Header con Logo & Glow Ámbar -->
+          <tr>
+            <td align="center" style="background: linear-gradient(180deg, rgba(245, 158, 11, 0.15) 0%, rgba(17, 24, 39, 0) 100%); padding: 36px 30px 24px; border-bottom: 1px solid rgba(255, 255, 255, 0.06);">
+              <div style="width: 72px; height: 72px; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(245, 158, 11, 0.4); border-radius: 18px; margin: 0 auto 16px; padding: 12px; box-sizing: border-box;">
+                <img src="https://app.laampolleta.tv/logo.png" alt="La Ampolleta Logo" width="48" height="48" style="display: block; margin: 0 auto; object-fit: contain; border: 0;" />
+              </div>
+              <h1 style="margin: 0; font-size: 22px; font-weight: 800; letter-spacing: 2px; color: #ffffff; text-transform: uppercase;">
+                LA AMPOLLETA
+              </h1>
+              <p style="margin: 4px 0 0; font-size: 11px; font-weight: 700; letter-spacing: 3px; color: #f59e0b; text-transform: uppercase;">
+                PRODUCCIONES & EVENTOS
+              </p>
+            </td>
+          </tr>
+
+          <!-- Body -->
+          <tr>
+            <td style="padding: 32px 30px;">
+              <div style="display: inline-block; padding: 6px 14px; background-color: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.4); border-radius: 9999px; margin-bottom: 20px;">
+                <span style="font-size: 12px; font-weight: 700; color: #fbbf24; letter-spacing: 0.5px;">
+                  ✨ Cuenta de Staff Creada
+                </span>
+              </div>
+
+              <h2 style="margin: 0 0 14px; font-size: 24px; font-weight: 700; color: #ffffff; line-height: 1.3;">
+                ¡Hola, ${data.name}!
+              </h2>
+
+              <p style="margin: 0 0 20px; font-size: 15px; line-height: 1.6; color: #9ca3af;">
+                Te damos la bienvenida al equipo oficial de <strong style="color: #f59e0b;">La Ampolleta Producciones</strong>. La coordinación de producción ha creado tu cuenta activa en nuestra plataforma.
+              </p>
+
+              <!-- Tarjeta de Credenciales -->
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 14px; margin-bottom: 24px; overflow: hidden;">
+                <tr>
+                  <td style="padding: 16px 20px; border-bottom: 1px solid rgba(255, 255, 255, 0.06);">
+                    <span style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #f59e0b;">
+                      Tus Datos de Acceso
+                    </span>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding: 18px 20px;">
+                    <table role="presentation" width="100%" cellspacing="0" cellpadding="6">
+                      <tr>
+                        <td width="38%" style="font-size: 13px; color: #9ca3af;">Correo de acceso:</td>
+                        <td style="font-size: 13px; font-weight: 600; color: #ffffff;">${data.email}</td>
+                      </tr>
+                      ${data.password ? `
+                      <tr>
+                        <td style="font-size: 13px; color: #9ca3af;">Contraseña inicial:</td>
+                        <td style="font-size: 14px; font-weight: 700; color: #fbbf24; font-family: monospace;">${data.password}</td>
+                      </tr>` : ""}
+                      <tr>
+                        <td style="font-size: 13px; color: #9ca3af;">Cargo / Área:</td>
+                        <td style="font-size: 13px; font-weight: 600; color: #ffffff;">${data.role || "Staff"}</td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Botón CTA -->
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin: 28px 0;">
+                <tr>
+                  <td align="center">
+                    <a href="${loginUrl}" target="_blank" style="display: inline-block; background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: #000000; font-size: 15px; font-weight: 800; text-decoration: none; padding: 14px 34px; border-radius: 12px; box-shadow: 0 6px 20px rgba(245, 158, 11, 0.4); text-transform: uppercase; letter-spacing: 0.5px;">
+                      Ingresar a la Plataforma &rarr;
+                    </a>
+                  </td>
+                </tr>
+              </table>
+
+              <div style="padding: 14px 18px; background-color: rgba(245, 158, 11, 0.08); border-left: 3px solid #f59e0b; border-radius: 8px; font-size: 13px; line-height: 1.5; color: #d1d5db; margin-bottom: 20px;">
+                💡 <em>Por seguridad, tu contraseña inicial corresponde a los números de tu RUT (sin puntos ni guion). Te recomendamos iniciar sesión y cambiarla desde tu perfil si lo deseas.</em>
+              </div>
+
+              <!-- Funcionalidades -->
+              <h3 style="margin: 0 0 10px; font-size: 15px; font-weight: 700; color: #ffffff;">
+                ¿Qué puedes hacer desde tu panel de staff?
+              </h3>
+              <ul style="margin: 0 0 24px; padding-left: 20px; font-size: 14px; line-height: 1.6; color: #9ca3af;">
+                <li style="margin-bottom: 8px;">
+                  <strong style="color: #e5e7eb;">Eventos y Turnos:</strong> Revisa las fechas, horarios y ubicaciones donde se te convoque.
+                </li>
+                <li style="margin-bottom: 8px;">
+                  <strong style="color: #e5e7eb;">Asistencia GPS:</strong> Marca tu ingreso y salida en vivo desde tu celular en el lugar de cada evento.
+                </li>
+                <li>
+                  <strong style="color: #e5e7eb;">Finanzas y Pagos:</strong> Consulta el resumen de tus pagos acumulados y sube tus boletas de honorarios fácilmente.
+                </li>
+              </ul>
+            </td>
+          </tr>
+
+          <!-- Footer -->
           <tr>
             <td style="background-color: #0b0f19; padding: 24px 30px; text-align: center; border-top: 1px solid rgba(255, 255, 255, 0.06);">
               <p style="margin: 0 0 6px; font-size: 12px; font-weight: 700; color: #9ca3af; letter-spacing: 0.5px;">
@@ -508,7 +650,186 @@ serve(async (req: Request) => {
     }
 
     // =========================================================================
-    // FLUJO 3: DESPACHO GENÉRICO (to, subject, html)
+    // FLUJO 3: CREACIÓN MANUAL DE STAFF POR ADMINISTRADOR
+    // =========================================================================
+    if (action === "admin-create-staff" || type === "admin-create-staff") {
+      const email = body.email?.trim().toLowerCase();
+      const password = body.password;
+      const {
+        name,
+        rut,
+        phone,
+        role = "Staff",
+        system_role = "worker",
+        codigo_banco_destino,
+        cuenta_destino,
+        cuenta_origen,
+        monto_transferencia,
+        glosa_transferencia,
+      } = body;
+
+      if (!email || !password) {
+        return new Response(
+          JSON.stringify({ error: "Correo y contraseña son obligatorios." }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      console.log(`[ADMIN CREATE STAFF] Creando staff manual para: ${email} (${name}) con rol: ${role}`);
+
+      // 1. Crear usuario en Auth pre-confirmado y con status 'Activo'
+      const { data: userData, error: createError } = await supabaseAdmin.auth.admin.createUser({
+        email: email,
+        password: password,
+        email_confirm: true,
+        user_metadata: {
+          name: name,
+          rut: rut,
+          phone: phone,
+          role: role,
+          system_role: system_role,
+          status: "Activo",
+          codigo_banco_destino: codigo_banco_destino,
+          cuenta_destino: cuenta_destino,
+          cuenta_origen: cuenta_origen,
+          monto_transferencia: monto_transferencia,
+          glosa_transferencia: glosa_transferencia,
+        },
+      });
+
+      if (createError) {
+        console.error("[ADMIN CREATE STAFF ERROR]:", createError.message);
+        if (createError.message?.toLowerCase().includes("already registered") ||
+            createError.message?.toLowerCase().includes("already exists")) {
+          return new Response(
+            JSON.stringify({ error: "Este correo electrónico ya se encuentra registrado." }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+        return new Response(
+          JSON.stringify({ error: createError.message }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const userId = userData.user.id;
+
+      // 2. Asegurar registro en public.profiles con status: 'Activo'
+      try {
+        const profilePayload = {
+          id: userId,
+          email: email,
+          name: name,
+          rut: rut,
+          phone: phone,
+          role: role,
+          system_role: system_role,
+          status: "Activo",
+          codigo_banco_destino: codigo_banco_destino,
+          cuenta_destino: cuenta_destino,
+          cuenta_origen: cuenta_origen,
+          monto_transferencia: monto_transferencia,
+          glosa_transferencia: glosa_transferencia,
+          mensaje_beneficiario: phone,
+          email_confirmed: true,
+        };
+
+        const { error: upsertErr } = await supabaseAdmin
+          .from("profiles")
+          .upsert(profilePayload, { onConflict: "id" });
+
+        if (upsertErr) {
+          console.warn("[ADMIN STAFF UPSERT WARNING]:", upsertErr.message);
+        }
+      } catch (dbErr) {
+        console.warn("[ADMIN STAFF DB ERROR]:", dbErr);
+      }
+
+      // 3. Despachar correo oficial de bienvenida con credenciales desde no-reply
+      try {
+        const welcomeHtml = getManualStaffWelcomeHtml({
+          name: name,
+          email: email,
+          password: password,
+          role: role,
+          loginUrl: "https://app.laampolleta.tv/login",
+        });
+
+        const info = await transporter.sendMail({
+          from: SENDER_EMAIL,
+          to: email,
+          subject: "🎉 ¡Te damos la bienvenida al equipo! Tus datos de acceso - La Ampolleta Producciones",
+          html: welcomeHtml,
+        });
+
+        console.log(`[MANUAL STAFF WELCOME ENVIADO] MessageId: ${info.messageId} | Para: ${email}`);
+      } catch (mailErr: any) {
+        console.warn("[MANUAL STAFF MAIL ERROR]:", mailErr?.message || mailErr);
+      }
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          user: userData.user,
+          message: "Staff creado exitosamente y correo de bienvenida enviado.",
+        }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // =========================================================================
+    // FLUJO 4: REENVIAR ACCESO / ACTIVACIÓN POR PARTE DE UN ADMINISTRADOR
+    // =========================================================================
+    if (action === "resend-welcome" || type === "resend-welcome") {
+      const email = body.email?.trim().toLowerCase();
+      const name = body.name || "Miembro del Staff";
+      const role = body.role || "Staff";
+
+      if (!email) {
+        return new Response(
+          JSON.stringify({ error: "El correo es requerido." }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      console.log(`[RESEND WELCOME] Reenviando acceso para: ${email}`);
+
+      // Generar link criptográfico de recuperación oficial para acceso directo
+      const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
+        type: "recovery",
+        email: email,
+        options: {
+          redirectTo: "https://app.laampolleta.tv/reset-password",
+        },
+      });
+
+      if (linkError) {
+        throw linkError;
+      }
+
+      const resetUrl = linkData?.properties?.action_link;
+      const html = getPasswordResetHtml(resetUrl, name);
+      const subject = "🔐 Tus datos de acceso - La Ampolleta Producciones";
+
+      const info = await transporter.sendMail({
+        from: SENDER_EMAIL,
+        to: email,
+        subject: subject,
+        html: html,
+      });
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          message: "Correo de acceso reenviado exitosamente.",
+          messageId: info.messageId,
+        }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // =========================================================================
+    // FLUJO 5: DESPACHO GENÉRICO (to, subject, html)
     // Usado por Aprobación de Cuenta, Rechazo de Cuenta, etc.
     // =========================================================================
     const { to, subject, html } = body;

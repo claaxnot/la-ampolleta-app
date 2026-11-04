@@ -112,20 +112,25 @@ export default function Staff() {
 
   const rolePermissions = permissions[user?.systemRole] || permissions.viewer;
 
-  // Reenviar correo de confirmación auth
-  const handleResendEmail = async (email) => {
+  // Reenviar correo de datos de acceso auth
+  const handleResendEmail = async (email, name = "Miembro del Staff", role = "Staff") => {
     setResendingEmails(prev => ({ ...prev, [email]: true }));
-    const loadingToast = toast.loading("Reenviando correo de activación...");
+    const loadingToast = toast.loading("Reenviando datos de acceso...");
     try {
-      const { error } = await supabase.auth.resend({
-        type: 'signup',
-        email: email,
+      const { data: resData, error: resError } = await supabase.functions.invoke("send-email", {
+        body: {
+          action: "resend-welcome",
+          email: email.trim().toLowerCase(),
+          name,
+          role,
+        }
       });
-      if (error) throw error;
-      toast.success("Correo de activación reenviado correctamente.", { id: loadingToast });
+      if (resError) throw new Error(resError.message || "Error al reenviar acceso");
+      if (resData?.error) throw new Error(resData.error);
+      toast.success("Datos de acceso reenviados con éxito por correo.", { id: loadingToast });
     } catch (err) {
       console.error("Resend error:", err);
-      toast.error(translateAuthError(err.message || "Error al reenviar el correo de activación."), { id: loadingToast });
+      toast.error(err.message || "Error al reenviar el acceso.", { id: loadingToast });
     } finally {
       setResendingEmails(prev => ({ ...prev, [email]: false }));
     }
@@ -325,62 +330,36 @@ export default function Staff() {
         }
 
         const defaultPassword = normalizedRut.split('-')[0];
-        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-        const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-        const { createClient } = await import('@supabase/supabase-js');
-        const tempClient = createClient(supabaseUrl, supabaseAnonKey, {
-          auth: {
-            persistSession: false,
-            autoRefreshToken: false,
-            detectSessionInUrl: false,
-            storage: {
-              getItem: () => null,
-              setItem: () => {},
-              removeItem: () => {}
-            }
+        // Crear usuario mediante Edge Function blindada
+        // (Bypasea límites de correos/hora de Supabase y despacha credenciales de bienvenida desde no-reply)
+        const { data: createRes, error: createFuncError } = await supabase.functions.invoke("send-email", {
+          body: {
+            action: "admin-create-staff",
+            email: staffData.email.trim().toLowerCase(),
+            password: defaultPassword,
+            name: staffData.name,
+            rut: normalizedRut,
+            phone: staffData.phone || "",
+            role: staffData.role || "Staff",
+            system_role: staffData.system_role || "worker",
+            codigo_banco_destino: staffData.codigo_banco_destino,
+            cuenta_destino: staffData.cuenta_destino,
+            cuenta_origen: staffData.cuenta_origen,
+            monto_transferencia: staffData.monto_transferencia,
+            glosa_transferencia: staffData.glosa_transferencia,
           }
         });
 
-        const { data: authData, error: authError } = await tempClient.auth.signUp({
-          email: staffData.email,
-          password: defaultPassword,
-          options: {
-            data: {
-              name: staffData.name,
-              rut: normalizedRut,
-              role: staffData.role,
-              system_role: staffData.system_role,
-              status: 'Activo'
-            }
-          }
-        });
-
-        if (authError) {
-          throw new Error("Error en autenticación: " + authError.message);
+        if (createFuncError) {
+          throw new Error(createFuncError.message || "Error al crear staff.");
+        }
+        if (createRes?.error) {
+          throw new Error(createRes.error);
         }
 
-        await new Promise((resolve) => setTimeout(resolve, 1500));
-
-        const { error: profileError } = await supabase.from('profiles').update({
-          name: staffData.name,
-          rut: normalizedRut,
-          role: staffData.role,
-          system_role: staffData.system_role,
-          status: 'Activo',
-          phone: staffData.phone || "",
-          cuenta_origen: staffData.cuenta_origen,
-          cuenta_destino: staffData.cuenta_destino,
-          codigo_banco_destino: staffData.codigo_banco_destino,
-          monto_transferencia: staffData.monto_transferencia,
-          glosa_transferencia: staffData.glosa_transferencia,
-          mensaje_beneficiario: staffData.phone || staffData.mensaje_beneficiario
-        }).eq('email', staffData.email);
-
-        if (profileError) throw profileError;
-
         toast.success(
-          `Staff creado. Credenciales: Correo: ${staffData.email} | Contraseña: ${defaultPassword}`,
+          `Staff creado con éxito. Correo con credenciales enviado a ${staffData.email}. (Contraseña inicial: ${defaultPassword})`,
           { id: loadingToast, duration: 8000 }
         );
         fetchStaff();
@@ -887,7 +866,7 @@ export default function Staff() {
                                     </span>
                                   ) : (
                                     <button
-                                      onClick={() => handleResendEmail(member.email)}
+                                      onClick={() => handleResendEmail(member.email, member.name, member.role)}
                                       disabled={resendingEmails[member.email] || !rolePermissions.canEdit}
                                       className="flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/20 hover:bg-amber-500/20 disabled:opacity-50"
                                       title="Reenviar correo de activación"
