@@ -479,9 +479,9 @@ export default function Staff() {
         <GlassCard className="p-5 md:p-6 backdrop-blur-sm bg-white/5 border border-white/10">
           
           {/* HEADER PRINCIPAL */}
-          <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-6 gap-4">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
             <div>
-              <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+              <h2 className="text-xl sm:text-2xl font-bold text-white flex items-center gap-2">
                 <span>Equipo de Staff</span>
               </h2>
               <p className="text-gray-400 text-xs mt-0.5">
@@ -490,10 +490,10 @@ export default function Staff() {
             </div>
 
             {/* Acciones principales */}
-            <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+            <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 w-full sm:w-auto">
               <Button
                 variant="primary"
-                className={`flex items-center gap-2 justify-center text-xs py-2 px-3.5 ${!rolePermissions.canCreate ? 'opacity-50 cursor-not-allowed' : ''}`}
+                className={`flex items-center gap-2 justify-center text-xs py-2 px-3.5 w-full sm:w-auto ${!rolePermissions.canCreate ? 'opacity-50 cursor-not-allowed' : ''}`}
                 onClick={openAddModal}
                 title={!rolePermissions.canCreate ? "Disponible solo para administradores" : ""}
               >
@@ -501,7 +501,7 @@ export default function Staff() {
               </Button>
               <Button
                 variant="secondary"
-                className="flex items-center gap-2 justify-center border-amber-500/50 text-amber-500 hover:bg-amber-500/10 text-xs py-2 px-3.5"
+                className="flex items-center gap-2 justify-center border-amber-500/50 text-amber-500 hover:bg-amber-500/10 text-xs py-2 px-3.5 w-full sm:w-auto"
                 onClick={exportToExcel}
               >
                 <Download className="w-4 h-4" /> Exportar
@@ -509,19 +509,19 @@ export default function Staff() {
             </div>
           </div>
 
-          {/* PESTAÑAS DE ESTADO (Activos, Pendientes, Inactivos, Todos) */}
-          <div className="flex items-center gap-2 border-b border-gray-700/60 pb-3 mb-6 overflow-x-auto scrollbar-none">
+          {/* PESTAÑAS DE ESTADO: Responsive 2x2 en móvil, horizontal en desktop */}
+          <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 border-b border-gray-700/60 pb-3 mb-6">
             
             {/* Tab: Activos */}
             <button
               onClick={() => setStatusTab("Activo")}
-              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap ${
+              className={`px-3 py-2 sm:px-3.5 sm:py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center sm:justify-start gap-1.5 sm:gap-2 whitespace-nowrap ${
                 statusTab === "Activo"
                   ? "bg-amber-500 text-gray-950 shadow-lg shadow-amber-500/20"
                   : "bg-gray-800/50 text-gray-400 hover:text-white hover:bg-gray-800"
               }`}
             >
-              <UserCheck className="w-3.5 h-3.5" />
+              <UserCheck className="w-3.5 h-3.5 shrink-0" />
               <span>Activos</span>
               <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${statusTab === "Activo" ? "bg-black/20" : "bg-gray-700/60"}`}>
                 {activeCount}
@@ -531,14 +531,14 @@ export default function Staff() {
             {/* Tab: Pendientes de Aprobación */}
             <button
               onClick={() => setStatusTab("Pendiente")}
-              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap relative ${
+              className={`px-3 py-2 sm:px-3.5 sm:py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center sm:justify-start gap-1.5 sm:gap-2 whitespace-nowrap relative ${
                 statusTab === "Pendiente"
                   ? "bg-amber-500 text-gray-950 shadow-lg shadow-amber-500/20"
                   : "bg-gray-800/50 text-gray-400 hover:text-white hover:bg-gray-800"
               }`}
             >
-              <Clock className="w-3.5 h-3.5" />
-              <span>Pendientes de Aprobación</span>
+              <Clock className="w-3.5 h-3.5 shrink-0" />
+              <span>Pendientes<span className="hidden sm:inline"> de Aprobación</span></span>
               {pendingCount > 0 ? (
                 <span className={`px-2 py-0.5 rounded-full text-[11px] font-extrabold font-mono ${
                   statusTab === "Pendiente"
@@ -557,13 +557,13 @@ export default function Staff() {
             {/* Tab: Inactivos */}
             <button
               onClick={() => setStatusTab("Inactivo")}
-              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap ${
+              className={`px-3 py-2 sm:px-3.5 sm:py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center sm:justify-start gap-1.5 sm:gap-2 whitespace-nowrap ${
                 statusTab === "Inactivo"
                   ? "bg-amber-500 text-gray-950 shadow-lg shadow-amber-500/20"
                   : "bg-gray-800/50 text-gray-400 hover:text-white hover:bg-gray-800"
               }`}
             >
-              <Power className="w-3.5 h-3.5" />
+              <Power className="w-3.5 h-3.5 shrink-0" />
               <span>Inactivos</span>
               <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${statusTab === "Inactivo" ? "bg-black/20" : "bg-gray-700/60"}`}>
                 {inactiveCount}
@@ -573,13 +573,14 @@ export default function Staff() {
             {/* Tab: Todos */}
             <button
               onClick={() => setStatusTab("Todos")}
-              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap ${
+              className={`px-3 py-2 sm:px-3.5 sm:py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center sm:justify-start gap-1.5 sm:gap-2 whitespace-nowrap ${
                 statusTab === "Todos"
                   ? "bg-amber-500 text-gray-950 shadow-lg shadow-amber-500/20"
                   : "bg-gray-800/50 text-gray-400 hover:text-white hover:bg-gray-800"
               }`}
             >
-              <span>Todos (Activos + Inactivos)</span>
+              <User className="w-3.5 h-3.5 shrink-0" />
+              <span>Todos<span className="hidden sm:inline"> (Activos + Inactivos)</span></span>
               <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${statusTab === "Todos" ? "bg-black/20" : "bg-gray-700/60"}`}>
                 {totalCount}
               </span>
@@ -773,7 +774,7 @@ export default function Staff() {
             </div>
           ) : (
 
-            /* VISTA 2: TABLA REGULAR PARA ACTIVOS / INACTIVOS / TODOS */
+            /* VISTA 2: LISTADO DE ACTIVOS / INACTIVOS / TODOS */
             <div>
               {filteredStaff.length === 0 ? (
                 <div className="text-center py-12 text-gray-400">
@@ -781,145 +782,266 @@ export default function Staff() {
                   {staff.length === 0 ? "No hay personal registrado." : "Ningún miembro coincide con tu búsqueda."}
                 </div>
               ) : (
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-700">
-                    <thead className="bg-gray-800/30">
-                      <tr>
-                        <th className="px-4 py-2 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider">Nombre</th>
-                        <th className="px-4 py-2 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider">RUT</th>
-                        <th className="px-4 py-2 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider">Contacto</th>
-                        <th className="px-4 py-2 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider">Rol</th>
-                        <th className="px-4 py-2 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider">Estado</th>
-                        <th className="px-4 py-2 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider">Acciones</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-700/60">
-                      {filteredStaff.map((member) => {
-                        const isConfirmed = !!member.email_confirmed;
-                        const rawPhone = member.phone || member.mensaje_beneficiario || "";
-                        const formattedPhone = formatChileanPhone(rawPhone) || rawPhone || "-";
-                        const cleanPhone = getCleanWhatsAppPhone(rawPhone);
+                <>
+                  {/* VISTA MÓVIL (< md): TARJETAS INTUITIVAS SIN SCROLL LATERAL */}
+                  <div className="block md:hidden space-y-3">
+                    {filteredStaff.map((member) => {
+                      const rawPhone = member.phone || member.mensaje_beneficiario || "";
+                      const formattedPhone = formatChileanPhone(rawPhone) || rawPhone || "-";
+                      const cleanPhone = getCleanWhatsAppPhone(rawPhone);
 
-                        return (
-                          <tr key={member.id} className="hover:bg-gray-800/30 transition-colors">
-                            {/* Nombre y Foto */}
-                            <td className="px-4 py-2 flex items-center space-x-3 text-gray-100">
+                      return (
+                        <div
+                          key={member.id}
+                          className="bg-gray-800/40 border border-white/5 rounded-2xl p-4 hover:border-amber-500/30 transition-all shadow-md"
+                        >
+                          {/* Encabezado: Foto, Nombre, Rol y Estado */}
+                          <div className="flex items-start justify-between gap-3 mb-3">
+                            <div className="flex items-center gap-3 min-w-0">
                               <div
-                                className="w-10 h-10 rounded-full overflow-hidden border border-gray-600 cursor-pointer relative group shrink-0"
+                                className="w-11 h-11 rounded-full overflow-hidden border border-gray-600 cursor-pointer shrink-0"
                                 onClick={() => setSelectedPhoto(member.avatar_url || "https://ui-avatars.com/api/?name=" + member.name)}
                               >
-                                <img 
-                                  src={member.avatar_url || "https://ui-avatars.com/api/?name=" + member.name} 
-                                  alt={member.name} 
-                                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300" 
+                                <img
+                                  src={member.avatar_url || "https://ui-avatars.com/api/?name=" + member.name}
+                                  alt={member.name}
+                                  className="w-full h-full object-cover"
                                 />
-                                <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                                  <Search className="w-3.5 h-3.5 text-white" />
+                              </div>
+                              <div className="min-w-0">
+                                <h4 className="font-bold text-sm text-white truncate leading-tight">{member.name}</h4>
+                                <div className="flex items-center gap-2 mt-1">
+                                  <span className="text-[11px] font-semibold text-amber-400 capitalize">
+                                    {member.role || "Staff"}
+                                  </span>
+                                  <span className="text-gray-500 text-xs">•</span>
+                                  <span className="text-[11px] text-gray-400 font-mono">
+                                    {member.rut || "-"}
+                                  </span>
                                 </div>
                               </div>
-                              <span className="font-medium text-sm">{member.name}</span>
-                            </td>
+                            </div>
 
-                            {/* RUT */}
-                            <td className="px-4 py-2 text-gray-300 text-xs font-mono">{member.rut || "-"}</td>
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold border shrink-0 ${
+                              member.status === 'Inactivo'
+                                ? 'bg-gray-500/20 text-gray-400 border-gray-500/30'
+                                : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                            }`}>
+                              {member.status}
+                            </span>
+                          </div>
 
-                            {/* Contacto: Correo y WhatsApp */}
-                            <td className="px-4 py-2 text-gray-300 text-xs">
-                              <div>{member.email || "-"}</div>
-                              {cleanPhone && (
-                                <div className="text-[11px] text-gray-400 flex items-center gap-1.5 mt-0.5">
-                                  <Phone className="w-3 h-3 text-emerald-400" />
-                                  <span className="font-mono text-gray-300">{formattedPhone}</span>
+                          {/* Contacto: Email & WhatsApp */}
+                          <div className="bg-black/25 rounded-xl p-2.5 text-xs text-gray-300 space-y-1.5 mb-3 border border-white/5">
+                            <div className="flex items-center justify-between text-[11px]">
+                              <span className="text-gray-400">Correo:</span>
+                              <span className="font-mono text-gray-200 truncate max-w-[210px]">{member.email || "-"}</span>
+                            </div>
+                            {cleanPhone && (
+                              <div className="flex items-center justify-between pt-1 border-t border-white/5 text-[11px]">
+                                <span className="text-gray-400 flex items-center gap-1">
+                                  <Phone className="w-3 h-3 text-emerald-400" /> WhatsApp:
+                                </span>
+                                <div className="flex items-center gap-2">
+                                  <span className="font-mono text-emerald-400 font-semibold">{formattedPhone}</span>
                                   <button
                                     type="button"
                                     onClick={() => handleCopyWhatsAppMessage(member.name)}
-                                    className="text-gray-400 hover:text-emerald-400 p-0.5 rounded transition-colors"
-                                    title="Copiar mensaje de bienvenida para WhatsApp"
+                                    className="text-gray-400 hover:text-emerald-400 p-0.5 rounded"
+                                    title="Copiar mensaje de WhatsApp"
                                   >
                                     <Copy className="w-3 h-3" />
                                   </button>
                                 </div>
-                              )}
-                            </td>
-
-                            {/* Rol */}
-                            <td className="px-4 py-2 text-gray-100 capitalize text-xs">{member.role}</td>
-
-                            {/* Estado */}
-                            <td className="px-4 py-2">
-                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-medium border ${
-                                member.status === 'Inactivo' 
-                                  ? 'bg-gray-500/20 text-gray-400 border-gray-500/30' 
-                                  : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
-                              }`}>
-                                {member.status}
-                              </span>
-                            </td>
-
-                            {/* Acciones */}
-                            <td className="px-4 py-2">
-                              <div className="flex items-center space-x-2">
-                                <motion.div layout className="flex items-center">
-                                  {isConfirmed ? (
-                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                                      Cuenta activa
-                                    </span>
-                                  ) : (
-                                    <button
-                                      onClick={() => handleResendEmail(member.email, member.name, member.role)}
-                                      disabled={resendingEmails[member.email] || !rolePermissions.canEdit}
-                                      className="flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/20 hover:bg-amber-500/20 disabled:opacity-50"
-                                      title="Reenviar correo de activación"
-                                    >
-                                      {resendingEmails[member.email] ? (
-                                        <div className="w-3 h-3 border border-amber-400 border-t-transparent rounded-full animate-spin" />
-                                      ) : (
-                                        <Mail className="w-3 h-3" />
-                                      )}
-                                      <span>Reenviar</span>
-                                    </button>
-                                  )}
-                                </motion.div>
-
-                                <Button
-                                  variant="secondary"
-                                  size="sm"
-                                  onClick={() => openEditModal(member)}
-                                  className={`p-1.5 ${!rolePermissions.canEdit ? "opacity-50 cursor-not-allowed" : ""}`}
-                                  title={!rolePermissions.canEdit ? "Disponible solo para administradores" : "Editar"}
-                                >
-                                  <Settings className="w-3.5 h-3.5" />
-                                </Button>
-
-                                <button
-                                  onClick={() => handleToggleStatus(member.id, member.status)}
-                                  className={`p-1.5 rounded-lg transition-colors ${
-                                    member.status === 'Inactivo' 
-                                      ? 'text-emerald-500 hover:bg-emerald-500/10' 
-                                      : 'text-amber-500 hover:bg-amber-500/10'
-                                  } ${!rolePermissions.canEdit ? "opacity-50 cursor-not-allowed text-gray-500" : ""}`}
-                                  title={member.status === 'Inactivo' ? 'Activar Staff' : 'Desactivar Staff'}
-                                  disabled={!rolePermissions.canEdit}
-                                >
-                                  <Power className="w-3.5 h-3.5" />
-                                </button>
-
-                                <button
-                                  onClick={() => handleDelete(member.id)}
-                                  className={`p-1.5 rounded-lg transition-colors ${!rolePermissions.canDelete ? "opacity-50 cursor-not-allowed text-gray-500" : "text-red-500 hover:text-red-400 hover:bg-red-500/10"}`}
-                                  title="Eliminar permanentemente"
-                                  disabled={!rolePermissions.canDelete}
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
                               </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
+                            )}
+                          </div>
+
+                          {/* Acciones móviles */}
+                          <div className="flex items-center justify-end gap-1.5 pt-2 border-t border-white/5">
+                            <button
+                              onClick={() => handleResendEmail(member.email, member.name, member.role)}
+                              disabled={resendingEmails[member.email] || !rolePermissions.canEdit}
+                              className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-lg text-amber-400 hover:bg-amber-500/10 border border-amber-500/20"
+                              title="Reenviar enlace de acceso por correo"
+                            >
+                              {resendingEmails[member.email] ? (
+                                <div className="w-3.5 h-3.5 border border-amber-400 border-t-transparent rounded-full animate-spin" />
+                              ) : (
+                                <Mail className="w-3.5 h-3.5" />
+                              )}
+                              <span>Reenviar</span>
+                            </button>
+
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={() => openEditModal(member)}
+                              disabled={!rolePermissions.canEdit}
+                              className="p-1.5"
+                              title="Editar"
+                            >
+                              <Settings className="w-3.5 h-3.5" />
+                            </Button>
+
+                            <button
+                              onClick={() => handleToggleStatus(member.id, member.status)}
+                              disabled={!rolePermissions.canEdit}
+                              className={`p-1.5 rounded-lg transition-colors ${
+                                member.status === 'Inactivo' ? 'text-emerald-400 hover:bg-emerald-500/10' : 'text-amber-400 hover:bg-amber-500/10'
+                              }`}
+                              title={member.status === 'Inactivo' ? 'Activar Staff' : 'Desactivar Staff'}
+                            >
+                              <Power className="w-3.5 h-3.5" />
+                            </button>
+
+                            <button
+                              onClick={() => handleDelete(member.id)}
+                              disabled={!rolePermissions.canDelete}
+                              className="p-1.5 rounded-lg text-red-400 hover:bg-red-500/10"
+                              title="Eliminar permanentemente"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* VISTA ESCRITORIO (>= md): TABLA COMPACTA LIMPIA */}
+                  <div className="hidden md:block overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-700">
+                      <thead className="bg-gray-800/30">
+                        <tr>
+                          <th className="px-4 py-2 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider">Nombre</th>
+                          <th className="px-4 py-2 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider">RUT</th>
+                          <th className="px-4 py-2 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider">Contacto</th>
+                          <th className="px-4 py-2 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider">Rol</th>
+                          <th className="px-4 py-2 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider">Estado</th>
+                          <th className="px-4 py-2 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider">Acciones</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-700/60">
+                        {filteredStaff.map((member) => {
+                          const rawPhone = member.phone || member.mensaje_beneficiario || "";
+                          const formattedPhone = formatChileanPhone(rawPhone) || rawPhone || "-";
+                          const cleanPhone = getCleanWhatsAppPhone(rawPhone);
+
+                          return (
+                            <tr key={member.id} className="hover:bg-gray-800/30 transition-colors">
+                              {/* Nombre y Foto */}
+                              <td className="px-4 py-2 flex items-center space-x-3 text-gray-100">
+                                <div
+                                  className="w-10 h-10 rounded-full overflow-hidden border border-gray-600 cursor-pointer relative group shrink-0"
+                                  onClick={() => setSelectedPhoto(member.avatar_url || "https://ui-avatars.com/api/?name=" + member.name)}
+                                >
+                                  <img 
+                                    src={member.avatar_url || "https://ui-avatars.com/api/?name=" + member.name} 
+                                    alt={member.name} 
+                                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300" 
+                                  />
+                                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <Search className="w-3.5 h-3.5 text-white" />
+                                  </div>
+                                </div>
+                                <span className="font-medium text-sm">{member.name}</span>
+                              </td>
+
+                              {/* RUT */}
+                              <td className="px-4 py-2 text-gray-300 text-xs font-mono">{member.rut || "-"}</td>
+
+                              {/* Contacto: Correo y WhatsApp */}
+                              <td className="px-4 py-2 text-gray-300 text-xs">
+                                <div>{member.email || "-"}</div>
+                                {cleanPhone && (
+                                  <div className="text-[11px] text-gray-400 flex items-center gap-1.5 mt-0.5">
+                                    <Phone className="w-3 h-3 text-emerald-400" />
+                                    <span className="font-mono text-gray-300">{formattedPhone}</span>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleCopyWhatsAppMessage(member.name)}
+                                      className="text-gray-400 hover:text-emerald-400 p-0.5 rounded transition-colors"
+                                      title="Copiar mensaje de bienvenida para WhatsApp"
+                                    >
+                                      <Copy className="w-3 h-3" />
+                                    </button>
+                                  </div>
+                                )}
+                              </td>
+
+                              {/* Rol */}
+                              <td className="px-4 py-2 text-gray-100 capitalize text-xs">{member.role}</td>
+
+                              {/* Estado */}
+                              <td className="px-4 py-2">
+                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-medium border ${
+                                  member.status === 'Inactivo' 
+                                    ? 'bg-gray-500/20 text-gray-400 border-gray-500/30' 
+                                    : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                                }`}>
+                                  {member.status}
+                                </span>
+                              </td>
+
+                              {/* Acciones */}
+                              <td className="px-4 py-2">
+                                <div className="flex items-center space-x-1.5">
+                                  <button
+                                    onClick={() => handleResendEmail(member.email, member.name, member.role)}
+                                    disabled={resendingEmails[member.email] || !rolePermissions.canEdit}
+                                    className={`p-1.5 rounded-lg transition-colors text-amber-400 hover:bg-amber-500/10 ${
+                                      !rolePermissions.canEdit ? "opacity-50 cursor-not-allowed" : ""
+                                    }`}
+                                    title="Reenviar enlace de acceso por correo"
+                                  >
+                                    {resendingEmails[member.email] ? (
+                                      <div className="w-3.5 h-3.5 border border-amber-400 border-t-transparent rounded-full animate-spin" />
+                                    ) : (
+                                      <Mail className="w-3.5 h-3.5" />
+                                    )}
+                                  </button>
+
+                                  <Button
+                                    variant="secondary"
+                                    size="sm"
+                                    onClick={() => openEditModal(member)}
+                                    className={`p-1.5 ${!rolePermissions.canEdit ? "opacity-50 cursor-not-allowed" : ""}`}
+                                    title={!rolePermissions.canEdit ? "Disponible solo para administradores" : "Editar"}
+                                  >
+                                    <Settings className="w-3.5 h-3.5" />
+                                  </Button>
+
+                                  <button
+                                    onClick={() => handleToggleStatus(member.id, member.status)}
+                                    className={`p-1.5 rounded-lg transition-colors ${
+                                      member.status === 'Inactivo' 
+                                        ? 'text-emerald-500 hover:bg-emerald-500/10' 
+                                        : 'text-amber-500 hover:bg-amber-500/10'
+                                    } ${!rolePermissions.canEdit ? "opacity-50 cursor-not-allowed text-gray-500" : ""}`}
+                                    title={member.status === 'Inactivo' ? 'Activar Staff' : 'Desactivar Staff'}
+                                    disabled={!rolePermissions.canEdit}
+                                  >
+                                    <Power className="w-3.5 h-3.5" />
+                                  </button>
+
+                                  <button
+                                    onClick={() => handleDelete(member.id)}
+                                    className={`p-1.5 rounded-lg transition-colors ${!rolePermissions.canDelete ? "opacity-50 cursor-not-allowed text-gray-500" : "text-red-500 hover:text-red-400 hover:bg-red-500/10"}`}
+                                    title="Eliminar permanentemente"
+                                    disabled={!rolePermissions.canDelete}
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
               )}
             </div>
           )}
