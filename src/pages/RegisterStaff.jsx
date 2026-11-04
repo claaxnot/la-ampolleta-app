@@ -40,6 +40,7 @@ export default function RegisterStaff() {
     rut: "",
     email: "",
     phone: "",
+    role: "Anfitriona", // "Anfitriona", "Montajista", "Staff"
     codigo_banco_destino: "12", // Banco Estado por defecto (CuentaRUT muy común)
     tipo_cuenta: "Cuenta Vista / CuentaRUT",
     cuenta_destino: "",
@@ -217,6 +218,7 @@ export default function RegisterStaff() {
           name: cleanName,
           rut: normalizedRut,
           phone: formData.phone.trim(),
+          role: formData.role || "Staff",
           codigo_banco_destino: formData.codigo_banco_destino,
           cuenta_destino: formData.cuenta_destino.trim(),
           tipo_cuenta: formData.tipo_cuenta,
@@ -242,6 +244,7 @@ export default function RegisterStaff() {
         email: normalizedEmail,
         rut: normalizedRut,
         phone: formData.phone.trim(),
+        role: formData.role || "Staff",
         bankName,
         accountNumber: formData.cuenta_destino.trim()
       });
@@ -282,12 +285,12 @@ export default function RegisterStaff() {
           <div className="flex items-center justify-center gap-2 mb-1">
             <Sparkles className="w-4 h-4 text-amber-400" />
             <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight text-white">
-              Postulación Anfitrionas & Staff
+              Postulación Staff & Producción
             </h1>
             <Sparkles className="w-4 h-4 text-amber-400" />
           </div>
           <p className="text-gray-400 text-sm max-w-md mx-auto">
-            Únete al equipo oficial de <span className="text-amber-400 font-medium">La Ampolleta Producciones</span> para participar en nuestros eventos y activaciones.
+            Únete al equipo oficial de <span className="text-amber-400 font-medium">La Ampolleta Producciones</span> para participar en nuestros eventos y producciones.
           </p>
         </div>
 
@@ -314,11 +317,15 @@ export default function RegisterStaff() {
                   ¡Gracias por postular, {submittedData?.name}!
                 </h2>
                 <p className="text-gray-300 text-sm leading-relaxed mb-6">
-                  Tus datos han sido registrados en nuestro sistema de manera exitosa. Nuestro equipo de coordinación revisará tu ficha y te contactará.
+                  Tus datos han sido registrados en nuestro sistema de manera exitosa. Nuestro equipo de producción revisará tu ficha y te contactará.
                 </p>
 
                 {/* Info Card */}
                 <div className="bg-gray-800/40 border border-gray-700/50 rounded-2xl p-5 text-left mb-6 space-y-2 text-xs text-gray-300">
+                  <div className="flex justify-between border-b border-gray-700/40 pb-2">
+                    <span className="text-gray-400">Cargo / Área:</span>
+                    <span className="font-semibold text-amber-400">{submittedData?.role || "Staff"}</span>
+                  </div>
                   <div className="flex justify-between border-b border-gray-700/40 pb-2">
                     <span className="text-gray-400">RUT:</span>
                     <span className="font-semibold text-white">{submittedData?.rut}</span>
@@ -427,6 +434,38 @@ export default function RegisterStaff() {
                       <h3 className="text-xs font-bold text-gray-300 uppercase tracking-wider">
                         1. Datos Personales
                       </h3>
+                    </div>
+
+                    {/* Cargo / Área de Postulación */}
+                    <div>
+                      <label className="block text-xs font-medium text-gray-300 mb-2 ml-1">
+                        Área o Cargo a Postular <span className="text-amber-400">*</span>
+                      </label>
+                      <div className="grid grid-cols-3 gap-2.5">
+                        {[
+                          { id: "Anfitriona", label: "Anfitriona", icon: "✨", desc: "Protocolo & Eventos" },
+                          { id: "Montajista", label: "Montajista", icon: "🛠️", desc: "Técnica & Montaje" },
+                          { id: "Staff", label: "Staff", icon: "📋", desc: "Producción General" }
+                        ].map((r) => {
+                          const isSelected = formData.role === r.id;
+                          return (
+                            <button
+                              key={r.id}
+                              type="button"
+                              onClick={() => setFormData(prev => ({ ...prev, role: r.id }))}
+                              className={`flex flex-col items-center justify-center p-3 rounded-xl border text-center transition-all duration-200 cursor-pointer ${
+                                isSelected
+                                  ? "bg-amber-500/20 border-amber-500 text-amber-300 shadow-[0_0_15px_rgba(245,158,11,0.25)] ring-1 ring-amber-500"
+                                  : "bg-gray-800/50 border-gray-700/70 text-gray-400 hover:border-gray-500 hover:text-gray-200 hover:bg-gray-800"
+                              }`}
+                            >
+                              <span className="text-xl mb-1 select-none">{r.icon}</span>
+                              <span className="text-xs font-bold leading-tight">{r.label}</span>
+                              <span className="text-[10px] text-gray-400 hidden sm:inline mt-0.5">{r.desc}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
 
                     {/* Nombre Completo */}

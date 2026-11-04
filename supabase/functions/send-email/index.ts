@@ -67,7 +67,7 @@ function getPasswordResetHtml(resetUrl: string, name?: string) {
           <tr>
             <td align="center" style="background: linear-gradient(180deg, rgba(245, 158, 11, 0.15) 0%, rgba(17, 24, 39, 0) 100%); padding: 36px 30px 24px; border-bottom: 1px solid rgba(255, 255, 255, 0.06);">
               <div style="width: 72px; height: 72px; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(245, 158, 11, 0.4); border-radius: 18px; margin: 0 auto 16px; padding: 12px; box-sizing: border-box;">
-                <img src="https://laampolleta.tv/logo.png" onerror="this.src='https://raw.githubusercontent.com/crisvidaldev/app-ampolleta/main/public/logo.png'" alt="La Ampolleta Logo" width="48" height="48" style="display: block; margin: 0 auto; object-fit: contain;" />
+                <img src="https://app.laampolleta.tv/logo.png" alt="La Ampolleta Logo" width="48" height="48" style="display: block; margin: 0 auto; object-fit: contain; border: 0;" />
               </div>
               <h1 style="margin: 0; font-size: 22px; font-weight: 800; letter-spacing: 2px; color: #ffffff; text-transform: uppercase;">
                 LA AMPOLLETA
@@ -144,6 +144,7 @@ function getPostulacionHtml(data: {
   email: string;
   rut?: string;
   phone?: string;
+  role?: string;
   bankName?: string;
   accountType?: string;
   accountNumber?: string;
@@ -172,7 +173,7 @@ function getPostulacionHtml(data: {
           <tr>
             <td align="center" style="background: linear-gradient(180deg, rgba(245, 158, 11, 0.15) 0%, rgba(17, 24, 39, 0) 100%); padding: 36px 30px 24px; border-bottom: 1px solid rgba(255, 255, 255, 0.06);">
               <div style="width: 72px; height: 72px; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(245, 158, 11, 0.4); border-radius: 18px; margin: 0 auto 16px; padding: 12px; box-sizing: border-box;">
-                <img src="https://laampolleta.tv/logo.png" onerror="this.src='https://raw.githubusercontent.com/crisvidaldev/app-ampolleta/main/public/logo.png'" alt="La Ampolleta Logo" width="48" height="48" style="display: block; margin: 0 auto; object-fit: contain;" />
+                <img src="https://app.laampolleta.tv/logo.png" alt="La Ampolleta Logo" width="48" height="48" style="display: block; margin: 0 auto; object-fit: contain; border: 0;" />
               </div>
               <h1 style="margin: 0; font-size: 22px; font-weight: 800; letter-spacing: 2px; color: #ffffff; text-transform: uppercase;">
                 LA AMPOLLETA
@@ -196,7 +197,7 @@ function getPostulacionHtml(data: {
               </h2>
 
               <p style="margin: 0 0 20px; font-size: 15px; line-height: 1.6; color: #9ca3af;">
-                Hemos recibido tu registro con éxito para formar parte de nuestro equipo de <strong style="color: #ffffff;">Anfitrionas & Staff</strong> en <strong style="color: #f59e0b;">La Ampolleta Producciones</strong>.
+                Hemos recibido tu registro con éxito para formar parte de nuestro equipo en <strong style="color: #f59e0b;">La Ampolleta Producciones</strong>${data.role ? ` como <strong style="color: #ffffff;">${data.role}</strong>` : ""}.
               </p>
 
               <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 14px; margin-bottom: 24px; overflow: hidden;">
@@ -213,6 +214,10 @@ function getPostulacionHtml(data: {
                       <tr>
                         <td width="38%" style="font-size: 13px; color: #9ca3af;">Nombre:</td>
                         <td style="font-size: 13px; font-weight: 600; color: #ffffff;">${data.name}</td>
+                      </tr>
+                      <tr>
+                        <td style="font-size: 13px; color: #9ca3af;">Cargo / Área:</td>
+                        <td style="font-size: 13px; font-weight: 600; color: #f59e0b;">${data.role || "Staff"}</td>
                       </tr>
                       <tr>
                         <td style="font-size: 13px; color: #9ca3af;">RUT:</td>
@@ -256,7 +261,7 @@ function getPostulacionHtml(data: {
                   <strong style="color: #e5e7eb;">Aprobación y Notificación:</strong> Te enviaremos un correo electrónico y/o WhatsApp en cuanto tu cuenta sea habilitada.
                 </li>
                 <li>
-                  <strong style="color: #e5e7eb;">Acceso a Convocatorias:</strong> Una vez aprobada, podrás ingresar con tu correo y contraseña para ver eventos, marcar asistencia con GPS y gestionar tus pagos.
+                  <strong style="color: #e5e7eb;">Acceso a Convocatorias:</strong> Una vez aprobada tu cuenta, podrás ingresar con tu correo y contraseña para ver eventos, marcar asistencia con GPS y gestionar tus pagos.
                 </li>
               </ol>
 
@@ -385,6 +390,7 @@ serve(async (req: Request) => {
         name,
         rut,
         phone,
+        role = "Staff",
         codigo_banco_destino,
         cuenta_destino,
         tipo_cuenta,
@@ -399,7 +405,7 @@ serve(async (req: Request) => {
         );
       }
 
-      console.log(`[STAFF REGISTER] Creando cuenta de staff para: ${email} (${name})`);
+      console.log(`[STAFF REGISTER] Creando cuenta de staff para: ${email} (${name}) con rol: ${role}`);
 
       // 1. Crear usuario en Auth pre-confirmado (email_confirm: true)
       // Esto evita que Supabase intente mandar un correo y se caiga por el rate limit
@@ -411,7 +417,7 @@ serve(async (req: Request) => {
           name: name,
           rut: rut,
           phone: phone,
-          role: "Anfitriona",
+          role: role,
           system_role: "worker",
           status: "Pendiente",
           codigo_banco_destino: codigo_banco_destino,
@@ -445,7 +451,7 @@ serve(async (req: Request) => {
           name: name,
           rut: rut,
           phone: phone,
-          role: "Anfitriona",
+          role: role,
           system_role: "worker",
           status: "Pendiente",
           codigo_banco_destino: codigo_banco_destino,
@@ -473,6 +479,7 @@ serve(async (req: Request) => {
           email: email,
           rut: rut,
           phone: phone,
+          role: role,
           bankName: bankName,
           accountType: tipo_cuenta,
           accountNumber: cuenta_destino,

@@ -10,6 +10,7 @@ export const getPostulacionRecibidaTemplate = ({
   email,
   rut,
   phone,
+  role,
   bankName,
   accountType,
   accountNumber
@@ -40,7 +41,7 @@ export const getPostulacionRecibidaTemplate = ({
           <tr>
             <td align="center" style="background: linear-gradient(180deg, rgba(245, 158, 11, 0.15) 0%, rgba(17, 24, 39, 0) 100%); padding: 36px 30px 24px; border-bottom: 1px solid rgba(255, 255, 255, 0.06);">
               <div style="width: 72px; height: 72px; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(245, 158, 11, 0.4); border-radius: 18px; margin: 0 auto 16px; padding: 12px; box-sizing: border-box;">
-                <img src="https://laampolleta.tv/logo.png" onerror="this.src='https://raw.githubusercontent.com/crisvidaldev/app-ampolleta/main/public/logo.png'" alt="La Ampolleta Logo" width="48" height="48" style="display: block; margin: 0 auto; object-fit: contain;" />
+                <img src="https://app.laampolleta.tv/logo.png" alt="La Ampolleta Logo" width="48" height="48" style="display: block; margin: 0 auto; object-fit: contain; border: 0;" />
               </div>
               <h1 style="margin: 0; font-size: 22px; font-weight: 800; letter-spacing: 2px; color: #ffffff; text-transform: uppercase;">
                 LA AMPOLLETA
@@ -66,7 +67,7 @@ export const getPostulacionRecibidaTemplate = ({
               </h2>
 
               <p style="margin: 0 0 20px; font-size: 15px; line-height: 1.6; color: #9ca3af;">
-                Hemos recibido tu registro con éxito para formar parte de nuestro equipo de <strong style="color: #ffffff;">Anfitrionas & Staff</strong> en <strong style="color: #f59e0b;">La Ampolleta Producciones</strong>.
+                Hemos recibido tu registro con éxito para formar parte de nuestro equipo en <strong style="color: #f59e0b;">La Ampolleta Producciones</strong>${role ? ` para el cargo de <strong style="color: #ffffff;">${role}</strong>` : ""}.
               </p>
 
               <!-- Applicant Summary Box -->
@@ -84,6 +85,10 @@ export const getPostulacionRecibidaTemplate = ({
                       <tr>
                         <td width="38%" style="font-size: 13px; color: #9ca3af;">Nombre:</td>
                         <td style="font-size: 13px; font-weight: 600; color: #ffffff;">${name}</td>
+                      </tr>
+                      <tr>
+                        <td style="font-size: 13px; color: #9ca3af;">Cargo / Área:</td>
+                        <td style="font-size: 13px; font-weight: 600; color: #f59e0b;">${role || "Staff"}</td>
                       </tr>
                       <tr>
                         <td style="font-size: 13px; color: #9ca3af;">RUT:</td>
@@ -130,7 +135,7 @@ export const getPostulacionRecibidaTemplate = ({
                   <strong style="color: #e5e7eb;">Aprobación y Activación:</strong> Te enviaremos un correo electrónico y/o WhatsApp en cuanto tu cuenta sea habilitada.
                 </li>
                 <li>
-                  <strong style="color: #e5e7eb;">Acceso a Convocatorias:</strong> Una vez aprobada, podrás ingresar con tu correo y contraseña a la plataforma para ver eventos, marcar turnos con GPS y gestionar tus pagos.
+                  <strong style="color: #e5e7eb;">Acceso a Convocatorias:</strong> Una vez aprobada tu cuenta, podrás ingresar con tu correo y contraseña a la plataforma para ver eventos, marcar turnos con GPS y gestionar tus pagos.
                 </li>
               </ol>
 
@@ -167,6 +172,7 @@ export const getPostulacionRecibidaTemplate = ({
 export const getCuentaAprobadaTemplate = ({
   name,
   email,
+  role = "Staff",
   loginUrl = "https://app.laampolleta.tv"
 }) => {
   const currentYear = new Date().getFullYear();
@@ -190,7 +196,7 @@ export const getCuentaAprobadaTemplate = ({
           <tr>
             <td align="center" style="background: linear-gradient(180deg, rgba(16, 185, 129, 0.15) 0%, rgba(17, 24, 39, 0) 100%); padding: 36px 30px 24px; border-bottom: 1px solid rgba(255, 255, 255, 0.06);">
               <div style="width: 72px; height: 72px; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(16, 185, 129, 0.5); border-radius: 18px; margin: 0 auto 16px; padding: 12px; box-sizing: border-box;">
-                <img src="https://laampolleta.tv/logo.png" onerror="this.src='https://raw.githubusercontent.com/crisvidaldev/app-ampolleta/main/public/logo.png'" alt="La Ampolleta Logo" width="48" height="48" style="display: block; margin: 0 auto; object-fit: contain;" />
+                <img src="https://app.laampolleta.tv/logo.png" alt="La Ampolleta Logo" width="48" height="48" style="display: block; margin: 0 auto; object-fit: contain; border: 0;" />
               </div>
               <h1 style="margin: 0; font-size: 22px; font-weight: 800; letter-spacing: 2px; color: #ffffff; text-transform: uppercase;">
                 LA AMPOLLETA
@@ -212,11 +218,11 @@ export const getCuentaAprobadaTemplate = ({
               </div>
 
               <h2 style="margin: 0 0 14px; font-size: 24px; font-weight: 700; color: #ffffff; line-height: 1.3;">
-                ¡Felicidades y bienvenida, ${name || "Anfitriona"}!
+                ¡Felicidades, ${name || "Staff"}!
               </h2>
 
               <p style="margin: 0 0 20px; font-size: 15px; line-height: 1.6; color: #9ca3af;">
-                Tu perfil ha sido revisado y <strong style="color: #34d399;">aprobado</strong> por el equipo de producción. A partir de este momento, eres parte oficial de nuestro staff activo.
+                Te damos la bienvenida al equipo oficial de <strong style="color: #f59e0b;">La Ampolleta Producciones</strong>. Tu postulación ha sido revisada y <strong style="color: #34d399;">aprobada</strong> por el equipo de producción.
               </p>
 
               <!-- Access Information Card -->
@@ -240,8 +246,8 @@ export const getCuentaAprobadaTemplate = ({
                         <td style="font-size: 13px; font-weight: 600; color: #ffffff;">La que definiste en tu registro</td>
                       </tr>
                       <tr>
-                        <td style="font-size: 13px; color: #9ca3af;">Rol asignado:</td>
-                        <td style="font-size: 13px; font-weight: 600; color: #f59e0b;">Anfitriona / Staff</td>
+                        <td style="font-size: 13px; color: #9ca3af;">Cargo / Área:</td>
+                        <td style="font-size: 13px; font-weight: 600; color: #f59e0b;">${role || "Staff"}</td>
                       </tr>
                     </table>
                   </td>
@@ -265,7 +271,7 @@ export const getCuentaAprobadaTemplate = ({
               </h3>
               <ul style="margin: 0 0 24px; padding-left: 20px; font-size: 14px; line-height: 1.6; color: #9ca3af;">
                 <li style="margin-bottom: 8px;">
-                  <strong style="color: #e5e7eb;">Eventos y Turnos:</strong> Revisa las fechas, horarios y ubicaciones donde estés asignada.
+                  <strong style="color: #e5e7eb;">Eventos y Turnos:</strong> Revisa las fechas, horarios y ubicaciones donde tengas asignaciones.
                 </li>
                 <li style="margin-bottom: 8px;">
                   <strong style="color: #e5e7eb;">Asistencia GPS:</strong> Marca tu ingreso y salida en vivo desde tu celular en el lugar del evento.
@@ -327,7 +333,7 @@ export const getCuentaRechazadaTemplate = ({ name }) => {
           <tr>
             <td align="center" style="background: linear-gradient(180deg, rgba(255, 255, 255, 0.05) 0%, rgba(17, 24, 39, 0) 100%); padding: 36px 30px 24px; border-bottom: 1px solid rgba(255, 255, 255, 0.06);">
               <div style="width: 72px; height: 72px; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(245, 158, 11, 0.4); border-radius: 18px; margin: 0 auto 16px; padding: 12px; box-sizing: border-box;">
-                <img src="https://laampolleta.tv/logo.png" onerror="this.src='https://raw.githubusercontent.com/crisvidaldev/app-ampolleta/main/public/logo.png'" alt="La Ampolleta Logo" width="48" height="48" style="display: block; margin: 0 auto; object-fit: contain;" />
+                <img src="https://app.laampolleta.tv/logo.png" alt="La Ampolleta Logo" width="48" height="48" style="display: block; margin: 0 auto; object-fit: contain; border: 0;" />
               </div>
               <h1 style="margin: 0; font-size: 22px; font-weight: 800; letter-spacing: 2px; color: #ffffff; text-transform: uppercase;">
                 LA AMPOLLETA
@@ -353,7 +359,7 @@ export const getCuentaRechazadaTemplate = ({ name }) => {
               </h2>
 
               <p style="margin: 0 0 16px; font-size: 15px; line-height: 1.6; color: #d1d5db;">
-                Agradecemos sinceramente tu tiempo e interés en formar parte del equipo de <strong style="color: #ffffff;">Anfitrionas y Staff</strong> de <strong style="color: #f59e0b;">La Ampolleta Producciones</strong>.
+                Agradecemos sinceramente tu tiempo e interés en formar parte de nuestro equipo de staff y producción en <strong style="color: #f59e0b;">La Ampolleta Producciones</strong>.
               </p>
 
               <p style="margin: 0 0 20px; font-size: 15px; line-height: 1.6; color: #9ca3af;">
@@ -442,15 +448,15 @@ export const sendPostulacionRecibidaEmail = async (applicantData) => {
 /**
  * Despacha notificación por correo de "Cuenta Aprobada"
  */
-export const sendCuentaAprobadaEmail = async ({ name, email, userId }) => {
+export const sendCuentaAprobadaEmail = async ({ name, email, role, userId }) => {
   if (!email) return;
 
   const loginUrl = window?.location?.origin 
     ? `${window.location.origin}/login` 
     : "https://app.laampolleta.tv/login";
 
-  const subject = "🎉 ¡Bienvenida al equipo! Tu cuenta ha sido aprobada - La Ampolleta Producciones";
-  const html = getCuentaAprobadaTemplate({ name, email, loginUrl });
+  const subject = "🎉 ¡Te damos la bienvenida al equipo! Tu cuenta ha sido aprobada - La Ampolleta Producciones";
+  const html = getCuentaAprobadaTemplate({ name, email, role, loginUrl });
 
   // 1. Crear notificación en base de datos si tenemos userId
   if (userId) {

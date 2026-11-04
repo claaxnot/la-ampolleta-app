@@ -179,6 +179,7 @@ export default function Staff() {
       sendCuentaAprobadaEmail({
         name: applicant.name,
         email: applicant.email,
+        role: applicant.role,
         userId: applicant.id
       });
 
@@ -186,9 +187,9 @@ export default function Staff() {
       const welcomeText = `¡Hola ${applicant.name}! Te damos la bienvenida a La Ampolleta Producciones. Tu cuenta ha sido aprobada con éxito. Ya puedes ingresar a nuestra app en https://app.laampolleta.tv con tu correo y contraseña.`;
       try {
         await navigator.clipboard.writeText(welcomeText);
-        toast.success(`¡${applicant.name} aprobada! Mensaje para WhatsApp copiado al portapapeles.`, { id: loadingToast, duration: 5000 });
+        toast.success(`¡Cuenta de ${applicant.name} aprobada con éxito! Mensaje para WhatsApp copiado.`, { id: loadingToast, duration: 5000 });
       } catch {
-        toast.success(`¡${applicant.name} ha sido aprobada con éxito!`, { id: loadingToast, duration: 4000 });
+        toast.success(`¡Cuenta de ${applicant.name} aprobada con éxito!`, { id: loadingToast, duration: 4000 });
       }
 
       fetchStaff();
@@ -505,7 +506,7 @@ export default function Staff() {
                 <span>Equipo de Staff</span>
               </h2>
               <p className="text-gray-400 text-xs mt-0.5">
-                Gestión operativa, anfitrionas y aprobaciones de personal
+                Gestión operativa, asignaciones y aprobaciones de personal
               </p>
             </div>
 
@@ -646,7 +647,7 @@ export default function Staff() {
                     No hay postulaciones pendientes
                   </h3>
                   <p className="text-gray-400 text-xs max-w-md mx-auto">
-                    Todas las solicitudes de anfitrionas y staff han sido revisadas. Cuando una nueva postulante complete el formulario público, aparecerá aquí.
+                    Todas las solicitudes de postulantes han sido revisadas. Cuando un nuevo usuario complete el formulario público, aparecerá aquí.
                   </p>
                 </div>
               ) : (
@@ -703,7 +704,7 @@ export default function Staff() {
                                 {applicant.name}
                               </h4>
                               <p className="text-xs text-amber-400 font-medium">
-                                Postulación: {applicant.role || "Anfitriona"}
+                                Postulación: {applicant.role || "Staff"}
                               </p>
                             </div>
 
