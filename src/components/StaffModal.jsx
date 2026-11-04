@@ -5,6 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import GlassCard from "./GlassCard.jsx";
 import { sanitizeRut, validateRut, formatRut } from "../utils/validateRut.js";
+import { formatChileanPhone } from "../utils/formatPhone.js";
 import Button from "../components/Button.jsx";
 import { X } from "lucide-react";
 
@@ -17,6 +18,7 @@ const staffSchema = z.object({
       message: "RUT chileno inválido (ej: 12345678-9)",
     }),
   email: z.string().email("Debe ser un correo electrónico válido"),
+  phone: z.string().optional(),
   role: z.string().min(2, "El rol es obligatorio"),
   system_role: z.enum(["admin", "productor", "worker", "viewer"]).optional(),
   cuenta_origen: z.string().optional(),
@@ -42,6 +44,7 @@ export default function StaffModal({ isOpen, onClose, onSubmit, initialData: raw
       name: "",
       rut: "",
       email: "",
+      phone: "",
       role: "",
       system_role: "worker",
       cuenta_origen: "72052242",
@@ -64,6 +67,12 @@ export default function StaffModal({ isOpen, onClose, onSubmit, initialData: raw
     setValue("rut", formatted, { shouldValidate: true });
   };
 
+  const handlePhoneChange = (e) => {
+    const rawVal = e.target.value;
+    const formatted = formatChileanPhone(rawVal);
+    setValue("phone", formatted);
+  };
+
   const prevOpenRef = useRef(false);
   const prevInitialIdRef = useRef(null);
 
@@ -81,6 +90,7 @@ export default function StaffModal({ isOpen, onClose, onSubmit, initialData: raw
             name: initialData.name || "",
             rut: initialData.rut || "",
             email: initialData.email || "",
+            phone: initialData.phone || initialData.mensaje_beneficiario || "",
             role: initialData.role || "",
             system_role: initialData.system_role || "worker",
             cuenta_origen: initialData.cuenta_origen || "72052242",
@@ -95,6 +105,7 @@ export default function StaffModal({ isOpen, onClose, onSubmit, initialData: raw
             name: "",
             rut: "",
             email: "",
+            phone: "",
             role: "",
             system_role: "worker",
             cuenta_origen: "72052242",
@@ -198,6 +209,25 @@ export default function StaffModal({ isOpen, onClose, onSubmit, initialData: raw
                       }`}
                     />
                     {errors.email && <span className="text-red-400 text-xs mt-1">{errors.email.message}</span>}
+                  </div>
+
+                  <div className="flex flex-col">
+                    <label htmlFor="phone" className="text-gray-300 mb-1 flex items-center justify-between">
+                      <span>WhatsApp / Celular</span>
+                      <span className="text-[10px] text-gray-500 font-mono">+56 9 XXXX XXXX</span>
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs select-none pointer-events-none">🇨🇱</span>
+                      <input
+                        id="phone"
+                        placeholder="+56 9 1234 5678"
+                        maxLength={17}
+                        {...register("phone", {
+                          onChange: handlePhoneChange
+                        })}
+                        className="w-full bg-gray-800/50 border border-gray-700 rounded-xl pl-9 pr-3 py-2 text-white font-mono placeholder-gray-500 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-all text-sm"
+                      />
+                    </div>
                   </div>
 
                   <div className="flex flex-col">

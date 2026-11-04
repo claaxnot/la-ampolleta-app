@@ -32,6 +32,7 @@ import { permissions } from "../lib/permissions.js";
 import { toast } from "react-hot-toast";
 import { useSmartPolling } from "../hooks/useSmartPolling.js";
 import { getBankName } from "../utils/banks.js";
+import { formatChileanPhone, getCleanWhatsAppPhone } from "../utils/formatPhone.js";
 import { sendCuentaAprobadaEmail } from "../services/emailService.js";
 
 const translateAuthError = (message) => {
@@ -175,17 +176,16 @@ export default function Staff() {
 
       // 3. Ofrecer apertura de WhatsApp con mensaje de bienvenida pre-redactado
       const rawPhone = applicant.phone || applicant.mensaje_beneficiario || "";
-      const cleanPhone = rawPhone.replace(/[^0-9]/g, "");
+      const cleanPhone = getCleanWhatsAppPhone(rawPhone);
 
       if (cleanPhone) {
-        const finalPhone = cleanPhone.startsWith("56") ? cleanPhone : `56${cleanPhone}`;
         const welcomeText = encodeURIComponent(
           `¡Hola ${applicant.name}! Te damos la bienvenida a La Ampolleta Producciones. Tu cuenta ha sido aprobada con éxito. Ya puedes ingresar a nuestra app: https://app.laampolleta.tv con tu correo y contraseña.`
         );
 
         setTimeout(() => {
           if (window.confirm(`¿Deseas abrir WhatsApp para enviarle el mensaje de bienvenida a ${applicant.name}?`)) {
-            window.open(`https://wa.me/${finalPhone}?text=${welcomeText}`, '_blank');
+            window.open(`https://wa.me/${cleanPhone}?text=${welcomeText}`, '_blank');
           }
         }, 300);
       }
@@ -261,12 +261,13 @@ export default function Staff() {
           rut: normalizedRut,
           role: staffData.role,
           system_role: staffData.system_role,
+          phone: staffData.phone || "",
           cuenta_origen: staffData.cuenta_origen,
           cuenta_destino: staffData.cuenta_destino,
           codigo_banco_destino: staffData.codigo_banco_destino,
           monto_transferencia: staffData.monto_transferencia,
           glosa_transferencia: staffData.glosa_transferencia,
-          mensaje_beneficiario: staffData.mensaje_beneficiario
+          mensaje_beneficiario: staffData.phone || staffData.mensaje_beneficiario
         };
 
         if (normalizedEmail) {
@@ -344,12 +345,13 @@ export default function Staff() {
           role: staffData.role,
           system_role: staffData.system_role,
           status: 'Activo',
+          phone: staffData.phone || "",
           cuenta_origen: staffData.cuenta_origen,
           cuenta_destino: staffData.cuenta_destino,
           codigo_banco_destino: staffData.codigo_banco_destino,
           monto_transferencia: staffData.monto_transferencia,
           glosa_transferencia: staffData.glosa_transferencia,
-          mensaje_beneficiario: staffData.mensaje_beneficiario
+          mensaje_beneficiario: staffData.phone || staffData.mensaje_beneficiario
         }).eq('email', staffData.email);
 
         if (profileError) throw profileError;
@@ -628,9 +630,10 @@ export default function Staff() {
               ) : (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                   {filteredStaff.map((applicant) => {
-                    const phone = applicant.phone || applicant.mensaje_beneficiario || "";
-                    const cleanPhone = phone.replace(/[^0-9]/g, "");
-                    const waLink = cleanPhone ? `https://wa.me/${cleanPhone.startsWith('56') ? cleanPhone : '56' + cleanPhone}` : null;
+                    const rawPhone = applicant.phone || applicant.mensaje_beneficiario || "";
+                    const formattedPhone = formatChileanPhone(rawPhone) || rawPhone || "-";
+                    const cleanPhone = getCleanWhatsAppPhone(rawPhone);
+                    const waLink = cleanPhone ? `https://wa.me/${cleanPhone}` : null;
                     const bankName = getBankName(applicant.codigo_banco_destino);
                     const formattedDate = applicant.created_at 
                       ? new Date(applicant.created_at).toLocaleDateString("es-CL", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })
@@ -694,7 +697,7 @@ export default function Staff() {
                               <div className="sm:col-span-2 mt-1">
                                 <span className="text-gray-500 block text-[10px] uppercase">WhatsApp / Celular</span>
                                 <div className="flex items-center gap-2">
-                                  <span className="font-semibold text-white">{phone || "-"}</span>
+                                  <span className="font-semibold text-white font-mono">{formattedPhone}</span>
                                   {waLink && (
                                     <a
                                       href={waLink}
@@ -781,8 +784,9 @@ export default function Staff() {
                     <tbody className="divide-y divide-gray-700/60">
                       {filteredStaff.map((member) => {
                         const isConfirmed = !!member.email_confirmed;
-                        const phone = member.phone || member.mensaje_beneficiario || "";
-                        const cleanPhone = phone.replace(/[^0-9]/g, "");
+                        const rawPhone = member.phone || member.mensaje_beneficiario || "";
+                        const formattedPhone = formatChileanPhone(rawPhone) || rawPhone || "-";
+                        const cleanPhone = getCleanWhatsAppPhone(rawPhone);
 
                         return (
                           <tr key={member.id} className="hover:bg-gray-800/30 transition-colors">
@@ -814,12 +818,12 @@ export default function Staff() {
                                 <div className="text-[11px] text-gray-400 flex items-center gap-1 mt-0.5">
                                   <Phone className="w-3 h-3 text-emerald-400" />
                                   <a 
-                                    href={`https://wa.me/${cleanPhone.startsWith('56') ? cleanPhone : '56' + cleanPhone}`}
+                                    href={`https://wa.me/${cleanPhone}`}
                                     target="_blank" 
                                     rel="noreferrer"
                                     className="hover:text-emerald-300 font-mono"
                                   >
-                                    {phone}
+                                    {formattedPhone}
                                   </a>
                                 </div>
                               )}

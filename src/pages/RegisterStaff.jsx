@@ -25,6 +25,7 @@ import GlassCard from "../components/GlassCard.jsx";
 import Button from "../components/Button.jsx";
 import { supabase } from "../lib/supabase.js";
 import { validateRut, formatRut, sanitizeRut } from "../utils/validateRut.js";
+import { formatChileanPhone, validateChileanPhone, getCleanWhatsAppPhone } from "../utils/formatPhone.js";
 import { BANCOS_CHILE, TIPOS_CUENTA, getBankName } from "../utils/banks.js";
 import { sendPostulacionRecibidaEmail } from "../services/emailService.js";
 import { toast } from "react-hot-toast";
@@ -52,6 +53,7 @@ export default function RegisterStaff() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [rutError, setRutError] = useState("");
+  const [phoneError, setPhoneError] = useState("");
   const [isSuccess, setIsSuccess] = useState(false);
   const [submittedData, setSubmittedData] = useState(null);
 
@@ -75,9 +77,17 @@ export default function RegisterStaff() {
     }
 
     if (name === "phone") {
-      // Filtrar números y signo +
-      const cleanedPhone = value.replace(/[^0-9+\s-]/g, "");
-      setFormData(prev => ({ ...prev, phone: cleanedPhone }));
+      const formattedPhone = formatChileanPhone(value);
+      setFormData(prev => ({ ...prev, phone: formattedPhone }));
+      if (formattedPhone.length >= 7) {
+        if (!validateChileanPhone(formattedPhone)) {
+          setPhoneError("Celular incompleto (+56 9 XXXX XXXX)");
+        } else {
+          setPhoneError("");
+        }
+      } else {
+        setPhoneError("");
+      }
       return;
     }
 
@@ -154,8 +164,9 @@ export default function RegisterStaff() {
       return;
     }
 
-    if (!formData.phone || formData.phone.trim().length < 8) {
-      setErrorMessage("Por favor ingresa un número de teléfono o WhatsApp válido.");
+    if (!formData.phone || !validateChileanPhone(formData.phone)) {
+      setPhoneError("Ingresa un celular chileno válido (+56 9 XXXX XXXX).");
+      setErrorMessage("Por favor ingresa un número de celular chileno válido (+56 9 XXXX XXXX).");
       return;
     }
 
@@ -501,21 +512,39 @@ export default function RegisterStaff() {
                       </div>
 
                       <div>
-                        <label className="block text-xs font-medium text-gray-300 mb-1 ml-1">
-                          WhatsApp / Teléfono <span className="text-amber-400">*</span>
+                        <label className="block text-xs font-medium text-gray-300 mb-1 ml-1 flex items-center justify-between">
+                          <span>WhatsApp / Celular <span className="text-amber-400">*</span></span>
+                          <span className="text-[10px] text-gray-400 font-mono">+56 9 XXXX XXXX</span>
                         </label>
                         <div className="relative">
-                          <Phone className="w-4 h-4 text-gray-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                          <div className="absolute left-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5 pointer-events-none">
+                            <span className="text-xs select-none">🇨🇱</span>
+                            <Phone className="w-3.5 h-3.5 text-gray-500" />
+                          </div>
                           <input
                             type="tel"
                             name="phone"
                             required
+                            maxLength={17}
                             placeholder="+56 9 8765 4321"
                             value={formData.phone}
                             onChange={handleChange}
-                            className="w-full pl-10 pr-4 py-2.5 bg-gray-800/60 border border-gray-700/70 rounded-xl text-white text-sm focus:outline-none focus:border-amber-500 transition-all placeholder-gray-500"
+                            className={`w-full pl-14 pr-4 py-2.5 bg-gray-800/60 border ${
+                              phoneError ? 'border-red-500/70 focus:border-red-500' : 'border-gray-700/70 focus:border-amber-500'
+                            } rounded-xl text-white text-sm font-mono focus:outline-none transition-all placeholder-gray-500`}
                           />
                         </div>
+                        {phoneError ? (
+                          <span className="text-[11px] text-red-400 mt-1 block ml-1">{phoneError}</span>
+                        ) : formData.phone && validateChileanPhone(formData.phone) ? (
+                          <span className="text-[11px] text-emerald-400 mt-1 block ml-1 flex items-center gap-1 font-medium">
+                            <CheckCircle2 className="w-3 h-3" /> Formato chileno válido para WhatsApp
+                          </span>
+                        ) : (
+                          <span className="text-[10px] text-gray-500 mt-1 block ml-1">
+                            Ingresa tu número (se auto-formatea con prefijo chileno)
+                          </span>
+                        )}
                       </div>
                     </div>
 
