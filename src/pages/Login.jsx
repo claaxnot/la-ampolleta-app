@@ -126,14 +126,25 @@ export default function Login({ onLogin }) {
     try {
       const redirectToUrl = `${window.location.origin}/reset-password`;
 
-      const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: redirectToUrl,
+      const { data: resData, error: funcError } = await supabase.functions.invoke("send-email", {
+        body: {
+          action: "reset-password",
+          email: email.trim().toLowerCase(),
+          redirectTo: redirectToUrl,
+        },
       });
-      if (resetError) throw resetError;
-      setMessage("Se ha enviado un enlace de recuperación a tu correo. Por favor, revisa tu bandeja de entrada o spam.");
+
+      if (funcError) {
+        throw new Error(funcError.message || "Error al solicitar restablecimiento de contraseña");
+      }
+      if (resData?.error) {
+        throw new Error(resData.error);
+      }
+
+      setMessage("Se ha enviado un enlace oficial de recuperación a tu correo. Por favor, revisa tu bandeja de entrada o spam.");
     } catch (err) {
       console.error("Reset error:", err.message);
-      setError("No se pudo enviar el correo de recuperación. Verifica la dirección o intenta nuevamente.");
+      setError(err.message || "No se pudo enviar el correo de recuperación. Verifica la dirección o intenta nuevamente.");
     } finally {
       setIsLoading(false);
     }

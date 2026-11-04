@@ -205,83 +205,37 @@ export default function RegisterStaff() {
         }
       }
 
-      // 3. Registrar usuario en Supabase Auth con status 'Pendiente'
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: normalizedEmail,
-        password: formData.password,
-        options: {
-          data: {
-            name: cleanName,
-            rut: normalizedRut,
-            phone: formData.phone.trim(),
-            role: "Anfitriona",
-            system_role: "worker",
-            status: "Pendiente",
-            codigo_banco_destino: formData.codigo_banco_destino,
-            cuenta_destino: formData.cuenta_destino.trim(),
-            glosa_transferencia: formData.tipo_cuenta,
-            avatar_url: avatarPreview || null
-          }
-        }
-      });
-
-      if (authError) {
-        if (authError.message?.toLowerCase().includes("already registered") || 
-            authError.message?.toLowerCase().includes("user already exists")) {
-          throw new Error("Este correo electrónico ya está registrado. Por favor inicia sesión con tu contraseña o recupérala.");
-        }
-        throw authError;
-      }
-
-      // 4. Actualizar tabla public.profiles de manera explícita por seguridad y persistencia
-      const newUserId = authData?.user?.id;
-      if (newUserId) {
-        const profilePayload = {
-          name: cleanName,
-          rut: normalizedRut,
-          role: "Anfitriona",
-          system_role: "worker",
-          status: "Pendiente",
-          codigo_banco_destino: formData.codigo_banco_destino,
-          cuenta_destino: formData.cuenta_destino.trim(),
-          glosa_transferencia: formData.tipo_cuenta,
-          mensaje_beneficiario: formData.phone.trim(), // Respaldo del teléfono
-          avatar_url: avatarPreview || null
-        };
-
-        // Intentar actualizar también la columna 'phone' si la BD ya la tiene
-        try {
-          const { error: updateError } = await supabase
-            .from('profiles')
-            .update({ ...profilePayload, phone: formData.phone.trim() })
-            .eq('id', newUserId);
-
-          if (updateError && updateError.message?.includes("phone")) {
-            // Reintentar sin la columna phone si no ha migrado aún
-            await supabase.from('profiles').update(profilePayload).eq('id', newUserId);
-          }
-        } catch (dbErr) {
-          console.warn("⚠️ Warning updating profile directly:", dbErr);
-        }
-      }
-
       const bankName = getBankName(formData.codigo_banco_destino);
 
-      // 5. Despachar correo de postulación recibida mediante Edge Function (no-reply)
-      sendPostulacionRecibidaEmail({
-        name: cleanName,
-        email: normalizedEmail,
-        rut: normalizedRut,
-        phone: formData.phone.trim(),
-        bankName,
-        accountType: formData.tipo_cuenta,
-        accountNumber: formData.cuenta_destino.trim()
+      // 3. Registrar usuario mediante Edge Function blindada
+      // (Bypasea límites de correos/hora de Supabase y despacha confirmación desde no-reply)
+      const { data: regResult, error: regError } = await supabase.functions.invoke("send-email", {
+        body: {
+          action: "register-staff",
+          email: normalizedEmail,
+          password: formData.password,
+          name: cleanName,
+          rut: normalizedRut,
+          phone: formData.phone.trim(),
+          codigo_banco_destino: formData.codigo_banco_destino,
+          cuenta_destino: formData.cuenta_destino.trim(),
+          tipo_cuenta: formData.tipo_cuenta,
+          bankName,
+          avatar_url: avatarPreview || null,
+        },
       });
 
-      // 6. Cerrar sesión de Supabase para que no quede logueado en modo 'Pendiente'
+      if (regError) {
+        throw new Error(regError.message || "Error al registrar postulación.");
+      }
+      if (regResult?.error) {
+        throw new Error(regResult.error);
+      }
+
+      // 4. Cerrar cualquier sesión huérfana para que no quede logueado en modo 'Pendiente'
       await supabase.auth.signOut();
 
-      // 7. Marcar éxito
+      // 5. Marcar éxito
       toast.success("¡Postulación enviada exitosamente!", { id: loadingToast, duration: 5000 });
       setSubmittedData({
         name: cleanName,

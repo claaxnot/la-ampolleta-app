@@ -17,6 +17,12 @@ export default function ResetPassword() {
 
   // Check if there is an active recovery session
   useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === "PASSWORD_RECOVERY" || session) {
+        setHasSession(true);
+      }
+    });
+
     const checkSession = async () => {
       // Give Supabase client a moment to parse the URL hash fragment
       await new Promise((resolve) => setTimeout(resolve, 800));
@@ -25,8 +31,8 @@ export default function ResetPassword() {
       if (session) {
         setHasSession(true);
       } else {
-        // If there's a recovery token in hash, wait a bit more or warn
-        if (window.location.hash.includes("access_token")) {
+        // If there's a recovery token in hash or PKCE code in search, allow session
+        if (window.location.hash.includes("access_token") || window.location.search.includes("code")) {
           setHasSession(true);
         } else {
           toast.error("El enlace de recuperación es inválido o ha expirado. Por favor, solicita uno nuevo.");
@@ -34,6 +40,10 @@ export default function ResetPassword() {
       }
     };
     checkSession();
+
+    return () => {
+      subscription?.unsubscribe();
+    };
   }, []);
 
   const handleSubmit = async (e) => {
