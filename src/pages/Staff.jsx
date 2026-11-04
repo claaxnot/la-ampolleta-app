@@ -341,6 +341,15 @@ export default function Staff() {
         const { data: authData, error: authError } = await tempClient.auth.signUp({
           email: staffData.email,
           password: defaultPassword,
+          options: {
+            data: {
+              name: staffData.name,
+              rut: normalizedRut,
+              role: staffData.role,
+              system_role: staffData.system_role,
+              status: 'Activo'
+            }
+          }
         });
 
         if (authError) {
