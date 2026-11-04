@@ -151,6 +151,7 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData: raw
   ]);
   const [staffDays, setStaffDays] = useState({});
   const [activeShiftTab, setActiveShiftTab] = useState(0);
+  const [consolidateAccountingMonth, setConsolidateAccountingMonth] = useState(true);
 
   const safeShiftTab = Math.max(0, Math.min(activeShiftTab, days.length - 1));
  
@@ -496,6 +497,12 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData: raw
           allowed_radius_meters: initialData.allowed_radius_meters !== null && initialData.allowed_radius_meters !== undefined ? initialData.allowed_radius_meters : 300
         });
 
+        setConsolidateAccountingMonth(
+          initialData.consolidate_accounting_month !== undefined 
+            ? initialData.consolidate_accounting_month !== false 
+            : true
+        );
+
         const targetIdForAssignments = initialData?.id || initialData?.duplicateFromId;
         if (targetIdForAssignments) {
           // Fetch event days first, then fetch and map staff assignments to indices
@@ -576,6 +583,7 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData: raw
         prevInitialClientRef.current = "";
         setCustomRates({});
         setStaffDays({});
+        setConsolidateAccountingMonth(true);
         const defaultDay = {
           date: "", time: "10:00", end_time: "18:00", ends_next_day: false, call_time: "", setup_time: "", status: "Planificado", notes: ""
         };
@@ -619,6 +627,7 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData: raw
     eventData.staffIds = data.staffIds || [];
     eventData.customRates = customRates;
     eventData.isAdvancedActive = showAdvanced;
+    eventData.consolidate_accounting_month = consolidateAccountingMonth;
 
     // Sincronizar el estado operacional seleccionado con todas las jornadas del evento
     const mainStatus = data.status || "Planificado";
@@ -1043,6 +1052,32 @@ export default function EventModal({ isOpen, onClose, onSubmit, initialData: raw
                           </div>
                         ))}
                       </div>
+
+                      {/* Opción de Corte Contable para Eventos Multidía */}
+                      {days.length > 1 && (
+                        <div className="bg-amber-500/10 border border-amber-500/25 rounded-xl p-3.5 flex items-start gap-3 mt-3">
+                          <input
+                            type="checkbox"
+                            id="consolidate_accounting_month"
+                            checked={consolidateAccountingMonth}
+                            onChange={(e) => setConsolidateAccountingMonth(e.target.checked)}
+                            className="mt-0.5 form-checkbox h-4 w-4 text-amber-500 bg-gray-900 border-gray-600 rounded focus:ring-amber-500/50 shrink-0 cursor-pointer"
+                          />
+                          <label htmlFor="consolidate_accounting_month" className="cursor-pointer select-none">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-bold text-amber-300">
+                                Imputar finanzas y boletas al mes de inicio del evento
+                              </span>
+                              <span className="text-[10px] bg-amber-400/20 text-amber-300 px-1.5 py-0.2 rounded font-extrabold uppercase">
+                                Recomendado
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-gray-300 mt-1 leading-relaxed">
+                              Si el evento cruza de mes (ej: 31 de Octubre a 1 de Noviembre), todas sus jornadas se liquidarán y solicitarán boleta en el mes inicial ({days[0]?.date ? new Date(days[0].date + "T12:00:00").toLocaleDateString("es-CL", { month: "long" }) : "del evento"}), consolidando la contabilidad en una sola factura o lote.
+                            </p>
+                          </label>
+                        </div>
+                      )}
                     </div>
 
                     <div className="flex flex-col">

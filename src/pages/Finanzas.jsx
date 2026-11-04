@@ -435,11 +435,13 @@ export default function Finanzas() {
           invoice_received,
           event_days (
             date,
-            status
+            status,
+            notes
           ),
           events:event_id (
             date,
-            status
+            status,
+            consolidate_accounting_month
           ),
           profiles:staff_id (
             id,
@@ -455,7 +457,10 @@ export default function Finanzas() {
       // Filtrar las asignaciones que corresponden al periodo, requieren boleta, no están pagadas/recibidas y están confirmadas/aceptadas
       const pendingAssignments = (assignments || []).filter(a => {
         const dayDate = a.event_days ? a.event_days.date : (a.events ? a.events.date : "");
-        const assignmentPeriod = dayDate ? dayDate.substring(0, 7) : "";
+        const shouldConsolidate = a.events?.consolidate_accounting_month !== false;
+        const parentDate = a.events?.date || dayDate;
+        const accountingDate = (shouldConsolidate && parentDate) ? parentDate : dayDate;
+        const assignmentPeriod = accountingDate ? accountingDate.substring(0, 7) : "";
 
         const isPeriodMatch = assignmentPeriod === periodKey;
         const isPending = a.invoice_required && !a.invoice_received && a.status !== "Pagado" && (a.status === "Confirmado" || a.status === "Aceptado");
@@ -645,8 +650,8 @@ export default function Finanzas() {
 
     const groups = {};
     pendingEvents.forEach(p => {
-      const dateStr = p.event_date || p.date || "";
-      const periodKey = dateStr.substring(0, 7) || new Date().toISOString().substring(0, 7); // "YYYY-MM"
+      const dateStr = p.accounting_date || p.event_date || p.date || "";
+      const periodKey = p.accounting_period || (dateStr ? dateStr.substring(0, 7) : new Date().toISOString().substring(0, 7)); // "YYYY-MM"
       const groupKey = `${p.staff_rut || p.staff_id}_${periodKey}`;
 
       if (!p.staff_rut && !p.staff_id) return;
@@ -1207,7 +1212,7 @@ export default function Finanzas() {
       }
 
       // Intentamos traer las asignaciones con los datos del perfil, del evento y de las jornadas específicas
-      const { data: assignments, error } = await supabase
+      let { data: assignments, error } = await supabase
         .from("event_assignments")
         .select(`
           id,
@@ -1230,14 +1235,16 @@ export default function Finanzas() {
             date,
             start_time,
             end_time,
-            status
+            status,
+            notes
           ),
           events:event_id (
             id,
             name,
             date,
             time,
-            status
+            status,
+            consolidate_accounting_month
           ),
           profiles:staff_id (
             id,
@@ -1253,6 +1260,59 @@ export default function Finanzas() {
             mensaje_beneficiario
           )
         `);
+
+      if (error && error.message && error.message.includes('consolidate_accounting_month')) {
+        console.warn("⚠️ [FINANZAS]: Columna consolidate_accounting_month no existe en BD todavía, reintentando sin ella.");
+        const retry = await supabase
+          .from("event_assignments")
+          .select(`
+            id,
+            status,
+            payment_status,
+            custom_rate,
+            event_day_id,
+            invoice_required,
+            invoice_received,
+            invoice_number,
+            invoice_received_at,
+            invoice_amount,
+            invoice_verified_by,
+            invoice_notes,
+            verifier:invoice_verified_by (
+              name
+            ),
+            event_days (
+              id,
+              date,
+              start_time,
+              end_time,
+              status,
+              notes
+            ),
+            events:event_id (
+              id,
+              name,
+              date,
+              time,
+              status
+            ),
+            profiles:staff_id (
+              id,
+              name,
+              rut,
+              email,
+              role,
+              cuenta_origen,
+              cuenta_destino,
+              codigo_banco_destino,
+              monto_transferencia,
+              glosa_transferencia,
+              mensaje_beneficiario
+            )
+          `);
+        assignments = retry.data;
+        error = retry.error;
+      }
 
       if (error) throw error;
 
@@ -1314,6 +1374,10 @@ export default function Finanzas() {
               event_name: e.events?.name ? `[${e.expense_type}] ${e.events.name}` : `[Gasto] ${e.expense_type}`,
               expense_type: e.expense_type,
               event_date: e.expense_date || "",
+              accounting_date: e.expense_date || "",
+              accounting_period: (e.expense_date || "").substring(0, 7),
+              is_cross_month_consolidated: false,
+              shift_label: null,
               is_finished: true,
               staff_id: e.profiles?.id || "",
               staff_name: e.profiles?.name || "Personal Desconocido",
@@ -1357,10 +1421,29 @@ export default function Finanzas() {
 
           const eventStatus = day ? (day.status ? day.status.toLowerCase() : "") : (parent.status ? parent.status.toLowerCase() : "");
           const dayDate = day ? day.date : parent.date;
+          const parentDate = parent.date || dayDate;
+
+          // Regla contable: Imputar al mes de inicio del evento si consolidate_accounting_month !== false (por defecto activo)
+          const shouldConsolidate = parent.consolidate_accounting_month !== false;
+          const accountingDate = (shouldConsolidate && parentDate) ? parentDate : (dayDate || "");
+          const accountingPeriod = accountingDate ? accountingDate.substring(0, 7) : "";
+          const calendarPeriod = dayDate ? dayDate.substring(0, 7) : "";
+          const isCrossMonthConsolidated = shouldConsolidate && accountingPeriod && calendarPeriod && accountingPeriod !== calendarPeriod;
 
           const todayStr = new Date().toLocaleDateString("en-CA");
           const isDateFinished = dayDate ? dayDate <= todayStr : false;
           const isFinished = eventStatus === "completado" || eventStatus === "finalizado" || isDateFinished;
+
+          // Determinar etiqueta descriptiva de jornada / turno
+          let shiftLabel = "";
+          if (day) {
+            const timeRange = day.start_time && day.end_time ? `${day.start_time.substring(0, 5)} - ${day.end_time.substring(0, 5)}` : "";
+            if (day.notes) {
+              shiftLabel = `${day.notes}${timeRange ? ` (${timeRange})` : ""}`;
+            } else if (timeRange) {
+              shiftLabel = `Turno ${timeRange}`;
+            }
+          }
 
           // Indexar log de asistencia por event_day_id o en su defecto por parent event_id
           const attKey = a.event_day_id ? `${a.event_day_id}-${a.profiles?.id}` : `${parent.id}-${a.profiles?.id}`;
@@ -1370,6 +1453,10 @@ export default function Finanzas() {
             id: a.id,
             event_name: parent.name || "Sin Nombre",
             event_date: dayDate || "",
+            accounting_date: accountingDate,
+            accounting_period: accountingPeriod,
+            is_cross_month_consolidated: isCrossMonthConsolidated,
+            shift_label: shiftLabel,
             event_status: eventStatus,
             is_finished: isFinished,
             staff_id: a.profiles?.id || "",
@@ -2267,8 +2354,9 @@ export default function Finanzas() {
   const uniqueMonths = React.useMemo(() => {
     const periods = new Set();
     payments.forEach(p => {
-      if (p.event_date) {
-        const [year, month] = p.event_date.split("-");
+      const dateVal = p.accounting_date || p.event_date;
+      if (dateVal) {
+        const [year, month] = dateVal.split("-");
         if (year && month) {
           periods.add(`${year}-${month}`);
         }
@@ -2315,9 +2403,10 @@ export default function Finanzas() {
       matchesStatus = sStatus === "Pagado";
     }
 
+    const targetPeriod = p.accounting_period || (p.accounting_date ? p.accounting_date.substring(0, 7) : (eDate ? eDate.substring(0, 7) : ""));
     const matchesMonth =
       monthFilter === "all" ||
-      (eDate && eDate.startsWith(monthFilter));
+      targetPeriod === monthFilter;
 
     const matchesFinished = includeFuture || p?.is_finished;
 
@@ -2366,9 +2455,10 @@ export default function Finanzas() {
         eName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         sRut.includes(searchTerm);
 
+      const targetPeriod = p.accounting_period || (p.accounting_date ? p.accounting_date.substring(0, 7) : (eDate ? eDate.substring(0, 7) : ""));
       const matchesMonth =
         monthFilter === "all" ||
-        (eDate && eDate.startsWith(monthFilter));
+        targetPeriod === monthFilter;
 
       const matchesFinished = includeFuture || p?.is_finished;
 
@@ -2894,7 +2984,19 @@ export default function Finanzas() {
                             <td className="py-4 px-6 text-left">
                               <div className="flex flex-col">
                                 <span className="font-medium text-gray-200">{p.event_name}</span>
-                                <span className="text-xs text-gray-400 mt-0.5">{p.event_date}</span>
+                                <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
+                                  <span className="text-xs text-gray-400">{p.event_date}</span>
+                                  {p.shift_label && (
+                                    <span className="text-[10px] px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-300 border border-amber-500/20 font-semibold">
+                                      {p.shift_label}
+                                    </span>
+                                  )}
+                                  {p.is_cross_month_consolidated && (
+                                    <span className="text-[9px] px-1.5 py-0.2 rounded bg-teal-500/15 text-teal-300 border border-teal-500/30 font-bold" title={`Jornada del día ${p.event_date} imputada contablemente a este mes`}>
+                                      Imputado a mes de inicio
+                                    </span>
+                                  )}
+                                </div>
                               </div>
                             </td>
                             <td className="py-4 px-6 text-left">
@@ -3048,9 +3150,21 @@ export default function Finanzas() {
                         {/* Fila Media: Información de Evento / Datos Bancarios */}
                         <div className="grid grid-cols-1 gap-4 pt-3 border-t border-white/5 text-xs text-gray-300">
                           <div className="flex flex-col gap-1">
-                            <span className="text-[9px] text-gray-500 uppercase font-extrabold tracking-wider">Evento / Fecha</span>
+                            <span className="text-[9px] text-gray-500 uppercase font-extrabold tracking-wider">Evento / Turno</span>
                             <span className="font-semibold text-gray-200">{p.event_name}</span>
-                            <span className="text-gray-400 text-[10px]">{p.event_date}</span>
+                            <div className="flex flex-wrap items-center gap-1 mt-0.5">
+                              <span className="text-gray-400 text-[10px]">{p.event_date}</span>
+                              {p.shift_label && (
+                                <span className="text-[9px] px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-300 border border-amber-500/20 font-semibold">
+                                  {p.shift_label}
+                                </span>
+                              )}
+                              {p.is_cross_month_consolidated && (
+                                <span className="text-[8px] px-1 rounded bg-teal-500/15 text-teal-300 border border-teal-500/30 font-bold">
+                                  Imputado a inicio
+                                </span>
+                              )}
+                            </div>
                           </div>
 
                           <div className="flex flex-col gap-1 pt-1">

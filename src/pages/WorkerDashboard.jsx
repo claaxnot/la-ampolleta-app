@@ -303,8 +303,9 @@ export default function WorkerDashboard({ user }) {
 
     // 1. Agrupar eventos completados por mes
     completedEvents.forEach(e => {
-      if (!e.date) return;
-      const periodKey = e.date.substring(0, 7); // "YYYY-MM"
+      const dateStr = e.accounting_date || e.date;
+      if (!dateStr) return;
+      const periodKey = dateStr.substring(0, 7); // "YYYY-MM"
       if (!periods[periodKey]) {
         periods[periodKey] = {
           period_key: periodKey,
@@ -888,7 +889,7 @@ export default function WorkerDashboard({ user }) {
     if (!workerId) return;
     if (!silent) setIsLoading(true);
     try {
-      const { data, error } = await supabase
+      let { data, error } = await supabase
         .from('event_assignments')
         .select(`
           id,
@@ -917,12 +918,54 @@ export default function WorkerDashboard({ user }) {
             call_time, setup_time, end_time, priority, operational_notes,
             supervisor_id, type, operational_info_pending,
             attendance_control_enabled, attendance_require_confirmed, latitude, longitude, allowed_radius_meters,
+            consolidate_accounting_month,
             profiles:supervisor_id (
               name
             )
           )
         `)
         .eq('staff_id', workerId);
+
+      if (error && error.message && error.message.includes('consolidate_accounting_month')) {
+        console.warn("⚠️ [WORKER_DASHBOARD]: Columna consolidate_accounting_month no existe en BD todavía, reintentando.");
+        const retry = await supabase
+          .from('event_assignments')
+          .select(`
+            id,
+            status,
+            payment_status,
+            custom_rate,
+            event_id,
+            event_day_id,
+            invoice_required,
+            invoice_received,
+            invoice_number,
+            invoice_received_at,
+            invoice_amount,
+            event_days (
+              id,
+              date,
+              start_time,
+              end_time,
+              call_time,
+              setup_time,
+              status,
+              notes
+            ),
+            events (
+              id, name, date, time, location, client, status, description,
+              call_time, setup_time, end_time, priority, operational_notes,
+              supervisor_id, type, operational_info_pending,
+              attendance_control_enabled, attendance_require_confirmed, latitude, longitude, allowed_radius_meters,
+              profiles:supervisor_id (
+                name
+              )
+            )
+          `)
+          .eq('staff_id', workerId);
+        data = retry.data;
+        error = retry.error;
+      }
 
       if (error) throw error;
 
@@ -932,6 +975,8 @@ export default function WorkerDashboard({ user }) {
             if (!assignment) return null;
             const day = assignment.event_days;
             const parent = assignment.events || {};
+            const shouldConsolidate = parent.consolidate_accounting_month !== false;
+            const accountingDate = (shouldConsolidate && parent.date) ? parent.date : (day ? day.date : parent.date);
 
             return {
               assignment_id: assignment.id,
@@ -964,6 +1009,7 @@ export default function WorkerDashboard({ user }) {
 
               // Dynamic day values with parent fallback
               date: day ? day.date : parent.date,
+              accounting_date: accountingDate,
               time: day ? (day.start_time ? day.start_time.substring(0, 5) : parent.time) : parent.time,
               end_time: day ? (day.end_time ? day.end_time.substring(0, 5) : parent.end_time) : parent.end_time,
               call_time: day ? (day.call_time ? day.call_time.substring(0, 5) : parent.call_time) : parent.call_time,

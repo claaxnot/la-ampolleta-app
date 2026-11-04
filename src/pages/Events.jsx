@@ -184,13 +184,22 @@ export default function Events({ user }) {
       eventData.allowed_radius_meters = parseInt(eventData.allowed_radius_meters, 10);
     }
 
+    eventData.consolidate_accounting_month = eventData.consolidate_accounting_month !== false;
+
     let eventId = eventData.id;
     console.log("4️⃣ [INSERTING EVENT] - Iniciando transacción en Supabase con payload normalizado:", eventData);
 
     try {
       if (eventId) {
         // Update Event
-        const { error } = await supabase.from('events').update(eventData).eq('id', eventId);
+        let { error } = await supabase.from('events').update(eventData).eq('id', eventId);
+        if (error && error.message && error.message.includes('consolidate_accounting_month')) {
+          console.warn("⚠️ [EVENTS]: Columna consolidate_accounting_month ausente en BD, reintentando sin ella.");
+          const fallbackData = { ...eventData };
+          delete fallbackData.consolidate_accounting_month;
+          const retryRes = await supabase.from('events').update(fallbackData).eq('id', eventId);
+          error = retryRes.error;
+        }
         if (error) {
           console.error("5️⃣ [UPDATE RESPONSE] - Error de actualización:", error);
           throw error;
@@ -198,14 +207,20 @@ export default function Events({ user }) {
         console.log("5️⃣ [UPDATE RESPONSE] - Evento actualizado con éxito en Supabase.");
       } else {
         // Insert new Event
-        const { data, error } = await supabase.from('events').insert([eventData]).select();
-        if (error) {
-          console.error("5️⃣ [INSERT RESPONSE] - Error al insertar:", error);
-          throw error;
+        let insResult = await supabase.from('events').insert([eventData]).select();
+        if (insResult.error && insResult.error.message && insResult.error.message.includes('consolidate_accounting_month')) {
+          console.warn("⚠️ [EVENTS]: Columna consolidate_accounting_month ausente en BD, reintentando sin ella.");
+          const fallbackData = { ...eventData };
+          delete fallbackData.consolidate_accounting_month;
+          insResult = await supabase.from('events').insert([fallbackData]).select();
         }
-        console.log("5️⃣ [INSERT RESPONSE] - Evento insertado con éxito en Supabase. Datos recibidos:", data);
-        if (data && data.length > 0) {
-          eventId = data[0].id;
+        if (insResult.error) {
+          console.error("5️⃣ [INSERT RESPONSE] - Error al insertar:", insResult.error);
+          throw insResult.error;
+        }
+        console.log("5️⃣ [INSERT RESPONSE] - Evento insertado con éxito en Supabase. Datos recibidos:", insResult.data);
+        if (insResult.data && insResult.data.length > 0) {
+          eventId = insResult.data[0].id;
         }
       }
 
