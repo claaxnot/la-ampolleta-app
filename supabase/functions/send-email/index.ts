@@ -27,11 +27,15 @@ const corsHeaders = {
 const SMTP_HOST = Deno.env.get("SMTP_HOST") || "mail.laampolleta.tv";
 const SMTP_PORT = parseInt(Deno.env.get("SMTP_PORT") || "465", 10);
 const SMTP_USER = Deno.env.get("SMTP_USER") || "no-reply@laampolleta.tv";
-const SMTP_PASS = Deno.env.get("SMTP_PASS") || "Kmdqtvc9dkXlMOf2";
+const SMTP_PASS = Deno.env.get("SMTP_PASS");
 const SENDER_EMAIL = Deno.env.get("SENDER_EMAIL") || "La Ampolleta Producciones <no-reply@laampolleta.tv>";
 
 // Helper para crear el transporte de correo
 function createMailTransporter() {
+  if (!SMTP_PASS) {
+    throw new Error("La variable de entorno SMTP_PASS no está configurada en los Secrets de Supabase.");
+  }
+
   return nodemailer.createTransport({
     host: SMTP_HOST,
     port: SMTP_PORT,
