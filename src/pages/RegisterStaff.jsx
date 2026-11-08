@@ -228,7 +228,14 @@ export default function RegisterStaff() {
       });
 
       if (regError) {
-        throw new Error(regError.message || "Error al registrar postulación.");
+        let errDetail = regError.message;
+        if (regError.context && typeof regError.context.json === "function") {
+          try {
+            const bodyErr = await regError.context.json();
+            if (bodyErr?.error) errDetail = bodyErr.error;
+          } catch (_) {}
+        }
+        throw new Error(errDetail || "Error al registrar postulación.");
       }
       if (regResult?.error) {
         throw new Error(regResult.error);
