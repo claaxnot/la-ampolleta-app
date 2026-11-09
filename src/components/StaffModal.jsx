@@ -6,6 +6,7 @@ import * as z from "zod";
 import GlassCard from "./GlassCard.jsx";
 import { sanitizeRut, validateRut, formatRut } from "../utils/validateRut.js";
 import { formatChileanPhone } from "../utils/formatPhone.js";
+import { BANCOS_CHILE, TIPOS_CUENTA, getBankName } from "../utils/banks.js";
 import Button from "../components/Button.jsx";
 import { X } from "lucide-react";
 
@@ -24,6 +25,7 @@ const staffSchema = z.object({
   cuenta_origen: z.string().optional(),
   cuenta_destino: z.string().optional(),
   codigo_banco_destino: z.string().optional(),
+  tipo_cuenta: z.string().optional(),
   monto_transferencia: z.string().optional(),
   glosa_transferencia: z.string().optional(),
   mensaje_beneficiario: z.string().optional(),
@@ -49,7 +51,8 @@ export default function StaffModal({ isOpen, onClose, onSubmit, initialData: raw
       system_role: "worker",
       cuenta_origen: "72052242",
       cuenta_destino: "",
-      codigo_banco_destino: "",
+      codigo_banco_destino: "12",
+      tipo_cuenta: "Cuenta Vista / CuentaRUT",
       monto_transferencia: "",
       glosa_transferencia: "",
       mensaje_beneficiario: "",
@@ -95,7 +98,8 @@ export default function StaffModal({ isOpen, onClose, onSubmit, initialData: raw
             system_role: initialData.system_role || "worker",
             cuenta_origen: initialData.cuenta_origen || "72052242",
             cuenta_destino: initialData.cuenta_destino || "",
-            codigo_banco_destino: initialData.codigo_banco_destino || "",
+            codigo_banco_destino: initialData.codigo_banco_destino || "12",
+            tipo_cuenta: initialData.tipo_cuenta || "Cuenta Vista / CuentaRUT",
             monto_transferencia: initialData.monto_transferencia || "",
             glosa_transferencia: initialData.glosa_transferencia || "",
             mensaje_beneficiario: initialData.mensaje_beneficiario || "",
@@ -110,7 +114,8 @@ export default function StaffModal({ isOpen, onClose, onSubmit, initialData: raw
             system_role: "worker",
             cuenta_origen: "72052242",
             cuenta_destino: "",
-            codigo_banco_destino: "",
+            codigo_banco_destino: "12",
+            tipo_cuenta: "Cuenta Vista / CuentaRUT",
             monto_transferencia: "",
             glosa_transferencia: "",
             mensaje_beneficiario: "",
@@ -127,6 +132,9 @@ export default function StaffModal({ isOpen, onClose, onSubmit, initialData: raw
   const onSubmitForm = (data) => {
     const staffData = { ...data };
     if (initialData?.id) staffData.id = initialData.id;
+    if (staffData.cuenta_destino && staffData.cuenta_destino.includes("@")) {
+      staffData.cuenta_destino = "";
+    }
     onSubmit(staffData);
     onClose();
   };
@@ -271,19 +279,61 @@ export default function StaffModal({ isOpen, onClose, onSubmit, initialData: raw
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="flex flex-col">
                         <label htmlFor="cuenta_origen" className="text-gray-300 mb-1 text-sm">Cuenta Origen</label>
-                        <input id="cuenta_origen" {...register("cuenta_origen")} className="w-full bg-gray-800/50 border border-gray-700 rounded-xl p-2 text-white placeholder-gray-500" />
+                        <input id="cuenta_origen" {...register("cuenta_origen")} className="w-full bg-gray-800/50 border border-gray-700 rounded-xl p-2.5 text-white placeholder-gray-500 text-sm" />
                       </div>
                       <div className="flex flex-col">
-                        <label htmlFor="cuenta_destino" className="text-gray-300 mb-1 text-sm">Cuenta Destino</label>
-                        <input id="cuenta_destino" {...register("cuenta_destino")} className="w-full bg-gray-800/50 border border-gray-700 rounded-xl p-2 text-white placeholder-gray-500" />
+                        <label htmlFor="codigo_banco_destino" className="text-gray-300 mb-1 text-sm">Banco Destino</label>
+                        <select
+                          id="codigo_banco_destino"
+                          {...register("codigo_banco_destino")}
+                          className="w-full bg-gray-800/50 border border-gray-700 rounded-xl p-2.5 text-white text-sm focus:outline-none focus:border-amber-500 transition-all"
+                        >
+                          <option value="">Selecciona un banco...</option>
+                          {Object.entries(BANCOS_CHILE).map(([code, name]) => (
+                            <option key={code} value={code} className="bg-gray-800 text-white">
+                              {name}
+                            </option>
+                          ))}
+                        </select>
                       </div>
                       <div className="flex flex-col">
-                        <label htmlFor="codigo_banco_destino" className="text-gray-300 mb-1 text-sm">Código Banco Destino</label>
-                        <input id="codigo_banco_destino" {...register("codigo_banco_destino")} className="w-full bg-gray-800/50 border border-gray-700 rounded-xl p-2 text-white placeholder-gray-500" />
+                        <label htmlFor="tipo_cuenta" className="text-gray-300 mb-1 text-sm">Tipo de Cuenta</label>
+                        <select
+                          id="tipo_cuenta"
+                          {...register("tipo_cuenta")}
+                          className="w-full bg-gray-800/50 border border-gray-700 rounded-xl p-2.5 text-white text-sm focus:outline-none focus:border-amber-500 transition-all"
+                        >
+                          {TIPOS_CUENTA.map((type) => (
+                            <option key={type} value={type} className="bg-gray-800 text-white">
+                              {type}
+                            </option>
+                          ))}
+                        </select>
                       </div>
                       <div className="flex flex-col">
-                        <label htmlFor="glosa_transferencia" className="text-gray-300 mb-1 text-sm">Glosa Transferencia</label>
-                        <input id="glosa_transferencia" {...register("glosa_transferencia")} className="w-full bg-gray-800/50 border border-gray-700 rounded-xl p-2 text-white placeholder-gray-500" />
+                        <label htmlFor="cuenta_destino" className="text-gray-300 mb-1 text-sm">Cuenta Destino (N° de cuenta)</label>
+                        <input
+                          id="cuenta_destino"
+                          {...register("cuenta_destino")}
+                          autoComplete="off"
+                          placeholder="Ej: 12345678"
+                          className="w-full bg-gray-800/50 border border-gray-700 rounded-xl p-2.5 text-white placeholder-gray-500 font-mono text-sm"
+                        />
+                      </div>
+                      <div className="flex flex-col md:col-span-2">
+                        <label htmlFor="glosa_transferencia" className="text-gray-300 mb-1 text-sm flex items-center justify-between">
+                          <span>Glosa Transferencia</span>
+                          <span className="text-xs text-amber-400 font-normal">Llenado por Admin</span>
+                        </label>
+                        <input
+                          id="glosa_transferencia"
+                          {...register("glosa_transferencia")}
+                          placeholder="Ej: HONORARIOS PRODUCCION"
+                          className="w-full bg-gray-800/50 border border-gray-700 rounded-xl p-2.5 text-white placeholder-gray-500 text-sm"
+                        />
+                        <span className="text-gray-500 text-xs mt-1">
+                          Glosa personalizada que aparecerá en la transferencia bancaria hacia el personal.
+                        </span>
                       </div>
                     </div>
                   </div>

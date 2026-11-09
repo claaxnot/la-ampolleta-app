@@ -2182,6 +2182,10 @@ export default function WorkerDashboard({ user }) {
             toast.error("Por favor completa todos los campos bancarios.");
             return;
           }
+          if (bankForm.cuenta_destino.includes("@")) {
+            toast.error("El número de cuenta bancaria no puede ser un correo electrónico.");
+            return;
+          }
 
           setIsUpdatingBank(true);
           try {

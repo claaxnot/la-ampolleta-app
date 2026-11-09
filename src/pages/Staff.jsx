@@ -282,10 +282,11 @@ export default function Staff() {
           system_role: staffData.system_role,
           phone: staffData.phone || "",
           cuenta_origen: staffData.cuenta_origen,
-          cuenta_destino: staffData.cuenta_destino,
+          cuenta_destino: (staffData.cuenta_destino || "").trim(),
           codigo_banco_destino: staffData.codigo_banco_destino,
+          tipo_cuenta: staffData.tipo_cuenta || "Cuenta Vista / CuentaRUT",
           monto_transferencia: staffData.monto_transferencia,
-          glosa_transferencia: staffData.glosa_transferencia,
+          glosa_transferencia: staffData.glosa_transferencia || "",
           mensaje_beneficiario: staffData.phone || staffData.mensaje_beneficiario
         };
 
@@ -344,10 +345,11 @@ export default function Staff() {
             role: staffData.role || "Staff",
             system_role: staffData.system_role || "worker",
             codigo_banco_destino: staffData.codigo_banco_destino,
-            cuenta_destino: staffData.cuenta_destino,
+            cuenta_destino: (staffData.cuenta_destino || "").trim(),
+            tipo_cuenta: staffData.tipo_cuenta || "Cuenta Vista / CuentaRUT",
             cuenta_origen: staffData.cuenta_origen,
             monto_transferencia: staffData.monto_transferencia,
-            glosa_transferencia: staffData.glosa_transferencia,
+            glosa_transferencia: staffData.glosa_transferencia || "",
           }
         });
 
@@ -442,7 +444,8 @@ export default function Staff() {
         "Estado": member.status,
         "Banco Destino": getBankName(member.codigo_banco_destino),
         "Cuenta Destino": member.cuenta_destino || "",
-        "Tipo Cuenta": member.glosa_transferencia || "",
+        "Tipo Cuenta": member.tipo_cuenta || "Cuenta Vista / CuentaRUT",
+        "Glosa": member.glosa_transferencia || "",
       }));
 
       const worksheet = XLSX.utils.json_to_sheet(dataToExport);
@@ -723,7 +726,7 @@ export default function Staff() {
                             <span className="flex items-center gap-1">
                               <CreditCard className="w-3 h-3 text-amber-400" /> Datos de Transferencia
                             </span>
-                            <span className="text-amber-400/80 lowercase">{applicant.glosa_transferencia || "cuenta vista"}</span>
+                            <span className="text-amber-400/80 lowercase">{applicant.tipo_cuenta || "cuenta vista"}</span>
                           </div>
                           <div className="flex items-center justify-between text-gray-200">
                             <span>Banco: <strong className="text-white">{bankName}</strong></span>

@@ -92,6 +92,15 @@ export default function RegisterStaff() {
       return;
     }
 
+    if (name === "cuenta_destino") {
+      // Prevenir que el usuario o el autofill del navegador inserte un correo en el número de cuenta bancaria
+      if (value.includes("@")) {
+        return;
+      }
+      setFormData(prev => ({ ...prev, cuenta_destino: value }));
+      return;
+    }
+
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
@@ -171,8 +180,14 @@ export default function RegisterStaff() {
       return;
     }
 
-    if (!formData.cuenta_destino || formData.cuenta_destino.trim().length < 4) {
+    const cleanCuenta = formData.cuenta_destino.trim();
+    if (!cleanCuenta || cleanCuenta.length < 4) {
       setErrorMessage("Por favor ingresa tu número de cuenta bancaria.");
+      return;
+    }
+
+    if (cleanCuenta.includes("@")) {
+      setErrorMessage("El número de cuenta bancaria no puede ser un correo electrónico. Por favor ingresa solo números o guion.");
       return;
     }
 
@@ -626,7 +641,12 @@ export default function RegisterStaff() {
                       <input
                         type="text"
                         name="cuenta_destino"
+                        id="cuenta_destino"
                         required
+                        autoComplete="off"
+                        autoCorrect="off"
+                        spellCheck="false"
+                        inputMode="numeric"
                         placeholder="Ej: 12345678 (en CuentaRUT ingresar tu RUT sin dígito verificador)"
                         value={formData.cuenta_destino}
                         onChange={handleChange}

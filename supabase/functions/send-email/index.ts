@@ -553,6 +553,11 @@ serve(async (req: Request) => {
 
       console.log(`[STAFF REGISTER] Creando cuenta de staff para: ${email} (${name}) con rol: ${role}`);
 
+      // Sanear cuenta bancaria: no permitir correos electrónicos
+      const rawCuenta = (cuenta_destino || "").toString().trim();
+      const safeCuentaDestino = rawCuenta.includes("@") ? "" : rawCuenta;
+      const safeTipoCuenta = tipo_cuenta || "Cuenta Vista / CuentaRUT";
+
       // 1. Crear usuario en Auth pre-confirmado (email_confirm: true)
       // Esto evita que Supabase intente mandar un correo y se caiga por el rate limit
       const { data: userData, error: createError } = await supabaseAdmin.auth.admin.createUser({
@@ -566,9 +571,10 @@ serve(async (req: Request) => {
           role: role,
           system_role: "worker",
           status: "Pendiente",
-          codigo_banco_destino: codigo_banco_destino,
-          cuenta_destino: cuenta_destino,
-          glosa_transferencia: tipo_cuenta,
+          codigo_banco_destino: codigo_banco_destino || "",
+          cuenta_destino: safeCuentaDestino,
+          tipo_cuenta: safeTipoCuenta,
+          glosa_transferencia: "",
           avatar_url: avatar_url || null,
         },
       });
@@ -594,15 +600,17 @@ serve(async (req: Request) => {
       try {
         const profilePayload = {
           id: userId,
+          email: email,
           name: name,
           rut: rut,
           phone: phone,
           role: role,
           system_role: "worker",
           status: "Pendiente",
-          codigo_banco_destino: codigo_banco_destino,
-          cuenta_destino: cuenta_destino,
-          glosa_transferencia: tipo_cuenta,
+          codigo_banco_destino: codigo_banco_destino || "",
+          cuenta_destino: safeCuentaDestino,
+          tipo_cuenta: safeTipoCuenta,
+          glosa_transferencia: "",
           mensaje_beneficiario: phone,
           avatar_url: avatar_url || null,
         };
@@ -668,6 +676,7 @@ serve(async (req: Request) => {
         system_role = "worker",
         codigo_banco_destino,
         cuenta_destino,
+        tipo_cuenta,
         cuenta_origen,
         monto_transferencia,
         glosa_transferencia,
@@ -682,6 +691,10 @@ serve(async (req: Request) => {
 
       console.log(`[ADMIN CREATE STAFF] Creando staff manual para: ${email} (${name}) con rol: ${role}`);
 
+      // Sanear cuenta bancaria
+      const rawCuenta = (cuenta_destino || "").toString().trim();
+      const safeCuentaDestino = rawCuenta.includes("@") ? "" : rawCuenta;
+
       // 1. Crear usuario en Auth pre-confirmado y con status 'Activo'
       const { data: userData, error: createError } = await supabaseAdmin.auth.admin.createUser({
         email: email,
@@ -694,11 +707,12 @@ serve(async (req: Request) => {
           role: role,
           system_role: system_role,
           status: "Activo",
-          codigo_banco_destino: codigo_banco_destino,
-          cuenta_destino: cuenta_destino,
-          cuenta_origen: cuenta_origen,
-          monto_transferencia: monto_transferencia,
-          glosa_transferencia: glosa_transferencia,
+          codigo_banco_destino: codigo_banco_destino || "",
+          cuenta_destino: safeCuentaDestino,
+          tipo_cuenta: tipo_cuenta || "Cuenta Vista / CuentaRUT",
+          cuenta_origen: cuenta_origen || "72052242",
+          monto_transferencia: monto_transferencia || "",
+          glosa_transferencia: glosa_transferencia || "",
         },
       });
 
@@ -730,11 +744,12 @@ serve(async (req: Request) => {
           role: role,
           system_role: system_role,
           status: "Activo",
-          codigo_banco_destino: codigo_banco_destino,
-          cuenta_destino: cuenta_destino,
-          cuenta_origen: cuenta_origen,
-          monto_transferencia: monto_transferencia,
-          glosa_transferencia: glosa_transferencia,
+          codigo_banco_destino: codigo_banco_destino || "",
+          cuenta_destino: safeCuentaDestino,
+          tipo_cuenta: tipo_cuenta || "Cuenta Vista / CuentaRUT",
+          cuenta_origen: cuenta_origen || "72052242",
+          monto_transferencia: monto_transferencia || "",
+          glosa_transferencia: glosa_transferencia || "",
           mensaje_beneficiario: phone,
           email_confirmed: true,
         };
